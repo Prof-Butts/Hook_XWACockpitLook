@@ -14,15 +14,34 @@
 #include <Stdio.h>
 #include <stdarg.h>
 
+// cockpitlook.cfg parameters
+const char *TRACKER_TYPE = "tracker_type"; // Defines which tracker to use
+const char *TRACKER_TYPE_FREEPIE = "FreePIE"; // Use FreePIE as the tracker
+const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // User SteamVR as the tracker
+const char *YAW_MULTIPLIER = "yaw_multiplier";
+const char *PITCH_MULTIPLIER = "pitch_multiplier";
+
+// General constants
 const float PI = 3.141592f;
 const float RAD_TO_DEG = 180.0f / PI;
 
+// Tracker-specific constants
+// Some people might want to use the regular (non-VR) game with a tracker. In that case
+// they usually want to be able to look around the cockpit while still having the screen
+// in front of them, so we need a multiplier for the yaw and pitch.
+const float DEFAULT_YAW_MULTIPLIER = 1.0f;
+const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
+
+// General types and globals
 typedef enum {
 	TRACKER_NONE,
 	TRACKER_FREEPIE,
 	TRACKER_STEAMVR
 } TrackerType;
 TrackerType g_TrackerType = TRACKER_NONE;
+
+float g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
+float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 
 void log_debug(const char *format, ...)
 {
@@ -38,8 +57,8 @@ void log_debug(const char *format, ...)
 }
 
 /*
-	FreePIE definitions and functions.
-*/
+ *	FreePIE definitions and functions.
+ */
 // An attempt to access the shared store of data failed.
 const INT32 FREEPIE_IO_ERROR_SHARED_DATA = -1;
 // An attempt to access out of bounds data was made.
@@ -65,7 +84,26 @@ bool g_bFreePIELoaded = false, g_bFreePIEInitialized = false;
 freepie_io_6dof_data g_FreePIEData;
 
 HMODULE hFreePIE = NULL;
-void InitFreePIE() {
+bool InitFreePIE() {
+	LONG lRes = ERROR_SUCCESS;
+	char regvalue[512];
+	DWORD size = 512;
+	
+	RegGetValue(HKEY_CURRENT_USER, "Software\\FreePIE", "path", RRF_RT_ANY, NULL, regvalue, &size);
+	if (lRes != ERROR_SUCCESS) {
+		log_debug("[DBG] Registry key for FreePIE was not found, error: 0x%x", lRes);
+		return false;
+	}
+
+	if (size > 0) {
+		log_debug("[DBG] FreePIE path: %s", regvalue);
+		SetDllDirectory(regvalue);
+	}
+	else {
+		log_debug("[DBG] Cannot load FreePIE, registry path is empty!");
+		return false;
+	}
+
 	hFreePIE = LoadLibraryA("freepie_io.dll");
 
 	if (hFreePIE != NULL) {
@@ -76,11 +114,18 @@ void InitFreePIE() {
 
 		UINT32 num_slots = freepie_io_6dof_slots();
 		log_debug("[DBG] num_slots: %d", num_slots);
+		return true;
 	}
 	else {
 		log_debug("[DBG] Could not load FreePIE");
 	}
 	g_bFreePIEInitialized = true;
+	return true;
+}
+
+void ShutdownFreePIE() {
+	if (hFreePIE != NULL)
+		FreeLibrary(hFreePIE);
 }
 
 bool readFreePIE() {
@@ -109,18 +154,17 @@ bool InitSteamVR()
 	if (eError != vr::VRInitError_None)
 	{
 		g_pHMD = NULL;
-		log_debug("[DBG] [MouseLook] Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
+		log_debug("[DBG] [Cockpitlook] Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
 		return false;
 	}
 	return true;
 }
 
 void ShutDownSteamVR() {
-	if (g_pHMD)
-	{
-		vr::VR_Shutdown();
-		g_pHMD = NULL;
-	}
+	log_debug("[DBG] [Cockpitlook] Shutting down SteamVR...");
+	vr::VR_Shutdown();
+	g_pHMD = NULL;
+	log_debug("[DBG] [Cockpitlook] SteamVR shut down");
 }
 
 /*
@@ -238,19 +282,7 @@ int CockpitLookHook(int* params)
 {
 	GetKeyboardDeviceState();
 	int playerIndex = params[-6];
-	if (!g_bFreePIEInitialized && !g_bEnableSteamVR)
-		InitFreePIE();
-
-	bool bUseFreePIE = false;
-	if (!g_bEnableSteamVR && g_bFreePIELoaded)
-		bUseFreePIE = readFreePIE();
-
-	if (g_bEnableSteamVR && !g_bSteamVRInitialized)
-	{
-		g_bUseSteamVR = InitSteamVR();
-		g_bSteamVRInitialized = true;
-		log_debug("[DBG] [MouseLook] g_bUseSteamVR: %d", g_bUseSteamVR);
-	}
+	float yaw = 0.0f, pitch = 0.0f;
 
 	if (!PlayerDataTable[playerIndex].externalCamera
 		&& !PlayerDataTable[playerIndex].hyperspacePhase
@@ -262,30 +294,33 @@ int CockpitLookHook(int* params)
 		// Keyboard code for moving the cockpit camera angle
 		__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
 
-		if (bUseFreePIE) {
-			float yaw = g_FreePIEData.yaw;
-			float pitch = g_FreePIEData.pitch;
+		// Read tracking data.
+		switch (g_TrackerType) {
+		case TRACKER_FREEPIE:
+			if (readFreePIE()) {
+				yaw = g_FreePIEData.yaw * g_fYawMultiplier;
+				pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
 
-			if (yaw < 0.0f) yaw += 360.0f;
-			PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yaw / 360.0f * 65535.0f);
-			
-			if (pitch < 0.0f) pitch += 360.0f;
-			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(-pitch / 360.0f * 65535.0f);
-		}
+				while (yaw < 0.0f) yaw += 360.0f;
+				while (pitch < 0.0f) pitch += 360.0f;
 
-		// SteamVR code to read yaw and pitch
-		if (g_bUseSteamVR) {
-			float yaw, pitch;
+				PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yaw / 360.0f * 65535.0f);
+				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(-pitch / 360.0f * 65535.0f);
+			}
+			break;
+		case TRACKER_STEAMVR:
 			GetSteamVRPositionalData(&yaw, &pitch);
-			yaw *= RAD_TO_DEG;
-			pitch *= RAD_TO_DEG;
-			if (yaw < 0.0f) yaw += 360.0f;
-			if (pitch < 0.0f) pitch += 360.0f;
-			//log_debug("[DBG] [MouseLook] Steam yaw, pitch: %0.3f, %0.3f", yaw, pitch);
+			yaw *= RAD_TO_DEG * g_fYawMultiplier;
+			pitch *= RAD_TO_DEG * g_fPitchMultiplier;
+			while (yaw < 0.0f) yaw += 360.0f;
+			while (pitch < 0.0f) pitch += 360.0f;
+
 			PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(-yaw / 360.0f * 65535.0f);
 			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitch / 360.0f * 65535.0f);
+			break;
 		}
 
+		/*
 		if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
 			PlayerDataTable[playerIndex].cockpitCameraYaw -= 1200;
 
@@ -297,6 +332,7 @@ int CockpitLookHook(int* params)
 
 		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
 			PlayerDataTable[playerIndex].cockpitCameraPitch -= 1200;
+		*/
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5)
 		{
@@ -351,18 +387,92 @@ int CockpitLookHook(int* params)
 	return 0;
 }
 
+/* Load the cockpitlook.cfg file */
+void LoadParams() {
+	FILE *file;
+	int error = 0;
+
+	try {
+		error = fopen_s(&file, "./cockpitlook.cfg", "rt");
+	}
+	catch (...) {
+		log_debug("[DBG] Could not load cockpitlook.cfg");
+	}
+
+	if (error != 0) {
+		log_debug("[DBG] Error %d when loading cockpitlook.cfg", error);
+		return;
+	}
+
+	char buf[160], param[80], value[80];
+	while (fgets(buf, 160, file) != NULL) {
+		// Skip comments and blank lines
+		if (buf[0] == ';' || buf[0] == '#')
+			continue;
+		if (strlen(buf) == 0)
+			continue;
+
+		if (sscanf_s(buf, "%s = %s", param, 80, value, 80) > 0) {
+			if (_stricmp(param, TRACKER_TYPE) == 0) {
+				if (_stricmp(value, TRACKER_TYPE_FREEPIE) == 0) {
+					log_debug("[DBG] Using FreePIE for tracking");
+					g_TrackerType = TRACKER_FREEPIE;
+				}
+				else if (_stricmp(value, TRACKER_TYPE_STEAMVR) == 0) {
+					log_debug("[DBG] Using SteamVR for tracking");
+					g_TrackerType = TRACKER_STEAMVR;
+				}
+			}
+			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
+				g_fYawMultiplier = (float)atof(value);
+				if (g_fYawMultiplier == 0.0f)
+					g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
+				log_debug("[DBG] Yaw multiplier: %0.3f", g_fYawMultiplier);
+			}
+			else if (_stricmp(param, PITCH_MULTIPLIER) == 0) {
+				g_fPitchMultiplier = (float)atof(value);
+				if (g_fPitchMultiplier == 0.0f)
+					g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
+				log_debug("[DBG] Pitch multiplier: %0.3f", g_fPitchMultiplier);
+			}
+		}
+	} // while ... read file
+	fclose(file);
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 {
 	switch (uReason)
 	{
 	case DLL_PROCESS_ATTACH:
-		log_debug("[DBG] [MouseLook] Mouse Hook Loaded");
-		// Load vrparams.cfg here and enable either FreePIE or SteamVR
+		log_debug("[DBG] [Cockpitlook] Cockpit Hook Loaded");
+		// Load cockpitlook.cfg here and enable either FreePIE or SteamVR
+		LoadParams();
+		switch (g_TrackerType)
+		{
+		case TRACKER_FREEPIE:
+			InitFreePIE();
+			g_bFreePIEInitialized = true;
+			break;
+		case TRACKER_STEAMVR:
+			g_bUseSteamVR = InitSteamVR();
+			break;
+		}
 		break;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
 		break;
 	case DLL_PROCESS_DETACH:
+		switch (g_TrackerType) {
+		case TRACKER_FREEPIE:
+			ShutdownFreePIE();
+			break;
+		case TRACKER_STEAMVR:
+			// We can't shutdown SteamVR twice: we either shut it down here, or in ddraw.dll.
+			// It looks like the right order is to shut it down here.
+			ShutDownSteamVR();
+			break;
+		}
 		break;
 	}
 
