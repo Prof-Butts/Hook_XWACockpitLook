@@ -10,40 +10,12 @@
 #include "Hex.h"
 
 #include <windows.h>
-
 #include <Stdio.h>
 #include <stdarg.h>
+#include "FreePIE.h"
 
+// TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
-
-// cockpitlook.cfg parameters
-const char *TRACKER_TYPE = "tracker_type"; // Defines which tracker to use
-const char *TRACKER_TYPE_FREEPIE = "FreePIE"; // Use FreePIE as the tracker
-const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // User SteamVR as the tracker
-const char *YAW_MULTIPLIER = "yaw_multiplier";
-const char *PITCH_MULTIPLIER = "pitch_multiplier";
-
-// General constants
-const float PI = 3.141592f;
-const float RAD_TO_DEG = 180.0f / PI;
-
-// Tracker-specific constants
-// Some people might want to use the regular (non-VR) game with a tracker. In that case
-// they usually want to be able to look around the cockpit while still having the screen
-// in front of them, so we need a multiplier for the yaw and pitch.
-const float DEFAULT_YAW_MULTIPLIER = 1.0f;
-const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
-
-// General types and globals
-typedef enum {
-	TRACKER_NONE,
-	TRACKER_FREEPIE,
-	TRACKER_STEAMVR
-} TrackerType;
-TrackerType g_TrackerType = TRACKER_NONE;
-
-float g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
-float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 
 void log_debug(const char *format, ...)
 {
@@ -58,89 +30,37 @@ void log_debug(const char *format, ...)
 	va_end(args);
 }
 
-/*
- *	FreePIE definitions and functions.
- */
-// An attempt to access the shared store of data failed.
-const INT32 FREEPIE_IO_ERROR_SHARED_DATA = -1;
-// An attempt to access out of bounds data was made.
-const INT32 FREEPIE_IO_ERROR_OUT_OF_BOUNDS = -2;
 
-typedef struct freepie_io_6dof_data
-{
-	float yaw;
-	float pitch;
-	float roll;
+// cockpitlook.cfg parameter names
+const char *TRACKER_TYPE = "tracker_type"; // Defines which tracker to use
+const char *TRACKER_TYPE_FREEPIE = "FreePIE"; // Use FreePIE as the tracker
+const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // User SteamVR as the tracker
+const char *YAW_MULTIPLIER = "yaw_multiplier";
+const char *PITCH_MULTIPLIER = "pitch_multiplier";
 
-	float x;
-	float y;
-	float z;
-} freepie_io_6dof_data;
+// General constants
+const float PI = 3.141592f;
+const float RAD_TO_DEG = 180.0f / PI;
 
-typedef UINT32(__cdecl *freepie_io_6dof_slots_fun_type)();
-freepie_io_6dof_slots_fun_type freepie_io_6dof_slots = NULL;
-typedef INT32(__cdecl *freepie_io_6dof_read_fun_type)(UINT32 index, UINT32 length, freepie_io_6dof_data *output);
-freepie_io_6dof_read_fun_type freepie_io_6dof_read = NULL;
+// Tracker-specific constants
+// Some people might want to use the regular (non-VR) game with a tracker. In that case
+// they usually want to be able to look around the cockpit while still having the screen
+// in front of them, so we need a multiplier for the yaw and pitch. Or, you know, just
+// give users the option to invert the axis if needed.
+const float DEFAULT_YAW_MULTIPLIER = 1.0f;
+const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
 
-bool g_bFreePIELoaded = false, g_bFreePIEInitialized = false;
-freepie_io_6dof_data g_FreePIEData;
+// General types and globals
+typedef enum {
+	TRACKER_NONE,
+	TRACKER_FREEPIE,
+	TRACKER_STEAMVR,
+	TRACKER_TRACKIR
+} TrackerType;
+TrackerType g_TrackerType = TRACKER_NONE;
 
-HMODULE hFreePIE = NULL;
-bool InitFreePIE() {
-	LONG lRes = ERROR_SUCCESS;
-	char regvalue[512];
-	DWORD size = 512;
-	log_debug("[DBG] [Cockpitlook] Initializing FreePIE");
-	
-	lRes = RegGetValue(HKEY_CURRENT_USER, "Software\\FreePIE", "path", RRF_RT_ANY, NULL, regvalue, &size);
-	if (lRes != ERROR_SUCCESS) {
-		log_debug("[DBG] Registry key for FreePIE was not found, error: 0x%x", lRes);
-		return false;
-	}
-
-	if (size > 0) {
-		log_debug("[DBG] FreePIE path: %s", regvalue);
-		SetDllDirectory(regvalue);
-	}
-	else {
-		log_debug("[DBG] Cannot load FreePIE, registry path is empty!");
-		return false;
-	}
-
-	hFreePIE = LoadLibraryA("freepie_io.dll");
-
-	if (hFreePIE != NULL) {
-		log_debug("[DBG] FreePIE loaded");
-		freepie_io_6dof_slots = (freepie_io_6dof_slots_fun_type)GetProcAddress(hFreePIE, "freepie_io_6dof_slots");
-		freepie_io_6dof_read = (freepie_io_6dof_read_fun_type)GetProcAddress(hFreePIE, "freepie_io_6dof_read");
-		g_bFreePIELoaded = true;
-
-		UINT32 num_slots = freepie_io_6dof_slots();
-		log_debug("[DBG] num_slots: %d", num_slots);
-		return true;
-	}
-	else {
-		log_debug("[DBG] Could not load FreePIE");
-	}
-	g_bFreePIEInitialized = true;
-	return true;
-}
-
-void ShutdownFreePIE() {
-	log_debug("[DBG] [Cockpitlook] Shutting down FreePIE");
-	if (hFreePIE != NULL)
-		FreeLibrary(hFreePIE);
-}
-
-bool readFreePIE() {
-	// Check how many slots (values) the current FreePIE implementation provides.
-	int error = freepie_io_6dof_read(0, 3, &g_FreePIEData);
-	if (error < 0) {
-		log_debug("[DBG] FreePIE error: %d", error);
-		return false;
-	}
-	return error;
-}
+float g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
+float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 
 /************************************************
   SteamVR
@@ -151,24 +71,24 @@ vr::IVRSystem *g_pHMD = NULL;
 
 bool InitSteamVR()
 {
-	log_debug("[DBG] [Cockpitlook] Loading SteamVR");
+	log_debug("Loading SteamVR");
 	vr::EVRInitError eError = vr::VRInitError_None;
 	g_pHMD = vr::VR_Init(&eError, vr::VRApplication_Scene);
 
 	if (eError != vr::VRInitError_None)
 	{
 		g_pHMD = NULL;
-		log_debug("[DBG] [Cockpitlook] Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
+		log_debug("Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
 		return false;
 	}
 	return true;
 }
 
 void ShutDownSteamVR() {
-	log_debug("[DBG] [Cockpitlook] Shutting down SteamVR...");
+	log_debug("Shutting down SteamVR...");
 	vr::VR_Shutdown();
 	g_pHMD = NULL;
-	log_debug("[DBG] [Cockpitlook] SteamVR shut down");
+	log_debug("SteamVR shut down");
 }
 
 /*
@@ -440,9 +360,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 	switch (uReason)
 	{
 	case DLL_PROCESS_ATTACH:
-		log_debug("[DBG] [Cockpitlook] Cockpit Hook Loaded");
+		log_debug("Cockpit Hook Loaded");
 		g_hWnd = GetForegroundWindow();
-		log_debug("[DBG] [Cockpitlook] g_hWnd: 0x%x", g_hWnd);
+		log_debug("g_hWnd: 0x%x", g_hWnd);
 		// Load cockpitlook.cfg here and enable either FreePIE or SteamVR
 		LoadParams();
 		switch (g_TrackerType)

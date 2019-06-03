@@ -142,10 +142,12 @@ copy /Y $(TargetPath) "C:\Program Files (x86)\Steam\steamapps\common\Star Wars X
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="FreePIE.cpp" />
     <ClCompile Include="hookmain.cpp" />
     <ClCompile Include="cockpitlook.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FreePIE.h" />
     <ClInclude Include="Hex.h" />
     <ClInclude Include="hooks.h" />
     <ClInclude Include="hook_function.h" />

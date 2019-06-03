@@ -21,6 +21,9 @@
     <ClCompile Include="cockpitlook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="FreePIE.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Hex.h">
@@ -51,6 +54,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="cockpitlook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FreePIE.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
