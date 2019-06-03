@@ -13,34 +13,33 @@
 #include <Stdio.h>
 #include <stdarg.h>
 #include "FreePIE.h"
+#include "SteamVR.h"
 
 // TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
 
 void log_debug(const char *format, ...)
 {
-	static char buf[120];
+	static char buf[300];
+	static char out[300];
 
 	va_list args;
 	va_start(args, format);
 
-	vsprintf_s(buf, 120, format, args);
-	OutputDebugString(buf);
+	vsprintf_s(buf, 300, format, args);
+	sprintf_s(out, 300, "[DBG] [Cockpitlook] %s", buf);
+	OutputDebugString(out);
 
 	va_end(args);
 }
 
-
 // cockpitlook.cfg parameter names
 const char *TRACKER_TYPE = "tracker_type"; // Defines which tracker to use
 const char *TRACKER_TYPE_FREEPIE = "FreePIE"; // Use FreePIE as the tracker
-const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // User SteamVR as the tracker
+const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // Use SteamVR as the tracker
+const char *TRACKER_TYPE_TRACKIR = "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
 const char *YAW_MULTIPLIER = "yaw_multiplier";
 const char *PITCH_MULTIPLIER = "pitch_multiplier";
-
-// General constants
-const float PI = 3.141592f;
-const float RAD_TO_DEG = 180.0f / PI;
 
 // Tracker-specific constants
 // Some people might want to use the regular (non-VR) game with a tracker. In that case
@@ -65,128 +64,6 @@ float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 /************************************************
   SteamVR
 *************************************************/
-#include <headers/openvr.h>
-
-vr::IVRSystem *g_pHMD = NULL;
-
-bool InitSteamVR()
-{
-	log_debug("Loading SteamVR");
-	vr::EVRInitError eError = vr::VRInitError_None;
-	g_pHMD = vr::VR_Init(&eError, vr::VRApplication_Scene);
-
-	if (eError != vr::VRInitError_None)
-	{
-		g_pHMD = NULL;
-		log_debug("Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
-		return false;
-	}
-	return true;
-}
-
-void ShutDownSteamVR() {
-	log_debug("Shutting down SteamVR...");
-	vr::VR_Shutdown();
-	g_pHMD = NULL;
-	log_debug("SteamVR shut down");
-}
-
-/*
- * Convert a rotation matrix to a normalized quaternion.
- * From: http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
- */
-vr::HmdQuaternionf_t rotationToQuaternion(vr::HmdMatrix34_t m) {
-	float tr = m.m[0][0] + m.m[1][1] + m.m[2][2];
-	vr::HmdQuaternionf_t q;
-
-	if (tr > 0) {
-		float S = sqrt(tr + 1.0f) * 2.0f; // S=4*qw 
-		q.w = 0.25f * S;
-		q.x = (m.m[2][1] - m.m[1][2]) / S;
-		q.y = (m.m[0][2] - m.m[2][0]) / S;
-		q.z = (m.m[1][0] - m.m[0][1]) / S;
-	}
-	else if ((m.m[0][0] > m.m[1][1]) && (m.m[0][0] > m.m[2][2])) {
-		float S = sqrt(1.0f + m.m[0][0] - m.m[1][1] - m.m[2][2]) * 2.0f; // S=4*qx 
-		q.w = (m.m[2][1] - m.m[1][2]) / S;
-		q.x = 0.25f * S;
-		q.y = (m.m[0][1] + m.m[1][0]) / S;
-		q.z = (m.m[0][2] + m.m[2][0]) / S;
-	}
-	else if (m.m[1][1] > m.m[2][2]) {
-		float S = sqrt(1.0f + m.m[1][1] - m.m[0][0] - m.m[2][2]) * 2.0f; // S=4*qy
-		q.w = (m.m[0][2] - m.m[2][0]) / S;
-		q.x = (m.m[0][1] + m.m[1][0]) / S;
-		q.y = 0.25f * S;
-		q.z = (m.m[1][2] + m.m[2][1]) / S;
-	}
-	else {
-		float S = sqrt(1.0f + m.m[2][2] - m.m[0][0] - m.m[1][1]) * 2.0f; // S=4*qz
-		q.w = (m.m[1][0] - m.m[0][1]) / S;
-		q.x = (m.m[0][2] + m.m[2][0]) / S;
-		q.y = (m.m[1][2] + m.m[2][1]) / S;
-		q.z = 0.25f * S;
-	}
-	float Q = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w;
-	q.x /= Q;
-	q.y /= Q;
-	q.z /= Q;
-	q.w /= Q;
-	return q;
-}
-
-/*
-   From: http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler/index.htm
-   yaw: left = +90, right = -90
-   pitch: up = +90, down = -90
-   roll: left = +90, right = -90
-
-   if roll > 90, the axis will swap pitch and roll; but why would anyone do that?
-*/
-void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch) {
-	float test = q.x*q.y + q.z*q.w;
-
-	if (test > 0.499f) { // singularity at north pole
-		*yaw = 2 * atan2(q.x, q.w);
-		*pitch = PI / 2.0f;
-		*roll = 0;
-		return;
-	}
-	if (test < -0.499f) { // singularity at south pole
-		*yaw = -2 * atan2(q.x, q.w);
-		*pitch = -PI / 2.0f;
-		*roll = 0;
-		return;
-	}
-	float sqx = q.x*q.x;
-	float sqy = q.y*q.y;
-	float sqz = q.z*q.z;
-	*yaw = atan2(2.0f * q.y*q.w - 2.0f * q.x*q.z, 1.0f - 2.0f * sqy - 2.0f * sqz);
-	*pitch = asin(2.0f * test);
-	*roll = atan2(2.0f * q.x*q.w - 2.0f * q.y*q.z, 1.0f - 2.0f * sqx - 2.0f * sqz);
-}
-
-void GetSteamVRPositionalData(float *yaw, float *pitch)
-{
-	float roll;
-	vr::TrackedDeviceIndex_t unDevice = vr::k_unTrackedDeviceIndex_Hmd;
-	if (!g_pHMD->IsTrackedDeviceConnected(unDevice))
-		return;
-
-	vr::VRControllerState_t state;
-	if (g_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
-	{
-		vr::TrackedDevicePose_t trackedDevicePose;
-		vr::HmdMatrix34_t poseMatrix;
-		vr::HmdQuaternionf_t q;
-		vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
-
-		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0, &trackedDevicePose, 1);
-		poseMatrix = trackedDevicePose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
-		q = rotationToQuaternion(trackedDevicePose.mDeviceToAbsoluteTracking);
-		quatToEuler(q, yaw, pitch, &roll);
-	}
-}
 
 /*
 Params[1] = 2nd on stack
@@ -311,11 +188,11 @@ void LoadParams() {
 		error = fopen_s(&file, "./cockpitlook.cfg", "rt");
 	}
 	catch (...) {
-		log_debug("[DBG] Could not load cockpitlook.cfg");
+		log_debug("Could not load cockpitlook.cfg");
 	}
 
 	if (error != 0) {
-		log_debug("[DBG] Error %d when loading cockpitlook.cfg", error);
+		log_debug("Error %d when loading cockpitlook.cfg", error);
 		return;
 	}
 
@@ -330,25 +207,29 @@ void LoadParams() {
 		if (sscanf_s(buf, "%s = %s", param, 80, value, 80) > 0) {
 			if (_stricmp(param, TRACKER_TYPE) == 0) {
 				if (_stricmp(value, TRACKER_TYPE_FREEPIE) == 0) {
-					log_debug("[DBG] Using FreePIE for tracking");
+					log_debug("Using FreePIE for tracking");
 					g_TrackerType = TRACKER_FREEPIE;
 				}
 				else if (_stricmp(value, TRACKER_TYPE_STEAMVR) == 0) {
-					log_debug("[DBG] Using SteamVR for tracking");
+					log_debug("Using SteamVR for tracking");
 					g_TrackerType = TRACKER_STEAMVR;
+				}
+				else if (_stricmp(value, TRACKER_TYPE_TRACKIR) == 0) {
+					log_debug("Using TrackIR for tracking");
+					g_TrackerType = TRACKER_TRACKIR;
 				}
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
 				g_fYawMultiplier = (float)atof(value);
 				if (g_fYawMultiplier == 0.0f)
 					g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
-				log_debug("[DBG] Yaw multiplier: %0.3f", g_fYawMultiplier);
+				log_debug("Yaw multiplier: %0.3f", g_fYawMultiplier);
 			}
 			else if (_stricmp(param, PITCH_MULTIPLIER) == 0) {
 				g_fPitchMultiplier = (float)atof(value);
 				if (g_fPitchMultiplier == 0.0f)
 					g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
-				log_debug("[DBG] Pitch multiplier: %0.3f", g_fPitchMultiplier);
+				log_debug("Pitch multiplier: %0.3f", g_fPitchMultiplier);
 			}
 		}
 	} // while ... read file
@@ -363,7 +244,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		log_debug("Cockpit Hook Loaded");
 		g_hWnd = GetForegroundWindow();
 		log_debug("g_hWnd: 0x%x", g_hWnd);
-		// Load cockpitlook.cfg here and enable either FreePIE or SteamVR
+		// Load cockpitlook.cfg here and enable FreePIE, SteamVR or TrackIR
 		LoadParams();
 		switch (g_TrackerType)
 		{
