@@ -14,6 +14,8 @@
 #include <Stdio.h>
 #include <stdarg.h>
 
+HWND g_hWnd = NULL;
+
 // cockpitlook.cfg parameters
 const char *TRACKER_TYPE = "tracker_type"; // Defines which tracker to use
 const char *TRACKER_TYPE_FREEPIE = "FreePIE"; // Use FreePIE as the tracker
@@ -88,8 +90,9 @@ bool InitFreePIE() {
 	LONG lRes = ERROR_SUCCESS;
 	char regvalue[512];
 	DWORD size = 512;
+	log_debug("[DBG] [Cockpitlook] Initializing FreePIE");
 	
-	RegGetValue(HKEY_CURRENT_USER, "Software\\FreePIE", "path", RRF_RT_ANY, NULL, regvalue, &size);
+	lRes = RegGetValue(HKEY_CURRENT_USER, "Software\\FreePIE", "path", RRF_RT_ANY, NULL, regvalue, &size);
 	if (lRes != ERROR_SUCCESS) {
 		log_debug("[DBG] Registry key for FreePIE was not found, error: 0x%x", lRes);
 		return false;
@@ -124,6 +127,7 @@ bool InitFreePIE() {
 }
 
 void ShutdownFreePIE() {
+	log_debug("[DBG] [Cockpitlook] Shutting down FreePIE");
 	if (hFreePIE != NULL)
 		FreeLibrary(hFreePIE);
 }
@@ -138,16 +142,16 @@ bool readFreePIE() {
 	return error;
 }
 
-// SteamVR
+/************************************************
+  SteamVR
+*************************************************/
 #include <headers/openvr.h>
-bool g_bEnableSteamVR = true; // The user sets this flag to request support for SteamVR
-bool g_bSteamVRInitialized = false; // The system sets this to true when SteamVR has been initialized
-bool g_bUseSteamVR = false; // The system sets this to true if SteamVR is loaded and working
 
 vr::IVRSystem *g_pHMD = NULL;
 
 bool InitSteamVR()
 {
+	log_debug("[DBG] [Cockpitlook] Loading SteamVR");
 	vr::EVRInitError eError = vr::VRInitError_None;
 	g_pHMD = vr::VR_Init(&eError, vr::VRApplication_Scene);
 
@@ -280,7 +284,7 @@ Params[-15] = EBP
 */
 int CockpitLookHook(int* params)
 {
-	GetKeyboardDeviceState();
+	//GetKeyboardDeviceState();
 	int playerIndex = params[-6];
 	float yaw = 0.0f, pitch = 0.0f;
 
@@ -296,43 +300,34 @@ int CockpitLookHook(int* params)
 
 		// Read tracking data.
 		switch (g_TrackerType) {
-		case TRACKER_FREEPIE:
-			if (readFreePIE()) {
-				yaw = g_FreePIEData.yaw * g_fYawMultiplier;
-				pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
+			case TRACKER_FREEPIE:
+			{
+				if (readFreePIE()) {
+					yaw = g_FreePIEData.yaw * g_fYawMultiplier;
+					pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
+
+					while (yaw < 0.0f) yaw += 360.0f;
+					while (pitch < 0.0f) pitch += 360.0f;
+
+					PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yaw / 360.0f * 65535.0f);
+					PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(-pitch / 360.0f * 65535.0f);
+				}
+				break;
+			}
+			case TRACKER_STEAMVR: 
+			{
+				GetSteamVRPositionalData(&yaw, &pitch);
+				yaw *= RAD_TO_DEG * g_fYawMultiplier;
+				pitch *= RAD_TO_DEG * g_fPitchMultiplier;
 
 				while (yaw < 0.0f) yaw += 360.0f;
 				while (pitch < 0.0f) pitch += 360.0f;
 
-				PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yaw / 360.0f * 65535.0f);
-				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(-pitch / 360.0f * 65535.0f);
+				PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(-yaw / 360.0f * 65535.0f);
+				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitch / 360.0f * 65535.0f);
 			}
 			break;
-		case TRACKER_STEAMVR:
-			GetSteamVRPositionalData(&yaw, &pitch);
-			yaw *= RAD_TO_DEG * g_fYawMultiplier;
-			pitch *= RAD_TO_DEG * g_fPitchMultiplier;
-			while (yaw < 0.0f) yaw += 360.0f;
-			while (pitch < 0.0f) pitch += 360.0f;
-
-			PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(-yaw / 360.0f * 65535.0f);
-			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitch / 360.0f * 65535.0f);
-			break;
 		}
-
-		/*
-		if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
-			PlayerDataTable[playerIndex].cockpitCameraYaw -= 1200;
-
-		if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
-			PlayerDataTable[playerIndex].cockpitCameraYaw += 1200;
-
-		if (*win32NumPad8Pressed || keycodePressed == KeyCode_ARROWDOWN)
-			PlayerDataTable[playerIndex].cockpitCameraPitch += 1200;
-
-		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
-			PlayerDataTable[playerIndex].cockpitCameraPitch -= 1200;
-		*/
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5)
 		{
@@ -446,16 +441,17 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 	{
 	case DLL_PROCESS_ATTACH:
 		log_debug("[DBG] [Cockpitlook] Cockpit Hook Loaded");
+		g_hWnd = GetForegroundWindow();
+		log_debug("[DBG] [Cockpitlook] g_hWnd: 0x%x", g_hWnd);
 		// Load cockpitlook.cfg here and enable either FreePIE or SteamVR
 		LoadParams();
 		switch (g_TrackerType)
 		{
 		case TRACKER_FREEPIE:
 			InitFreePIE();
-			g_bFreePIEInitialized = true;
 			break;
 		case TRACKER_STEAMVR:
-			g_bUseSteamVR = InitSteamVR();
+			InitSteamVR();
 			break;
 		}
 		break;
