@@ -15,11 +15,11 @@ HMODULE hFreePIE = NULL;
 
 bool InitFreePIE() {
 	LONG lRes = ERROR_SUCCESS;
-	char regvalue[512];
-	DWORD size = 512;
+	char regvalue[1024];
+	DWORD size = 1024;
 	log_debug("Initializing FreePIE");
 
-	lRes = RegGetValue(HKEY_CURRENT_USER, "Software\\FreePIE", "path", RRF_RT_ANY, NULL, regvalue, &size);
+	lRes = RegGetValueA(HKEY_CURRENT_USER, "Software\\FreePIE", "path", RRF_RT_ANY, NULL, regvalue, &size);
 	if (lRes != ERROR_SUCCESS) {
 		log_debug("Registry key for FreePIE was not found, error: 0x%x", lRes);
 		return false;
@@ -64,7 +64,7 @@ void ShutdownFreePIE() {
 		FreeLibrary(hFreePIE);
 }
 
-bool readFreePIE() {
+bool ReadFreePIE() {
 	// Check how many slots (values) the current FreePIE implementation provides.
 	int error = freepie_io_6dof_read(0, 3, &g_FreePIEData);
 	if (error < 0) {

@@ -25,4 +25,4 @@ extern freepie_io_6dof_data g_FreePIEData;
 
 bool InitFreePIE();
 void ShutdownFreePIE();
-bool readFreePIE();
+bool ReadFreePIE();

@@ -146,6 +146,7 @@ copy /Y $(TargetPath) "C:\Program Files (x86)\Steam\steamapps\common\Star Wars X
     <ClCompile Include="hookmain.cpp" />
     <ClCompile Include="cockpitlook.cpp" />
     <ClCompile Include="SteamVR.cpp" />
+    <ClCompile Include="TrackIR.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FreePIE.h" />
@@ -156,6 +157,7 @@ copy /Y $(TargetPath) "C:\Program Files (x86)\Steam\steamapps\common\Star Wars X
     <ClInclude Include="cockpitlook.h" />
     <ClInclude Include="SteamVR.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="TrackIR.h" />
     <ClInclude Include="XWAEnums.h" />
     <ClInclude Include="XWAFramework.h" />
     <ClInclude Include="XWAObject.h" />

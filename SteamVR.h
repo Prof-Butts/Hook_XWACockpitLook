@@ -3,5 +3,5 @@
 #include "cockpitlook.h"
 
 bool InitSteamVR();
-void ShutDownSteamVR();
+void ShutdownSteamVR();
 void GetSteamVRPositionalData(float *yaw, float *pitch);

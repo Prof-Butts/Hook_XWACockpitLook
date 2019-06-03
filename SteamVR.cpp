@@ -19,7 +19,7 @@ bool InitSteamVR()
 	return true;
 }
 
-void ShutDownSteamVR() {
+void ShutdownSteamVR() {
 	log_debug("Shutting down SteamVR...");
 	vr::VR_Shutdown();
 	g_pHMD = NULL;

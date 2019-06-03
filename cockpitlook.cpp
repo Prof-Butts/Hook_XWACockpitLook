@@ -14,6 +14,7 @@
 #include <stdarg.h>
 #include "FreePIE.h"
 #include "SteamVR.h"
+#include "TrackIR.h"
 
 // TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
@@ -61,10 +62,6 @@ TrackerType g_TrackerType = TRACKER_NONE;
 float g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 
-/************************************************
-  SteamVR
-*************************************************/
-
 /*
 Params[1] = 2nd on stack
 Params[0] = 1st on stack
@@ -84,6 +81,8 @@ int CockpitLookHook(int* params)
 	//GetKeyboardDeviceState();
 	int playerIndex = params[-6];
 	float yaw = 0.0f, pitch = 0.0f;
+	float yawSign = 1.0f, pitchSign = 1.0f;
+	bool dataReady = false;
 
 	if (!PlayerDataTable[playerIndex].externalCamera
 		&& !PlayerDataTable[playerIndex].hyperspacePhase
@@ -96,34 +95,45 @@ int CockpitLookHook(int* params)
 		__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
 
 		// Read tracking data.
-		switch (g_TrackerType) {
+		switch (g_TrackerType) 
+		{
 			case TRACKER_FREEPIE:
 			{
-				if (readFreePIE()) {
+				pitchSign = -1.0f;
+				if (ReadFreePIE()) {
 					yaw = g_FreePIEData.yaw * g_fYawMultiplier;
 					pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
-
-					while (yaw < 0.0f) yaw += 360.0f;
-					while (pitch < 0.0f) pitch += 360.0f;
-
-					PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yaw / 360.0f * 65535.0f);
-					PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(-pitch / 360.0f * 65535.0f);
+					dataReady = true;
 				}
-				break;
 			}
+			break;
+
 			case TRACKER_STEAMVR: 
 			{
 				GetSteamVRPositionalData(&yaw, &pitch);
 				yaw *= RAD_TO_DEG * g_fYawMultiplier;
 				pitch *= RAD_TO_DEG * g_fPitchMultiplier;
-
-				while (yaw < 0.0f) yaw += 360.0f;
-				while (pitch < 0.0f) pitch += 360.0f;
-
-				PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(-yaw / 360.0f * 65535.0f);
-				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitch / 360.0f * 65535.0f);
+				yawSign = -1.0f;
+				dataReady = true;
 			}
 			break;
+
+			case TRACKER_TRACKIR:
+			{
+				if (ReadTrackIRData(&yaw, &pitch)) {
+					yaw *= g_fYawMultiplier;
+					pitch *= g_fPitchMultiplier;
+					dataReady = true;
+				}
+			}
+			break;
+		}
+
+		if (dataReady) {
+			while (yaw < 0.0f) yaw += 360.0f;
+			while (pitch < 0.0f) pitch += 360.0f;
+			PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yawSign * yaw / 360.0f * 65535.0f);
+			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 		}
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5)
@@ -221,14 +231,10 @@ void LoadParams() {
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
 				g_fYawMultiplier = (float)atof(value);
-				if (g_fYawMultiplier == 0.0f)
-					g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
 				log_debug("Yaw multiplier: %0.3f", g_fYawMultiplier);
 			}
 			else if (_stricmp(param, PITCH_MULTIPLIER) == 0) {
 				g_fPitchMultiplier = (float)atof(value);
-				if (g_fPitchMultiplier == 0.0f)
-					g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 				log_debug("Pitch multiplier: %0.3f", g_fPitchMultiplier);
 			}
 		}
@@ -254,6 +260,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		case TRACKER_STEAMVR:
 			InitSteamVR();
 			break;
+		case TRACKER_TRACKIR:
+			InitTrackIR();
+			break;
 		}
 		break;
 	case DLL_THREAD_ATTACH:
@@ -267,7 +276,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		case TRACKER_STEAMVR:
 			// We can't shutdown SteamVR twice: we either shut it down here, or in ddraw.dll.
 			// It looks like the right order is to shut it down here.
-			ShutDownSteamVR();
+			ShutdownSteamVR();
+			break;
+		case TRACKER_TRACKIR:
+			ShutdownTrackIR();
 			break;
 		}
 		break;
