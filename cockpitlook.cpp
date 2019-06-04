@@ -123,6 +123,7 @@ int CockpitLookHook(int* params)
 				if (ReadTrackIRData(&yaw, &pitch)) {
 					yaw *= g_fYawMultiplier;
 					pitch *= g_fPitchMultiplier;
+					yawSign = -1.0f; pitchSign = -1.0f;
 					dataReady = true;
 				}
 			}
