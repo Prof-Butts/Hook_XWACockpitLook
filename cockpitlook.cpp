@@ -78,8 +78,7 @@ Params[-15] = EBP
 */
 int CockpitLookHook(int* params)
 {
-	//GetKeyboardDeviceState();
-	int playerIndex = params[-6];
+	int playerIndex = params[-10]; // Using -10 instead of -6, prevents this hook from crashing in Multiplayer
 	float yaw = 0.0f, pitch = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
 	bool dataReady = false;
