@@ -4,4 +4,4 @@
 
 bool InitSteamVR();
 void ShutdownSteamVR();
-void GetSteamVRPositionalData(float *yaw, float *pitch);
+bool GetSteamVRPositionalData(float *yaw, float *pitch);

@@ -1,14 +1,15 @@
 #include "SteamVR.h"
 
 void log_debug(const char *format, ...);
-
+bool g_bSteamVRInitialized = false;
 vr::IVRSystem *g_pHMD = NULL;
 
 bool InitSteamVR()
 {
-	log_debug("Loading SteamVR");
+	log_debug("InitSteamVR()");
 	vr::EVRInitError eError = vr::VRInitError_None;
 	g_pHMD = vr::VR_Init(&eError, vr::VRApplication_Scene);
+	log_debug("VR_Init --> g_pHMD: 0x%x, error: 0x%x", g_pHMD, eError);
 
 	if (eError != vr::VRInitError_None)
 	{
@@ -16,11 +17,13 @@ bool InitSteamVR()
 		log_debug("Unable to init VR runtime: %s", vr::VR_GetVRInitErrorAsEnglishDescription(eError));
 		return false;
 	}
+	log_debug("VR runtime loaded");
+	g_bSteamVRInitialized = true;
 	return true;
 }
 
 void ShutdownSteamVR() {
-	log_debug("Shutting down SteamVR...");
+	log_debug("ShutdownSteamVR()");
 	vr::VR_Shutdown();
 	g_pHMD = NULL;
 	log_debug("SteamVR shut down");
@@ -101,12 +104,25 @@ void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch) 
 	*roll = atan2(2.0f * q.x*q.w - 2.0f * q.y*q.z, 1.0f - 2.0f * sqx - 2.0f * sqz);
 }
 
-void GetSteamVRPositionalData(float *yaw, float *pitch)
+bool GetSteamVRPositionalData(float *yaw, float *pitch)
 {
+	if (g_pHMD == NULL) {
+		log_debug("GetSteamVRPositional Data with g_pHMD = NULL");
+		// Try to initialize once more
+		if (!g_bSteamVRInitialized) {
+			log_debug("Attempting SteamVR initialization again...");
+			InitSteamVR();
+			g_bSteamVRInitialized = true; // Don't try initializing again if this fails
+		}
+		if (g_pHMD == NULL)
+			return false;
+		log_debug("SteamVR initialized in the second attempt, continuing");
+	}
+
 	float roll;
 	vr::TrackedDeviceIndex_t unDevice = vr::k_unTrackedDeviceIndex_Hmd;
 	if (!g_pHMD->IsTrackedDeviceConnected(unDevice))
-		return;
+		return false;
 
 	vr::VRControllerState_t state;
 	if (g_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
@@ -120,5 +136,7 @@ void GetSteamVRPositionalData(float *yaw, float *pitch)
 		poseMatrix = trackedDevicePose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
 		q = rotationToQuaternion(trackedDevicePose.mDeviceToAbsoluteTracking);
 		quatToEuler(q, yaw, pitch, &roll);
+		return true;
 	}
+	return false;
 }

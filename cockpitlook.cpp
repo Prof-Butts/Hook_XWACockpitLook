@@ -19,10 +19,29 @@
 // TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
 
+extern bool g_bSteamVRInitialized;
+
+#define DEBUG_TO_FILE 1
+
+#ifdef DEBUG_TO_FILE
+FILE *g_DebugFile = NULL;
+#endif
+
 void log_debug(const char *format, ...)
 {
 	static char buf[300];
 	static char out[300];
+
+#ifdef DEBUG_TO_FILE
+	if (g_DebugFile == NULL) {
+		try {
+			errno_t error = fopen_s(&g_DebugFile, "./cockpitlook.log", "wt");
+		}
+		catch (...) {
+			OutputDebugString("[DBG] [Cockpitlook] Could not open cockpitlook.log");
+		}
+	}
+#endif
 
 	va_list args;
 	va_start(args, format);
@@ -30,6 +49,12 @@ void log_debug(const char *format, ...)
 	vsprintf_s(buf, 300, format, args);
 	sprintf_s(out, 300, "[DBG] [Cockpitlook] %s", buf);
 	OutputDebugString(out);
+#ifdef DEBUG_TO_FILE
+	if (g_DebugFile != NULL) {
+		fprintf(g_DebugFile, "%s\n", buf);
+		fflush(g_DebugFile);
+	}
+#endif
 
 	va_end(args);
 }
@@ -109,11 +134,10 @@ int CockpitLookHook(int* params)
 
 			case TRACKER_STEAMVR: 
 			{
-				GetSteamVRPositionalData(&yaw, &pitch);
+				dataReady = GetSteamVRPositionalData(&yaw, &pitch);
 				yaw *= RAD_TO_DEG * g_fYawMultiplier;
 				pitch *= RAD_TO_DEG * g_fPitchMultiplier;
 				yawSign = -1.0f;
-				dataReady = true;
 			}
 			break;
 
@@ -134,6 +158,7 @@ int CockpitLookHook(int* params)
 			while (pitch < 0.0f) pitch += 360.0f;
 			PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yawSign * yaw / 360.0f * 65535.0f);
 			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+			//PlayerDataTable[0].
 		}
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5)
@@ -252,6 +277,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		log_debug("g_hWnd: 0x%x", g_hWnd);
 		// Load cockpitlook.cfg here and enable FreePIE, SteamVR or TrackIR
 		LoadParams();
+		log_debug("Parameters loaded");
 		switch (g_TrackerType)
 		{
 		case TRACKER_FREEPIE:
@@ -269,6 +295,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 	case DLL_THREAD_DETACH:
 		break;
 	case DLL_PROCESS_DETACH:
+		log_debug("Unloading Cockpitlook hook");
 		switch (g_TrackerType) {
 		case TRACKER_FREEPIE:
 			ShutdownFreePIE();
@@ -282,6 +309,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 			ShutdownTrackIR();
 			break;
 		}
+		log_debug("Exiting Cockpitlook hook");
 		break;
 	}
 
