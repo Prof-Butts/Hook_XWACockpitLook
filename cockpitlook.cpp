@@ -21,7 +21,8 @@ HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
 
-#define DEBUG_TO_FILE 1
+//#define DEBUG_TO_FILE 1
+#undef DEBUG_TO_FILE
 
 #ifdef DEBUG_TO_FILE
 FILE *g_DebugFile = NULL;
@@ -66,6 +67,8 @@ const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // Use SteamVR as the tracker
 const char *TRACKER_TYPE_TRACKIR = "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
 const char *YAW_MULTIPLIER = "yaw_multiplier";
 const char *PITCH_MULTIPLIER = "pitch_multiplier";
+const char *YAW_OFFSET = "yaw_offset";
+const char *PITCH_OFFSET = "pitch_offset";
 
 // Tracker-specific constants
 // Some people might want to use the regular (non-VR) game with a tracker. In that case
@@ -74,6 +77,8 @@ const char *PITCH_MULTIPLIER = "pitch_multiplier";
 // give users the option to invert the axis if needed.
 const float DEFAULT_YAW_MULTIPLIER = 1.0f;
 const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
+const float DEFAULT_YAW_OFFSET = 0.0f;
+const float DEFAULT_PITCH_OFFSET = 0.0f;
 
 // General types and globals
 typedef enum {
@@ -86,6 +91,8 @@ TrackerType g_TrackerType = TRACKER_NONE;
 
 float g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
+float g_fYawOffset = DEFAULT_YAW_OFFSET;
+float g_fPitchOffset = DEFAULT_PITCH_OFFSET;
 
 /*
 Params[1] = 2nd on stack
@@ -125,6 +132,9 @@ int CockpitLookHook(int* params)
 			{
 				pitchSign = -1.0f;
 				if (ReadFreePIE()) {
+					// For some reason, in the latest Trinus version (1.0.4) the yaw is 180 when centered?
+					// I need to add a configurable offset to the config file; for now, let's hard-code it
+					// to 180:
 					yaw = g_FreePIEData.yaw * g_fYawMultiplier;
 					pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
 					dataReady = true;
@@ -154,11 +164,12 @@ int CockpitLookHook(int* params)
 		}
 
 		if (dataReady) {
+			yaw += g_fYawOffset;
+			pitch += g_fPitchOffset;
 			while (yaw < 0.0f) yaw += 360.0f;
 			while (pitch < 0.0f) pitch += 360.0f;
 			PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yawSign * yaw / 360.0f * 65535.0f);
 			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
-			//PlayerDataTable[0].
 		}
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5)
@@ -231,7 +242,8 @@ void LoadParams() {
 		return;
 	}
 
-	char buf[160], param[80], value[80];
+	char buf[160], param[80], svalue[80];
+	float value;
 	while (fgets(buf, 160, file) != NULL) {
 		// Skip comments and blank lines
 		if (buf[0] == ';' || buf[0] == '#')
@@ -239,28 +251,37 @@ void LoadParams() {
 		if (strlen(buf) == 0)
 			continue;
 
-		if (sscanf_s(buf, "%s = %s", param, 80, value, 80) > 0) {
+		if (sscanf_s(buf, "%s = %s", param, 80, svalue, 80) > 0) {
+			value = atof(svalue);
 			if (_stricmp(param, TRACKER_TYPE) == 0) {
-				if (_stricmp(value, TRACKER_TYPE_FREEPIE) == 0) {
+				if (_stricmp(svalue, TRACKER_TYPE_FREEPIE) == 0) {
 					log_debug("Using FreePIE for tracking");
 					g_TrackerType = TRACKER_FREEPIE;
 				}
-				else if (_stricmp(value, TRACKER_TYPE_STEAMVR) == 0) {
+				else if (_stricmp(svalue, TRACKER_TYPE_STEAMVR) == 0) {
 					log_debug("Using SteamVR for tracking");
 					g_TrackerType = TRACKER_STEAMVR;
 				}
-				else if (_stricmp(value, TRACKER_TYPE_TRACKIR) == 0) {
+				else if (_stricmp(svalue, TRACKER_TYPE_TRACKIR) == 0) {
 					log_debug("Using TrackIR for tracking");
 					g_TrackerType = TRACKER_TRACKIR;
 				}
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
-				g_fYawMultiplier = (float)atof(value);
+				g_fYawMultiplier = value;
 				log_debug("Yaw multiplier: %0.3f", g_fYawMultiplier);
 			}
 			else if (_stricmp(param, PITCH_MULTIPLIER) == 0) {
-				g_fPitchMultiplier = (float)atof(value);
+				g_fPitchMultiplier = value;
 				log_debug("Pitch multiplier: %0.3f", g_fPitchMultiplier);
+			}
+			else if (_stricmp(param, YAW_OFFSET) == 0) {
+				g_fYawOffset = value;
+				log_debug("Yaw offset: %0.3f", g_fYawOffset);
+			}
+			else if (_stricmp(param, PITCH_OFFSET) == 0) {
+				g_fPitchOffset = value;
+				log_debug("Pitch offset: %0.3f", g_fPitchOffset);
 			}
 		}
 	} // while ... read file
