@@ -69,6 +69,7 @@ const char *YAW_MULTIPLIER = "yaw_multiplier";
 const char *PITCH_MULTIPLIER = "pitch_multiplier";
 const char *YAW_OFFSET = "yaw_offset";
 const char *PITCH_OFFSET = "pitch_offset";
+const char *FREEPIE_SLOT = "freepie_slot";
 
 // Tracker-specific constants
 // Some people might want to use the regular (non-VR) game with a tracker. In that case
@@ -79,6 +80,7 @@ const float DEFAULT_YAW_MULTIPLIER = 1.0f;
 const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
+const int DEFAULT_FREEPIE_SLOT = 0;
 
 // General types and globals
 typedef enum {
@@ -93,6 +95,7 @@ float g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 float g_fYawOffset = DEFAULT_YAW_OFFSET;
 float g_fPitchOffset = DEFAULT_PITCH_OFFSET;
+int g_iFreePIESlot = DEFAULT_FREEPIE_SLOT;
 
 /*
 Params[1] = 2nd on stack
@@ -131,7 +134,7 @@ int CockpitLookHook(int* params)
 			case TRACKER_FREEPIE:
 			{
 				pitchSign = -1.0f;
-				if (ReadFreePIE()) {
+				if (ReadFreePIE(g_iFreePIESlot)) {
 					// For some reason, in the latest Trinus version (1.0.4) the yaw is 180 when centered?
 					// I need to add a configurable offset to the config file; for now, let's hard-code it
 					// to 180:
@@ -282,6 +285,10 @@ void LoadParams() {
 			else if (_stricmp(param, PITCH_OFFSET) == 0) {
 				g_fPitchOffset = value;
 				log_debug("Pitch offset: %0.3f", g_fPitchOffset);
+			}
+			else if (_stricmp(param, FREEPIE_SLOT) == 0) {
+				g_iFreePIESlot = (int )value;
+				log_debug("FreePIE slot: %d", g_iFreePIESlot);
 			}
 		}
 	} // while ... read file
