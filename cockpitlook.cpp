@@ -16,13 +16,16 @@
 #include "SteamVR.h"
 #include "TrackIR.h"
 
+#include "Vectors.h"
+#include "Matrices.h"
+
 // TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
 
-//#define DEBUG_TO_FILE 1
-#undef DEBUG_TO_FILE
+#define DEBUG_TO_FILE 1
+//#undef DEBUG_TO_FILE
 
 #ifdef DEBUG_TO_FILE
 FILE *g_DebugFile = NULL;
@@ -65,6 +68,7 @@ const char *TRACKER_TYPE = "tracker_type"; // Defines which tracker to use
 const char *TRACKER_TYPE_FREEPIE = "FreePIE"; // Use FreePIE as the tracker
 const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // Use SteamVR as the tracker
 const char *TRACKER_TYPE_TRACKIR = "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
+const char *TRACKER_TYPE_NONE = "None";
 const char *YAW_MULTIPLIER = "yaw_multiplier";
 const char *PITCH_MULTIPLIER = "pitch_multiplier";
 const char *YAW_OFFSET = "yaw_offset";
@@ -97,6 +101,10 @@ float g_fYawOffset = DEFAULT_YAW_OFFSET;
 float g_fPitchOffset = DEFAULT_PITCH_OFFSET;
 int g_iFreePIESlot = DEFAULT_FREEPIE_SLOT;
 
+int cockpitRefX = 0;
+int cockpitRefY = 0;
+int cockpitRefZ = 0;
+
 /*
 Params[1] = 2nd on stack
 Params[0] = 1st on stack
@@ -117,6 +125,8 @@ int CockpitLookHook(int* params)
 	float yaw = 0.0f, pitch = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
 	bool dataReady = false;
+	//Vector4 translation;
+	//Matrix4 rotX, rotY, rotZ, rot;
 
 	if (!PlayerDataTable[playerIndex].externalCamera
 		&& !PlayerDataTable[playerIndex].hyperspacePhase
@@ -128,9 +138,64 @@ int CockpitLookHook(int* params)
 		// Keyboard code for moving the cockpit camera angle
 		__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
 
+		/*
+		if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
+			cockpitRefX -= 16;
+		if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
+			cockpitRefX += 16;
+	
+		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
+			cockpitRefY -= 16;
+		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWDOWN)
+			cockpitRefY += 16;
+
+			if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
+			cockpitRefZ -= 16;
+		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWDOWN)
+			cockpitRefZ += 16;
+		
+		float playerYaw   = (float)PlayerDataTable[playerIndex].yaw   / 32768.0f * 180.0f;
+		float playerPitch = (float)PlayerDataTable[playerIndex].pitch / 32768.0f * 180.0f;
+		float playerRoll  = (float)PlayerDataTable[playerIndex].roll  / 32768.0f * 180.0f;
+
+		rotX.identity(); rotX.rotateX(-playerPitch);
+		rotY.identity(); rotY.rotateY(-playerYaw);
+		rotZ.identity(); rotZ.rotateZ(-playerRoll);
+		rot.identity();
+		//rot.invertGeneral();
+		rot = rotZ * rotX * rotY;
+		//rot = rotZ;
+		translation.set((float)cockpitRefX, (float)cockpitRefY, (float)cockpitRefZ, 1.0f);
+		Vector4 post_trans = rot * translation;
+		//post_trans[1] = -post_trans[1];
+		log_debug("pitch,yaw,roll: %f, %f, %f, T: [%0.1f, %0.1f, %0.1f], PT: [%0.1f, %0.1f %0.1f]",
+			playerPitch, playerYaw, playerRoll, translation[0], translation[1], translation[2],
+			post_trans[0], post_trans[1], post_trans[2]);
+		// posX, posY: No apparent effect
+		// cameraX, cameraY: No apparent effect
+		// Motion along "cockpit#Reference is along the absolute frame of reference.
+		PlayerDataTable[playerIndex].cockpitXReference = (int)post_trans[0];
+		PlayerDataTable[playerIndex].cockpitYReference = (int)post_trans[1];
+		PlayerDataTable[playerIndex].cockpitZReference = (int)post_trans[2];
+		*/
+		//PlayerDataTable[playerIndex].cameraY = cockpitRefY;
+		//log_debug("roll: %d", PlayerDataTable[playerIndex].roll); // <-- roll responds to the joystick roll and it alters
+		// the way cockpitXReference is interpreted, same goes for .pitch and .yaw
+		//PlayerDataTable[playerIndex].cockpitYReference = cockpitRefY;
+		//PlayerDataTable[playerIndex].cockpitZReference = cockpitRefZ;
+		/* log_debug("ypr: %d, %d, %d", PlayerDataTable[playerIndex].yaw,
+			PlayerDataTable[playerIndex].pitch,
+			PlayerDataTable[playerIndex].roll); */
+		
 		// Read tracking data.
 		switch (g_TrackerType) 
 		{
+			case TRACKER_NONE:
+			{
+				dataReady = false;
+			}
+			break;
+
 			case TRACKER_FREEPIE:
 			{
 				pitchSign = -1.0f;
@@ -166,20 +231,24 @@ int CockpitLookHook(int* params)
 			break;
 		}
 
+		// The offset is applied after the tracking data is read, regardless of the tracker.
 		if (dataReady) {
-			yaw += g_fYawOffset;
+			yaw   += g_fYawOffset;
 			pitch += g_fPitchOffset;
-			while (yaw < 0.0f) yaw += 360.0f;
+			while (yaw < 0.0f) yaw     += 360.0f;
 			while (pitch < 0.0f) pitch += 360.0f;
-			PlayerDataTable[playerIndex].cockpitCameraYaw = (short)(yawSign * yaw / 360.0f * 65535.0f);
+			PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 		}
 
-		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5)
+		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5 || keycodePressed == KeyCode_PERIOD)
 		{
 			// Cockpit camera is reset to center position
 			PlayerDataTable[playerIndex].cockpitCameraYaw = 0;
 			PlayerDataTable[playerIndex].cockpitCameraPitch = 0;
+			//cockpitRefX = 0;
+			//cockpitRefY = 0;
+			//cockpitRefZ = 0;
 		}
 
 		// Mouse look code
@@ -255,7 +324,7 @@ void LoadParams() {
 			continue;
 
 		if (sscanf_s(buf, "%s = %s", param, 80, svalue, 80) > 0) {
-			value = atof(svalue);
+			value = (float )atof(svalue);
 			if (_stricmp(param, TRACKER_TYPE) == 0) {
 				if (_stricmp(svalue, TRACKER_TYPE_FREEPIE) == 0) {
 					log_debug("Using FreePIE for tracking");
@@ -268,6 +337,10 @@ void LoadParams() {
 				else if (_stricmp(svalue, TRACKER_TYPE_TRACKIR) == 0) {
 					log_debug("Using TrackIR for tracking");
 					g_TrackerType = TRACKER_TRACKIR;
+				}
+				else if (_stricmp(svalue, TRACKER_TYPE_NONE) == 0) {
+					log_debug("Tracking disabled");
+					g_TrackerType = TRACKER_NONE;
 				}
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
