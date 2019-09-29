@@ -24,8 +24,8 @@ HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
 
-#define DEBUG_TO_FILE 1
-//#undef DEBUG_TO_FILE
+//#define DEBUG_TO_FILE 1
+#undef DEBUG_TO_FILE
 
 #ifdef DEBUG_TO_FILE
 FILE *g_DebugFile = NULL;
@@ -64,16 +64,16 @@ void log_debug(const char *format, ...)
 }
 
 // cockpitlook.cfg parameter names
-const char *TRACKER_TYPE = "tracker_type"; // Defines which tracker to use
-const char *TRACKER_TYPE_FREEPIE = "FreePIE"; // Use FreePIE as the tracker
-const char *TRACKER_TYPE_STEAMVR = "SteamVR"; // Use SteamVR as the tracker
-const char *TRACKER_TYPE_TRACKIR = "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
-const char *TRACKER_TYPE_NONE = "None";
-const char *YAW_MULTIPLIER = "yaw_multiplier";
-const char *PITCH_MULTIPLIER = "pitch_multiplier";
-const char *YAW_OFFSET = "yaw_offset";
-const char *PITCH_OFFSET = "pitch_offset";
-const char *FREEPIE_SLOT = "freepie_slot";
+const char *TRACKER_TYPE				= "tracker_type"; // Defines which tracker to use
+const char *TRACKER_TYPE_FREEPIE		= "FreePIE"; // Use FreePIE as the tracker
+const char *TRACKER_TYPE_STEAMVR		= "SteamVR"; // Use SteamVR as the tracker
+const char *TRACKER_TYPE_TRACKIR		= "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
+const char *TRACKER_TYPE_NONE		= "None";
+const char *YAW_MULTIPLIER			= "yaw_multiplier";
+const char *PITCH_MULTIPLIER			= "pitch_multiplier";
+const char *YAW_OFFSET				= "yaw_offset";
+const char *PITCH_OFFSET				= "pitch_offset";
+const char *FREEPIE_SLOT				= "freepie_slot";
 
 // Tracker-specific constants
 // Some people might want to use the regular (non-VR) game with a tracker. In that case
@@ -127,9 +127,10 @@ int CockpitLookHook(int* params)
 	bool dataReady = false;
 	//Vector4 translation;
 	//Matrix4 rotX, rotY, rotZ, rot;
-
-	if (!PlayerDataTable[playerIndex].externalCamera
-		&& !PlayerDataTable[playerIndex].hyperspacePhase
+	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
+	
+	//if (/* 	!PlayerDataTable[playerIndex].hyperspacePhase && */ // Enable mouse-look during hyperspace
+	if (	!PlayerDataTable[playerIndex].hyperspacePhase
 		&& PlayerDataTable[playerIndex].cockpitDisplayed
 		&& !PlayerDataTable[playerIndex].gunnerTurretActive
 		&& PlayerDataTable[playerIndex].cockpitDisplayed2
@@ -203,7 +204,7 @@ int CockpitLookHook(int* params)
 					// For some reason, in the latest Trinus version (1.0.4) the yaw is 180 when centered?
 					// I need to add a configurable offset to the config file; for now, let's hard-code it
 					// to 180:
-					yaw = g_FreePIEData.yaw * g_fYawMultiplier;
+					yaw   = g_FreePIEData.yaw   * g_fYawMultiplier;
 					pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
 					dataReady = true;
 				}
@@ -213,7 +214,7 @@ int CockpitLookHook(int* params)
 			case TRACKER_STEAMVR: 
 			{
 				dataReady = GetSteamVRPositionalData(&yaw, &pitch);
-				yaw *= RAD_TO_DEG * g_fYawMultiplier;
+				yaw   *= RAD_TO_DEG * g_fYawMultiplier;
 				pitch *= RAD_TO_DEG * g_fPitchMultiplier;
 				yawSign = -1.0f;
 			}
@@ -222,9 +223,10 @@ int CockpitLookHook(int* params)
 			case TRACKER_TRACKIR:
 			{
 				if (ReadTrackIRData(&yaw, &pitch)) {
-					yaw *= g_fYawMultiplier;
+					yaw   *= g_fYawMultiplier;
 					pitch *= g_fPitchMultiplier;
-					yawSign = -1.0f; pitchSign = -1.0f;
+					yawSign   = -1.0f; 
+					pitchSign = -1.0f;
 					dataReady = true;
 				}
 			}
@@ -235,21 +237,49 @@ int CockpitLookHook(int* params)
 		if (dataReady) {
 			yaw   += g_fYawOffset;
 			pitch += g_fPitchOffset;
-			while (yaw < 0.0f) yaw     += 360.0f;
+			while (yaw < 0.0f)   yaw   += 360.0f;
 			while (pitch < 0.0f) pitch += 360.0f;
-			PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
-			PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+
+			//if (!bExternalCamera) {
+				PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+			/*} else {
+				PlayerDataTable[playerIndex].cameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+				PlayerDataTable[playerIndex].cameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+			}*/
 		}
+
+		if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
+			PlayerDataTable[playerIndex].cockpitCameraYaw -= 1200;
+
+		if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
+			PlayerDataTable[playerIndex].cockpitCameraYaw += 1200;
+
+		if (*win32NumPad8Pressed || keycodePressed == KeyCode_ARROWDOWN)
+			PlayerDataTable[playerIndex].cockpitCameraPitch += 1200;
+
+		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
+			PlayerDataTable[playerIndex].cockpitCameraPitch -= 1200;
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5 || keycodePressed == KeyCode_PERIOD)
 		{
-			// Cockpit camera is reset to center position
-			PlayerDataTable[playerIndex].cockpitCameraYaw = 0;
-			PlayerDataTable[playerIndex].cockpitCameraPitch = 0;
+			if (!bExternalCamera) {
+				// Reset cockpit camera
+				PlayerDataTable[playerIndex].cockpitCameraYaw = 0;
+				PlayerDataTable[playerIndex].cockpitCameraPitch = 0;
+			} else {
+				// Reset external camera
+				PlayerDataTable[playerIndex].cameraYaw   = 0;
+				PlayerDataTable[playerIndex].cameraPitch = 0;
+			}
 			//cockpitRefX = 0;
 			//cockpitRefY = 0;
 			//cockpitRefZ = 0;
 		}
+
+		//if (dataReady)
+		//	goto out;
+		//goto out;
 
 		// Mouse look code
 		if (*mouseLook && !*inMissionFilmState && !*viewingFilmState)
@@ -261,38 +291,64 @@ int CockpitLookHook(int* params)
 				__int16 _mouseLook_Y = *mouseLook_Y;
 				if (*mouseLook_X || *mouseLook_Y)
 				{
+					//static int mouseSamples = 256;
+					//if (mouseSamples--)
+					//	log_debug("mouse: %d, %d", *mouseLook_X, *mouseLook_Y);
+
 					if (abs(*mouseLook_X) > 85 || abs(*mouseLook_Y) > 85)
 					{
 						char _mouseLookInverted = *mouseLookInverted;
 
-						PlayerDataTable[playerIndex].cockpitCameraYaw += 40 * *mouseLook_X;
-						if (_mouseLookInverted)
-							PlayerDataTable[playerIndex].cockpitCameraPitch += 40 * _mouseLook_Y;
-						else
-							PlayerDataTable[playerIndex].cockpitCameraPitch += -40 * _mouseLook_Y;
+						if (!bExternalCamera) {
+							PlayerDataTable[playerIndex].cockpitCameraYaw += 40 * *mouseLook_X;
+							if (_mouseLookInverted)
+								PlayerDataTable[playerIndex].cockpitCameraPitch +=  40 * _mouseLook_Y;
+							else
+								PlayerDataTable[playerIndex].cockpitCameraPitch += -40 * _mouseLook_Y;
+						}
+						else {
+							PlayerDataTable[playerIndex].cameraYaw += 40 * *mouseLook_X;
+							if (_mouseLookInverted)
+								PlayerDataTable[playerIndex].cameraPitch +=  40 * _mouseLook_Y;
+							else
+								PlayerDataTable[playerIndex].cameraPitch += -40 * _mouseLook_Y;
+						}
 					}
 					else
 					{
 						char _mouseLookInverted = *mouseLookInverted;
-						PlayerDataTable[playerIndex].cockpitCameraYaw += 15 * *mouseLook_X;
-						if (_mouseLookInverted)
-							PlayerDataTable[playerIndex].cockpitCameraPitch += 15 * _mouseLook_Y;
-						else
-							PlayerDataTable[playerIndex].cockpitCameraPitch += -15 * _mouseLook_Y;
+
+						if (!bExternalCamera) {
+							PlayerDataTable[playerIndex].cockpitCameraYaw += 15 * *mouseLook_X;
+							if (_mouseLookInverted)
+								PlayerDataTable[playerIndex].cockpitCameraPitch += 15 * _mouseLook_Y;
+							else
+								PlayerDataTable[playerIndex].cockpitCameraPitch += -15 * _mouseLook_Y;
+						}
+						else {
+							PlayerDataTable[playerIndex].cameraYaw += 15 * *mouseLook_X;
+							if (_mouseLookInverted)
+								PlayerDataTable[playerIndex].cameraPitch +=  15 * _mouseLook_Y;
+							else
+								PlayerDataTable[playerIndex].cameraPitch += -15 * _mouseLook_Y;
+						}
 					}
 				}
-					
 			}
+
 			if (*mouseLookResetPosition)
 			{
 				PlayerDataTable[playerIndex].cockpitCameraYaw = 0;
 				PlayerDataTable[playerIndex].cockpitCameraPitch = 0;
+				PlayerDataTable[playerIndex].cameraYaw = 0;
+				PlayerDataTable[playerIndex].cameraPitch = 0;
 			}
 			if (*mouseLookWasNotEnabled)
 				*mouseLookWasNotEnabled = 0;
 		}
 	}
 	
+//out:
 	params[-1] = 0x4F9C33;
 	return 0;
 }
@@ -303,7 +359,7 @@ void LoadParams() {
 	int error = 0;
 
 	try {
-		error = fopen_s(&file, "./cockpitlook.cfg", "rt");
+		error = fopen_s(&file, "./CockpitLook.cfg", "rt");
 	}
 	catch (...) {
 		log_debug("Could not load cockpitlook.cfg");
@@ -375,7 +431,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 	case DLL_PROCESS_ATTACH:
 		log_debug("Cockpit Hook Loaded");
 		g_hWnd = GetForegroundWindow();
-		log_debug("g_hWnd: 0x%x", g_hWnd);
 		// Load cockpitlook.cfg here and enable FreePIE, SteamVR or TrackIR
 		LoadParams();
 		log_debug("Parameters loaded");

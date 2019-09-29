@@ -23,7 +23,7 @@
     <ProjectGuid>{B7D1532C-312D-4A20-97D7-E87D1A129FC4}</ProjectGuid>
     <RootNamespace>HookXWASample</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <ProjectName>Hook_XWACockpitLook</ProjectName>
+    <ProjectName>Hook_CockpitLook</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
