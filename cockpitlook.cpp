@@ -24,8 +24,8 @@ HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
 
-//#define DEBUG_TO_FILE 1
-#undef DEBUG_TO_FILE
+#define DEBUG_TO_FILE 1
+//#undef DEBUG_TO_FILE
 
 #ifdef DEBUG_TO_FILE
 FILE *g_DebugFile = NULL;
@@ -39,10 +39,10 @@ void log_debug(const char *format, ...)
 #ifdef DEBUG_TO_FILE
 	if (g_DebugFile == NULL) {
 		try {
-			errno_t error = fopen_s(&g_DebugFile, "./cockpitlook.log", "wt");
+			errno_t error = fopen_s(&g_DebugFile, "./CockpitLook.log", "wt");
 		}
 		catch (...) {
-			OutputDebugString("[DBG] [Cockpitlook] Could not open cockpitlook.log");
+			OutputDebugString("[DBG] [Cockpitlook] Could not open CockpitLook.log");
 		}
 	}
 #endif
