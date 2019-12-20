@@ -130,8 +130,8 @@ int CockpitLookHook(int* params)
 	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
 	
 	//if (/* 	!PlayerDataTable[playerIndex].hyperspacePhase && */ // Enable mouse-look during hyperspace
-	if (	!PlayerDataTable[playerIndex].hyperspacePhase
-		&& PlayerDataTable[playerIndex].cockpitDisplayed
+	if (//!PlayerDataTable[playerIndex].hyperspacePhase &&
+		PlayerDataTable[playerIndex].cockpitDisplayed
 		&& !PlayerDataTable[playerIndex].gunnerTurretActive
 		&& PlayerDataTable[playerIndex].cockpitDisplayed2
 		&& *numberOfPlayersInGame == 1)
@@ -249,16 +249,23 @@ int CockpitLookHook(int* params)
 			}*/
 		}
 
-		if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
+		// TODO: I changed the arrow keys for numpad keys because the keys would move the
+		//       view and I want to use them for something else. I need to validate that this
+		//		 change didn't actually break the code.
+		//if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
+		if (*win32NumPad4Pressed || keycodePressed == KeyCode_NUMPAD3)
 			PlayerDataTable[playerIndex].cockpitCameraYaw -= 1200;
 
-		if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
+		//if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
+		if (*win32NumPad6Pressed || keycodePressed == KeyCode_NUMPAD6)
 			PlayerDataTable[playerIndex].cockpitCameraYaw += 1200;
 
-		if (*win32NumPad8Pressed || keycodePressed == KeyCode_ARROWDOWN)
+		//if (*win32NumPad8Pressed || keycodePressed == KeyCode_ARROWDOWN)
+		if (*win32NumPad8Pressed || keycodePressed == KeyCode_NUMPAD8)
 			PlayerDataTable[playerIndex].cockpitCameraPitch += 1200;
 
-		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
+		//if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
+		if (*win32NumPad2Pressed || keycodePressed == KeyCode_NUMPAD2)
 			PlayerDataTable[playerIndex].cockpitCameraPitch -= 1200;
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5 || keycodePressed == KeyCode_PERIOD)
@@ -277,10 +284,6 @@ int CockpitLookHook(int* params)
 			//cockpitRefZ = 0;
 		}
 
-		//if (dataReady)
-		//	goto out;
-		//goto out;
-
 		// Mouse look code
 		if (*mouseLook && !*inMissionFilmState && !*viewingFilmState)
 		{
@@ -291,9 +294,8 @@ int CockpitLookHook(int* params)
 				__int16 _mouseLook_Y = *mouseLook_Y;
 				if (*mouseLook_X || *mouseLook_Y)
 				{
-					//static int mouseSamples = 256;
-					//if (mouseSamples--)
-					//	log_debug("mouse: %d, %d", *mouseLook_X, *mouseLook_Y);
+					//if (PlayerDataTable->hyperspacePhase)
+					//	log_debug("[DBG] [Mouse] [Hyper]: %d, %d", *mouseLook_X, *mouseLook_Y);
 
 					if (abs(*mouseLook_X) > 85 || abs(*mouseLook_Y) > 85)
 					{
