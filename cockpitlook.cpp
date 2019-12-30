@@ -82,6 +82,7 @@ const char *FREEPIE_SLOT				= "freepie_slot";
 // give users the option to invert the axis if needed.
 const float DEFAULT_YAW_MULTIPLIER = 1.0f;
 const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
+const float DEFAULT_ROLL_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
 const int DEFAULT_FREEPIE_SLOT = 0;
@@ -95,15 +96,247 @@ typedef enum {
 } TrackerType;
 TrackerType g_TrackerType = TRACKER_NONE;
 
-float g_fYawMultiplier = DEFAULT_YAW_MULTIPLIER;
+float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
-float g_fYawOffset = DEFAULT_YAW_OFFSET;
-float g_fPitchOffset = DEFAULT_PITCH_OFFSET;
-int g_iFreePIESlot = DEFAULT_FREEPIE_SLOT;
+float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
+float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
+float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
+int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
 
-int cockpitRefX = 0;
-int cockpitRefY = 0;
-int cockpitRefZ = 0;
+//int cockpitRefX = 0;
+//int cockpitRefY = 0;
+//int cockpitRefZ = 0;
+
+/*********************************************************************/
+/*	Code used to enable leaning in the cockpit with the arrow keys   */
+/*********************************************************************/
+
+/*
+ * Compute the current ship's orientation. Returns:
+ * Rs: The "Right" vector in global coordinates
+ * Us: The "Up" vector in global coordinates
+ * Fs: The "Forward" vector in global coordinates
+ * A viewMatrix that maps [Rs, Us, Fs] to the major [X, Y, Z] axes
+ */
+Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool invert = false)
+{
+	const float DEG2RAD = 3.141593f / 180;
+	float yaw, pitch, roll;
+	Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
+	Vector4 T, B, N;
+	// Compute the full rotation
+	yaw = PlayerDataTable[0].yaw / 65536.0f * 360.0f;
+	pitch = PlayerDataTable[0].pitch / 65536.0f * 360.0f;
+	roll = PlayerDataTable[0].roll / 65536.0f * 360.0f;
+
+	// To test how (x,y,z) is aligned with either the Y+ or Z+ axis, just multiply rotMatrixPitch * rotMatrixYaw * (x,y,z)
+	//Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
+	rotMatrixFull.identity();
+	rotMatrixYaw.identity();   rotMatrixYaw.rotateY(-yaw);
+	rotMatrixPitch.identity(); rotMatrixPitch.rotateX(-pitch);
+	rotMatrixRoll.identity();  rotMatrixRoll.rotateY(roll);
+
+	// rotMatrixYaw aligns the orientation with the y-z plane (x --> 0)
+	// rotMatrixPitch * rotMatrixYaw aligns the orientation with y+ (x --> 0 && z --> 0)
+	// so the remaining rotation must be around the y axis (?)
+	// DEBUG, x = z, y = x, z = y;
+	// The yaw is indeed the y-axis rotation, it goes from -180 to 0 to 180.
+	// When pitch == 90, the craft is actually seeing the horizon
+	// When pitch == 0, the craft is looking towards the sun
+	// New approach: let's build a TBN system here to avoid the gimbal lock problem
+	float cosTheta, cosPhi, sinTheta, sinPhi;
+	cosTheta = cos(yaw * DEG2RAD), sinTheta = sin(yaw * DEG2RAD);
+	cosPhi = cos(pitch * DEG2RAD), sinPhi = sin(pitch * DEG2RAD);
+	N.z = cosTheta * sinPhi;
+	N.x = sinTheta * sinPhi;
+	N.y = cosPhi;
+	N.w = 0;
+
+	// This transform chain will always transform (N.x,N.y,N.z) into (0, 1, 0)
+	// To make an orthonormal basis, we need x+ and z+
+	N = rotMatrixPitch * rotMatrixYaw * N;
+	//log_debug("[DBG] N(DEBUG): %0.3f, %0.3f, %0.3f", N.x, N.y, N.z); // --> displays (0,1,0)
+	B.x = 0; B.y = 0; B.z = -1; B.w = 0;
+	T.x = 1; T.y = 0; T.z = 0; T.w = 0;
+	B = rotMatrixRoll * B;
+	T = rotMatrixRoll * T;
+	// Our new basis is T,B,N; but we need to invert the yaw/pitch rotation we applied
+	rotMatrixFull = rotMatrixPitch * rotMatrixYaw;
+	rotMatrixFull.invert();
+	T = rotMatrixFull * T;
+	B = rotMatrixFull * B;
+	N = rotMatrixFull * N;
+	// Our TBN basis is now in absolute coordinates
+	Matrix4 rotX, refl;
+	rotX.identity();
+	rotX.rotateX(90.0f);
+	refl.set(
+		1,  0,  0,  0,
+		0, -1,  0,  0,
+		0,  0,  1,  0,
+		0,  0,  0,  1
+	);
+	Fs = refl * rotX * N;
+	Us = refl * rotX * B;
+	Rs = refl * rotX * T;
+	Fs.w = 0; Rs.w = 0; Us.w = 0;
+	// This transform chain gets us the orientation of the craft in XWA's coord system:
+	// [1,0,0] is right, [0,1,0] is forward, [0,0,1] is up
+
+	Matrix4 viewMatrix;
+	if (!invert) { // Transform current ship's heading to Global Coordinates (Major Axes)
+		viewMatrix = Matrix4(
+			Rs.x, Us.x, Fs.x, 0,
+			Rs.y, Us.y, Fs.y, 0,
+			Rs.z, Us.z, Fs.z, 0,
+			0, 0, 0, 1
+		);
+		// Rs, Us, Fs is an orthonormal basis
+	}
+	else { // Transform Global Coordinates to the Ship's Coordinate System
+		viewMatrix = Matrix4(
+			Rs.x, Rs.y, Rs.z, 0,
+			Us.x, Us.y, Us.z, 0,
+			Fs.x, Fs.y, Fs.z, 0,
+			0, 0, 0, 1
+		);
+		// Rs, Us, Fs is an orthonormal basis
+	}
+	return viewMatrix;
+}
+
+typedef struct HeadPosStruct {
+	float x, y, z;
+} HeadPos;
+
+/* Maps (-6, 6) to (-0.5, 0.5) using a sigmoid function */
+float centeredSigmoid(float x) {
+	return 1.0f / (1.0f + exp(-x)) - 0.5f;
+}
+
+// TODO: Remove all these variables from ddraw once the migration is complete.
+//float g_fCockpitReferenceScale = 300.0f;
+float g_fCockpitReferenceScale = 400.0f;
+float g_fPosXMultiplier = -1.0f, g_fPosYMultiplier = -1.0f, g_fPosZMultiplier = -1.0f;
+float g_fMinPositionX = -1.50f, g_fMaxPositionX = 1.50f;
+float g_fMinPositionY = -1.50f, g_fMaxPositionY = 1.50f;
+float g_fMinPositionZ = -2.50f, g_fMaxPositionZ = 2.00f;
+HeadPos g_HeadPosAnim = { 0 }, g_HeadPos = { 0 };
+bool g_bLeftKeyDown = false, g_bRightKeyDown = false, g_bUpKeyDown = false, g_bDownKeyDown = false;
+bool g_bUpKeyDownShift = false, g_bDownKeyDownShift = false, g_bStickyArrowKeys = true;
+bool g_bResetHeadCenter = false;
+const float ANIM_INCR = 0.1f, MAX_LEAN_X = 1.5f, MAX_LEAN_Y = 1.5f, MAX_LEAN_Z = 1.5f;
+// The MAX_LEAN values will be clamped by the limits from vrparams.cfg
+
+void animTickX() {
+	if (g_bRightKeyDown)
+		g_HeadPosAnim.x -= ANIM_INCR;
+	else if (g_bLeftKeyDown)
+		g_HeadPosAnim.x += ANIM_INCR;
+	else if (!g_bRightKeyDown && !g_bLeftKeyDown && !g_bStickyArrowKeys) {
+		if (g_HeadPosAnim.x < 0.0001)
+			g_HeadPosAnim.x += ANIM_INCR;
+		if (g_HeadPosAnim.x > 0.0001)
+			g_HeadPosAnim.x -= ANIM_INCR;
+	}
+
+	// Range clamping
+	if (g_HeadPosAnim.x > 6.0f)  g_HeadPosAnim.x = 6.0f;
+	if (g_HeadPosAnim.x < -6.0f)  g_HeadPosAnim.x = -6.0f;
+
+	g_HeadPos.x = centeredSigmoid(g_HeadPosAnim.x) * MAX_LEAN_X;
+}
+
+void animTickY() {
+	if (g_bDownKeyDown)
+		g_HeadPosAnim.y += ANIM_INCR;
+	else if (g_bUpKeyDown)
+		g_HeadPosAnim.y -= ANIM_INCR;
+	else if (!g_bDownKeyDown && !g_bUpKeyDown && !g_bStickyArrowKeys) {
+		if (g_HeadPosAnim.y < 0.0001)
+			g_HeadPosAnim.y += ANIM_INCR;
+		if (g_HeadPosAnim.y > 0.0001)
+			g_HeadPosAnim.y -= ANIM_INCR;
+	}
+
+	// Range clamping
+	if (g_HeadPosAnim.y > 6.0f)  g_HeadPosAnim.y = 6.0f;
+	if (g_HeadPosAnim.y < -6.0f)  g_HeadPosAnim.y = -6.0f;
+
+	g_HeadPos.y = centeredSigmoid(g_HeadPosAnim.y) * MAX_LEAN_Y;
+}
+
+void animTickZ() {
+	if (g_bDownKeyDownShift)
+		g_HeadPosAnim.z -= ANIM_INCR;
+	else if (g_bUpKeyDownShift)
+		g_HeadPosAnim.z += ANIM_INCR;
+	else if (!g_bDownKeyDownShift && !g_bUpKeyDownShift && !g_bStickyArrowKeys) {
+		if (g_HeadPosAnim.z < 0.0001)
+			g_HeadPosAnim.z += ANIM_INCR;
+		if (g_HeadPosAnim.z > 0.0001)
+			g_HeadPosAnim.z -= ANIM_INCR;
+	}
+
+	// Range clamping
+	if (g_HeadPosAnim.z > 6.0f)  g_HeadPosAnim.z = 6.0f;
+	if (g_HeadPosAnim.z < -6.0f)  g_HeadPosAnim.z = -6.0f;
+
+	g_HeadPos.z = centeredSigmoid(g_HeadPosAnim.z) * MAX_LEAN_Z;
+}
+
+void ProcessKeyboard(__int16 keycodePressed) {
+	// Update the keyboard flags
+	g_bLeftKeyDown = (keycodePressed == KeyCode_ARROWLEFT);
+	g_bRightKeyDown = (keycodePressed == KeyCode_ARROWRIGHT);
+	g_bUpKeyDown = (keycodePressed == KeyCode_ARROWUP);
+	g_bDownKeyDown = (keycodePressed == KeyCode_ARROWDOWN);
+	g_bResetHeadCenter = (keycodePressed == KeyCode_PERIOD);
+	//if (keycodePressed == KeyCode_SHIFT)
+}
+
+void ComputeCockpitLean() 
+{
+	Vector4 headPos = Vector4(0, 0, 0, 0);
+
+	if (g_bResetHeadCenter) {
+		g_HeadPos = { 0 };
+		g_HeadPosAnim = { 0 };
+	}
+	
+	// Perform the lean left/right etc animations
+	animTickX();
+	animTickY();
+	animTickZ();
+	Vector3 headPosFromKeyboard(g_HeadPos.x, g_HeadPos.y, g_HeadPos.z); // Regular keyboard functionality
+
+	//headPos[0] = headPos[0] * g_fPosXMultiplier + headPosFromKeyboard[0];
+	//headPos[1] = headPos[1] * g_fPosYMultiplier + headPosFromKeyboard[1];
+	//headPos[2] = headPos[2] * g_fPosZMultiplier + headPosFromKeyboard[2];
+
+	headPos[0] = headPosFromKeyboard[0];
+	headPos[1] = headPosFromKeyboard[1];
+	headPos[2] = headPosFromKeyboard[2];
+
+	// Limits clamping
+	if (headPos[0] < g_fMinPositionX) headPos[0] = g_fMinPositionX;
+	if (headPos[1] < g_fMinPositionY) headPos[1] = g_fMinPositionY;
+	if (headPos[2] < g_fMinPositionZ) headPos[2] = g_fMinPositionZ;
+
+	if (headPos[0] > g_fMaxPositionX) headPos[0] = g_fMaxPositionX;
+	if (headPos[1] > g_fMaxPositionY) headPos[1] = g_fMaxPositionY;
+	if (headPos[2] > g_fMaxPositionZ) headPos[2] = g_fMaxPositionZ;
+
+	// Map the translation from global coordinates to heading coords
+	Vector4 Rs, Us, Fs;
+	Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+	headPos = HeadingMatrix * headPos;
+	PlayerDataTable->cockpitXReference = (int)(g_fCockpitReferenceScale * headPos[0]);
+	PlayerDataTable->cockpitYReference = (int)(g_fCockpitReferenceScale * headPos[1]);
+	PlayerDataTable->cockpitZReference = (int)(g_fCockpitReferenceScale * headPos[2]);
+}
+
+/*******************************************************************/
 
 /*
 Params[1] = 2nd on stack
@@ -125,19 +358,20 @@ int CockpitLookHook(int* params)
 	float yaw = 0.0f, pitch = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
 	bool dataReady = false;
-	//Vector4 translation;
-	//Matrix4 rotX, rotY, rotZ, rot;
 	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
-	
-	//if (/* 	!PlayerDataTable[playerIndex].hyperspacePhase && */ // Enable mouse-look during hyperspace
-	if (//!PlayerDataTable[playerIndex].hyperspacePhase &&
+
+	// Keyboard code for moving the cockpit camera angle
+	__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;	
+	ProcessKeyboard(keycodePressed);
+
+	if (//!PlayerDataTable[playerIndex].hyperspacePhase && // Enable mouse-look during hyperspace
 		PlayerDataTable[playerIndex].cockpitDisplayed
 		&& !PlayerDataTable[playerIndex].gunnerTurretActive
 		&& PlayerDataTable[playerIndex].cockpitDisplayed2
 		&& *numberOfPlayersInGame == 1)
 	{
 		// Keyboard code for moving the cockpit camera angle
-		__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
+		//__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
 
 		/*
 		if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
@@ -154,58 +388,104 @@ int CockpitLookHook(int* params)
 			cockpitRefZ -= 16;
 		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWDOWN)
 			cockpitRefZ += 16;
-		
-		float playerYaw   = (float)PlayerDataTable[playerIndex].yaw   / 32768.0f * 180.0f;
-		float playerPitch = (float)PlayerDataTable[playerIndex].pitch / 32768.0f * 180.0f;
-		float playerRoll  = (float)PlayerDataTable[playerIndex].roll  / 32768.0f * 180.0f;
-
-		rotX.identity(); rotX.rotateX(-playerPitch);
-		rotY.identity(); rotY.rotateY(-playerYaw);
-		rotZ.identity(); rotZ.rotateZ(-playerRoll);
-		rot.identity();
-		//rot.invertGeneral();
-		rot = rotZ * rotX * rotY;
-		//rot = rotZ;
-		translation.set((float)cockpitRefX, (float)cockpitRefY, (float)cockpitRefZ, 1.0f);
-		Vector4 post_trans = rot * translation;
-		//post_trans[1] = -post_trans[1];
-		log_debug("pitch,yaw,roll: %f, %f, %f, T: [%0.1f, %0.1f, %0.1f], PT: [%0.1f, %0.1f %0.1f]",
-			playerPitch, playerYaw, playerRoll, translation[0], translation[1], translation[2],
-			post_trans[0], post_trans[1], post_trans[2]);
-		// posX, posY: No apparent effect
-		// cameraX, cameraY: No apparent effect
-		// Motion along "cockpit#Reference is along the absolute frame of reference.
-		PlayerDataTable[playerIndex].cockpitXReference = (int)post_trans[0];
-		PlayerDataTable[playerIndex].cockpitYReference = (int)post_trans[1];
-		PlayerDataTable[playerIndex].cockpitZReference = (int)post_trans[2];
 		*/
-		//PlayerDataTable[playerIndex].cameraY = cockpitRefY;
-		//log_debug("roll: %d", PlayerDataTable[playerIndex].roll); // <-- roll responds to the joystick roll and it alters
-		// the way cockpitXReference is interpreted, same goes for .pitch and .yaw
-		//PlayerDataTable[playerIndex].cockpitYReference = cockpitRefY;
-		//PlayerDataTable[playerIndex].cockpitZReference = cockpitRefZ;
-		/* log_debug("ypr: %d, %d, %d", PlayerDataTable[playerIndex].yaw,
-			PlayerDataTable[playerIndex].pitch,
-			PlayerDataTable[playerIndex].roll); */
-		
+
+		// DEBUG
+		//PlayerDataTable[playerIndex].cockpitXReference = -200;
+		// DEBUG
+
 		// Read tracking data.
 		switch (g_TrackerType) 
 		{
 			case TRACKER_NONE:
 			{
+				ComputeCockpitLean();
 				dataReady = false;
 			}
 			break;
 
 			case TRACKER_FREEPIE:
 			{
+				static Vector4 headCenter(0, 0, 0, 0), headPos(0, 0, 0, 0);
+				//Vector3 headPosFromKeyboard(g_HeadPos.x, g_HeadPos.y, g_HeadPos.z); // Regular keyboard functionality
+				Vector3 headPosFromKeyboard(0, 0, 0);
+				float roll;
+
+				// TODO: Read these settings from a cfg file later:
+				g_fPosXMultiplier =  1.0f;
+				g_fPosYMultiplier =  1.0f;
+				g_fPosZMultiplier = -1.0f;
+
 				pitchSign = -1.0f;
 				if (ReadFreePIE(g_iFreePIESlot)) {
-					// For some reason, in the latest Trinus version (1.0.4) the yaw is 180 when centered?
-					// I need to add a configurable offset to the config file; for now, let's hard-code it
-					// to 180:
-					yaw   = g_FreePIEData.yaw   * g_fYawMultiplier;
-					pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
+					if (g_bResetHeadCenter) {
+						headCenter[0] = g_FreePIEData.x;
+						headCenter[1] = g_FreePIEData.y;
+						headCenter[2] = g_FreePIEData.z;
+						//log_debug("HEAD RESET, new center: %0.3f, %0.3f, %0.3f",
+						//	headCenter[0], headCenter[1], headCenter[2]);
+					}
+					Vector4 pos(g_FreePIEData.x, g_FreePIEData.y, g_FreePIEData.z, 1.0f);
+					yaw    = g_FreePIEData.yaw   * g_fYawMultiplier;
+					pitch  = g_FreePIEData.pitch * g_fPitchMultiplier;
+					roll   = g_FreePIEData.roll  * g_fRollMultiplier;
+					yaw   += g_fYawOffset;
+					pitch += g_fPitchOffset;
+					headPos = (pos - headCenter);
+					// Old code:
+					//yaw   = g_FreePIEData.yaw   * g_fYawMultiplier;
+					//pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
+
+					//if (g_bYawPitchFromMouseOverride) {
+					//	// If FreePIE could not be read, then get the yaw/pitch from the mouse:
+					//	yaw = (float)PlayerDataTable[0].cockpitCameraYaw / 32768.0f * 180.0f;
+					//	pitch = -(float)PlayerDataTable[0].cockpitCameraPitch / 32768.0f * 180.0f;
+					//}
+
+					headPos[0] = headPos[0] * g_fPosXMultiplier + headPosFromKeyboard[0];
+					headPos[1] = headPos[1] * g_fPosYMultiplier + headPosFromKeyboard[1];
+					headPos[2] = headPos[2] * g_fPosZMultiplier + headPosFromKeyboard[2];
+
+					// Limits clamping
+					if (headPos[0] < g_fMinPositionX) headPos[0] = g_fMinPositionX;
+					if (headPos[1] < g_fMinPositionY) headPos[1] = g_fMinPositionY;
+					if (headPos[2] < g_fMinPositionZ) headPos[2] = g_fMinPositionZ;
+
+					if (headPos[0] > g_fMaxPositionX) headPos[0] = g_fMaxPositionX;
+					if (headPos[1] > g_fMaxPositionY) headPos[1] = g_fMaxPositionY;
+					if (headPos[2] > g_fMaxPositionZ) headPos[2] = g_fMaxPositionZ;
+					
+					// For some reason it looks like we don't need to compensate for yaw/pitch
+					// here, applying the translation directly seems to work fine... Maybe because
+					// the frame's perspective is computed after this point (i.e. we're at the beginning
+					// of the frame), whereas in ddraw we're at the end of the frame
+					Matrix4 rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
+					rotMatrixYaw.identity();   rotMatrixYaw.rotateY(-yaw);
+					rotMatrixPitch.identity(); rotMatrixPitch.rotateX(pitch);
+					//rotMatrixRoll.identity();  rotMatrixRoll.rotateZ(roll);
+
+					// For the fixed GUI, yaw has to be like this:
+					//rotMatrixFull.rotateY(yaw);
+					//rotMatrixFull = rotMatrixRoll * rotMatrixPitch * rotMatrixFull;
+					// But the matrix to compensate for the translation uses -yaw:
+					rotMatrixYaw = rotMatrixPitch * rotMatrixYaw;
+					// Can we avoid computing the matrix inverse?
+					rotMatrixYaw.invert();
+					//headPos = rotMatrixYaw * headPos;
+
+					Vector4 Rs, Us, Fs;
+					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+					headPos = HeadingMatrix * headPos;
+					PlayerDataTable->cockpitXReference = (int)(g_fCockpitReferenceScale * headPos[0]);
+					PlayerDataTable->cockpitYReference = (int)(g_fCockpitReferenceScale * headPos[1]);
+					PlayerDataTable->cockpitZReference = (int)(g_fCockpitReferenceScale * headPos[2]);
+
+					// We add the yaw/pitch offset again right before we write it to the PlayerDataTable; but
+					// we need the yaw/pitch + offset to compute a proper translation. I probably need to fix
+					// this later:
+					yaw	  -= g_fYawOffset;
+					pitch -= g_fPitchOffset;
+
 					dataReady = true;
 				}
 			}
@@ -223,8 +503,8 @@ int CockpitLookHook(int* params)
 			case TRACKER_TRACKIR:
 			{
 				if (ReadTrackIRData(&yaw, &pitch)) {
-					yaw   *= g_fYawMultiplier;
-					pitch *= g_fPitchMultiplier;
+					yaw		 *= g_fYawMultiplier;
+					pitch	 *= g_fPitchMultiplier;
 					yawSign   = -1.0f; 
 					pitchSign = -1.0f;
 					dataReady = true;
@@ -351,6 +631,8 @@ int CockpitLookHook(int* params)
 	}
 	
 //out:
+	g_bResetHeadCenter = false;
+
 	params[-1] = 0x4F9C33;
 	return 0;
 }
