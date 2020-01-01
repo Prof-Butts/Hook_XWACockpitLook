@@ -75,6 +75,16 @@ const char *YAW_OFFSET				= "yaw_offset";
 const char *PITCH_OFFSET				= "pitch_offset";
 const char *FREEPIE_SLOT				= "freepie_slot";
 
+const char *POS_X_MULTIPLIER_VRPARAM = "positional_x_multiplier";
+const char *POS_Y_MULTIPLIER_VRPARAM = "positional_y_multiplier";
+const char *POS_Z_MULTIPLIER_VRPARAM = "positional_z_multiplier";
+const char *MIN_POSITIONAL_X_VRPARAM = "min_positional_track_x";
+const char *MAX_POSITIONAL_X_VRPARAM = "max_positional_track_x";
+const char *MIN_POSITIONAL_Y_VRPARAM = "min_positional_track_y";
+const char *MAX_POSITIONAL_Y_VRPARAM = "max_positional_track_y";
+const char *MIN_POSITIONAL_Z_VRPARAM = "min_positional_track_z";
+const char *MAX_POSITIONAL_Z_VRPARAM = "max_positional_track_z";
+
 // Tracker-specific constants
 // Some people might want to use the regular (non-VR) game with a tracker. In that case
 // they usually want to be able to look around the cockpit while still having the screen
@@ -82,10 +92,10 @@ const char *FREEPIE_SLOT				= "freepie_slot";
 // give users the option to invert the axis if needed.
 const float DEFAULT_YAW_MULTIPLIER = 1.0f;
 const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
-const float DEFAULT_ROLL_MULTIPLIER = 1.0f;
+//const float DEFAULT_ROLL_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
-const int DEFAULT_FREEPIE_SLOT = 0;
+const int   DEFAULT_FREEPIE_SLOT = 0;
 
 // General types and globals
 typedef enum {
@@ -98,14 +108,13 @@ TrackerType g_TrackerType = TRACKER_NONE;
 
 float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
-float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
+//float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
 float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
 float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
 int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
-
-//int cockpitRefX = 0;
-//int cockpitRefY = 0;
-//int cockpitRefZ = 0;
+bool	  g_bYawPitchFromMouseOverride = false;
+Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0);
+Vector3 g_headPosFromKeyboard(0, 0, 0);
 
 /*********************************************************************/
 /*	Code used to enable leaning in the cockpit with the arrow keys   */
@@ -125,9 +134,9 @@ Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool inve
 	Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
 	Vector4 T, B, N;
 	// Compute the full rotation
-	yaw = PlayerDataTable[0].yaw / 65536.0f * 360.0f;
+	yaw   = PlayerDataTable[0].yaw   / 65536.0f * 360.0f;
 	pitch = PlayerDataTable[0].pitch / 65536.0f * 360.0f;
-	roll = PlayerDataTable[0].roll / 65536.0f * 360.0f;
+	roll  = PlayerDataTable[0].roll  / 65536.0f * 360.0f;
 
 	// To test how (x,y,z) is aligned with either the Y+ or Z+ axis, just multiply rotMatrixPitch * rotMatrixYaw * (x,y,z)
 	//Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
@@ -215,16 +224,17 @@ float centeredSigmoid(float x) {
 }
 
 // TODO: Remove all these variables from ddraw once the migration is complete.
-//float g_fCockpitReferenceScale = 300.0f;
-float g_fCockpitReferenceScale = 400.0f;
+//float g_fXWAUnitsToMetersScale = 655.36f; // This is technically correct; but it seems too much for me
+float g_fXWAUnitsToMetersScale = 400.0f; // This value feels better
 float g_fPosXMultiplier = -1.0f, g_fPosYMultiplier = -1.0f, g_fPosZMultiplier = -1.0f;
-float g_fMinPositionX = -1.50f, g_fMaxPositionX = 1.50f;
-float g_fMinPositionY = -1.50f, g_fMaxPositionY = 1.50f;
-float g_fMinPositionZ = -2.50f, g_fMaxPositionZ = 2.00f;
+float g_fMinPositionX = -2.50f, g_fMaxPositionX = 2.50f;
+float g_fMinPositionY = -2.50f, g_fMaxPositionY = 2.50f;
+float g_fMinPositionZ = -2.50f, g_fMaxPositionZ = 2.50f;
 HeadPos g_HeadPosAnim = { 0 }, g_HeadPos = { 0 };
 bool g_bLeftKeyDown = false, g_bRightKeyDown = false, g_bUpKeyDown = false, g_bDownKeyDown = false;
 bool g_bUpKeyDownShift = false, g_bDownKeyDownShift = false, g_bStickyArrowKeys = true;
-bool g_bResetHeadCenter = false;
+bool g_bResetHeadCenter = false, g_bSteamVRPosFromFreePIE = false;
+bool g_bFlipYZAxes = false;
 const float ANIM_INCR = 0.1f, MAX_LEAN_X = 1.5f, MAX_LEAN_Y = 1.5f, MAX_LEAN_Z = 1.5f;
 // The MAX_LEAN values will be clamped by the limits from vrparams.cfg
 
@@ -331,9 +341,9 @@ void ComputeCockpitLean()
 	Vector4 Rs, Us, Fs;
 	Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
 	headPos = HeadingMatrix * headPos;
-	PlayerDataTable->cockpitXReference = (int)(g_fCockpitReferenceScale * headPos[0]);
-	PlayerDataTable->cockpitYReference = (int)(g_fCockpitReferenceScale * headPos[1]);
-	PlayerDataTable->cockpitZReference = (int)(g_fCockpitReferenceScale * headPos[2]);
+	PlayerDataTable->cockpitXReference = (int)(g_fXWAUnitsToMetersScale * headPos[0]);
+	PlayerDataTable->cockpitYReference = (int)(g_fXWAUnitsToMetersScale * headPos[1]);
+	PlayerDataTable->cockpitZReference = (int)(g_fXWAUnitsToMetersScale * headPos[2]);
 }
 
 /*******************************************************************/
@@ -406,86 +416,30 @@ int CockpitLookHook(int* params)
 
 			case TRACKER_FREEPIE:
 			{
-				static Vector4 headCenter(0, 0, 0, 0), headPos(0, 0, 0, 0);
 				//Vector3 headPosFromKeyboard(g_HeadPos.x, g_HeadPos.y, g_HeadPos.z); // Regular keyboard functionality
-				Vector3 headPosFromKeyboard(0, 0, 0);
-				float roll;
-
-				// TODO: Read these settings from a cfg file later:
-				g_fPosXMultiplier =  1.0f;
-				g_fPosYMultiplier =  1.0f;
-				g_fPosZMultiplier = -1.0f;
-
+				// The Z-axis should now be inverted because of XWA's coord system
 				pitchSign = -1.0f;
 				if (ReadFreePIE(g_iFreePIESlot)) {
 					if (g_bResetHeadCenter) {
-						headCenter[0] = g_FreePIEData.x;
-						headCenter[1] = g_FreePIEData.y;
-						headCenter[2] = g_FreePIEData.z;
-						//log_debug("HEAD RESET, new center: %0.3f, %0.3f, %0.3f",
-						//	headCenter[0], headCenter[1], headCenter[2]);
+						g_headCenter[0] =  g_FreePIEData.x;
+						g_headCenter[1] =  g_FreePIEData.y;
+						g_headCenter[2] = -g_FreePIEData.z;
 					}
-					Vector4 pos(g_FreePIEData.x, g_FreePIEData.y, g_FreePIEData.z, 1.0f);
 					yaw    = g_FreePIEData.yaw   * g_fYawMultiplier;
 					pitch  = g_FreePIEData.pitch * g_fPitchMultiplier;
-					roll   = g_FreePIEData.roll  * g_fRollMultiplier;
-					yaw   += g_fYawOffset;
-					pitch += g_fPitchOffset;
-					headPos = (pos - headCenter);
+
+					if (g_bYawPitchFromMouseOverride) {
+						// If FreePIE could not be read, then get the yaw/pitch from the mouse:
+						yaw   =  (float)PlayerDataTable[0].cockpitCameraYaw   / 32768.0f * 180.0f;
+						pitch = -(float)PlayerDataTable[0].cockpitCameraPitch / 32768.0f * 180.0f;
+					}
+
+					Vector4 pos(g_FreePIEData.x, g_FreePIEData.y, -g_FreePIEData.z, 1.0f);
+					g_headPos = (pos - g_headCenter);
+					
 					// Old code:
 					//yaw   = g_FreePIEData.yaw   * g_fYawMultiplier;
 					//pitch = g_FreePIEData.pitch * g_fPitchMultiplier;
-
-					//if (g_bYawPitchFromMouseOverride) {
-					//	// If FreePIE could not be read, then get the yaw/pitch from the mouse:
-					//	yaw = (float)PlayerDataTable[0].cockpitCameraYaw / 32768.0f * 180.0f;
-					//	pitch = -(float)PlayerDataTable[0].cockpitCameraPitch / 32768.0f * 180.0f;
-					//}
-
-					headPos[0] = headPos[0] * g_fPosXMultiplier + headPosFromKeyboard[0];
-					headPos[1] = headPos[1] * g_fPosYMultiplier + headPosFromKeyboard[1];
-					headPos[2] = headPos[2] * g_fPosZMultiplier + headPosFromKeyboard[2];
-
-					// Limits clamping
-					if (headPos[0] < g_fMinPositionX) headPos[0] = g_fMinPositionX;
-					if (headPos[1] < g_fMinPositionY) headPos[1] = g_fMinPositionY;
-					if (headPos[2] < g_fMinPositionZ) headPos[2] = g_fMinPositionZ;
-
-					if (headPos[0] > g_fMaxPositionX) headPos[0] = g_fMaxPositionX;
-					if (headPos[1] > g_fMaxPositionY) headPos[1] = g_fMaxPositionY;
-					if (headPos[2] > g_fMaxPositionZ) headPos[2] = g_fMaxPositionZ;
-					
-					// For some reason it looks like we don't need to compensate for yaw/pitch
-					// here, applying the translation directly seems to work fine... Maybe because
-					// the frame's perspective is computed after this point (i.e. we're at the beginning
-					// of the frame), whereas in ddraw we're at the end of the frame
-					Matrix4 rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
-					rotMatrixYaw.identity();   rotMatrixYaw.rotateY(-yaw);
-					rotMatrixPitch.identity(); rotMatrixPitch.rotateX(pitch);
-					//rotMatrixRoll.identity();  rotMatrixRoll.rotateZ(roll);
-
-					// For the fixed GUI, yaw has to be like this:
-					//rotMatrixFull.rotateY(yaw);
-					//rotMatrixFull = rotMatrixRoll * rotMatrixPitch * rotMatrixFull;
-					// But the matrix to compensate for the translation uses -yaw:
-					rotMatrixYaw = rotMatrixPitch * rotMatrixYaw;
-					// Can we avoid computing the matrix inverse?
-					rotMatrixYaw.invert();
-					//headPos = rotMatrixYaw * headPos;
-
-					Vector4 Rs, Us, Fs;
-					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
-					headPos = HeadingMatrix * headPos;
-					PlayerDataTable->cockpitXReference = (int)(g_fCockpitReferenceScale * headPos[0]);
-					PlayerDataTable->cockpitYReference = (int)(g_fCockpitReferenceScale * headPos[1]);
-					PlayerDataTable->cockpitZReference = (int)(g_fCockpitReferenceScale * headPos[2]);
-
-					// We add the yaw/pitch offset again right before we write it to the PlayerDataTable; but
-					// we need the yaw/pitch + offset to compute a proper translation. I probably need to fix
-					// this later:
-					yaw	  -= g_fYawOffset;
-					pitch -= g_fPitchOffset;
-
 					dataReady = true;
 				}
 			}
@@ -493,20 +447,58 @@ int CockpitLookHook(int* params)
 
 			case TRACKER_STEAMVR: 
 			{
-				dataReady = GetSteamVRPositionalData(&yaw, &pitch);
-				yaw   *= RAD_TO_DEG * g_fYawMultiplier;
-				pitch *= RAD_TO_DEG * g_fPitchMultiplier;
-				yawSign = -1.0f;
+				float x, y, z;
+				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &x, &y, &z);
+				// We need to invert the Z-axis because of XWA's coordinate system.
+				z = -z;
+
+				// HACK ALERT: I'm reading the positional tracking data from FreePIE when
+				// running SteamVR because setting up the PSMoveServiceSteamVRBridge is kind
+				// of... tricky; and I'm not going to bother right now since PSMoveService
+				// already works very well for me.
+				// Read the positional data from FreePIE if the right flag is set
+				if (g_bSteamVRPosFromFreePIE) {
+					ReadFreePIE(g_iFreePIESlot);
+					x =  g_FreePIEData.x;
+					y =  g_FreePIEData.y;
+					z = -g_FreePIEData.z;
+					log_debug("Pos read from FreePIE: (%0.3f, %0.3f, %0.3f)", x, y, z);
+				}
+
+				yaw      *= RAD_TO_DEG * g_fYawMultiplier;
+				pitch    *= RAD_TO_DEG * g_fPitchMultiplier;
+				yawSign   = -1.0f;
+				if (g_bResetHeadCenter) {
+					g_headCenter[0] = x;
+					g_headCenter[1] = y;
+					g_headCenter[2] = z;
+				}
+				Vector4 pos(x, y, z, 1.0f);
+				g_headPos = (pos - g_headCenter);
 			}
 			break;
 
 			case TRACKER_TRACKIR:
 			{
-				if (ReadTrackIRData(&yaw, &pitch)) {
+				float x, y, z;
+				if (ReadTrackIRData(&yaw, &pitch, &x, &y, &z)) {
 					yaw		 *= g_fYawMultiplier;
 					pitch	 *= g_fPitchMultiplier;
 					yawSign   = -1.0f; 
 					pitchSign = -1.0f;
+
+					if (g_bFlipYZAxes) {
+						float temp = y; y = z; z = temp;
+					}
+
+					if (g_bResetHeadCenter) {
+						g_headCenter[0] = x;
+						g_headCenter[1] = y;
+						g_headCenter[2] = z;
+					}
+					Vector4 pos(x, y, z, 1.0f);
+					g_headPos = (pos - g_headCenter);
+
 					dataReady = true;
 				}
 			}
@@ -523,6 +515,32 @@ int CockpitLookHook(int* params)
 			//if (!bExternalCamera) {
 				PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+
+				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
+				g_headPos[1] = g_headPos[1] * g_fPosYMultiplier + g_headPosFromKeyboard[1];
+				g_headPos[2] = g_headPos[2] * g_fPosZMultiplier + g_headPosFromKeyboard[2];
+
+				// Limits clamping
+				if (g_headPos[0] < g_fMinPositionX) g_headPos[0] = g_fMinPositionX;
+				if (g_headPos[1] < g_fMinPositionY) g_headPos[1] = g_fMinPositionY;
+				if (g_headPos[2] < g_fMinPositionZ) g_headPos[2] = g_fMinPositionZ;
+
+				if (g_headPos[0] > g_fMaxPositionX) g_headPos[0] = g_fMaxPositionX;
+				if (g_headPos[1] > g_fMaxPositionY) g_headPos[1] = g_fMaxPositionY;
+				if (g_headPos[2] > g_fMaxPositionZ) g_headPos[2] = g_fMaxPositionZ;
+
+				// For some reason it looks like we don't need to compensate for yaw/pitch
+				// here (as opposed to doing it in ddraw), applying the translation directly seems 
+				// to work fine... Maybe because the frame's perspective is computed after this 
+				// point (i.e. we're at the beginning of the frame), whereas in ddraw we're at the
+				// end of the frame (?)
+
+				Vector4 Rs, Us, Fs;
+				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+				g_headPos = HeadingMatrix * g_headPos;
+				PlayerDataTable->cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
+				PlayerDataTable->cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
+				PlayerDataTable->cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
 			/*} else {
 				PlayerDataTable[playerIndex].cameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 				PlayerDataTable[playerIndex].cameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
@@ -655,7 +673,7 @@ void LoadParams() {
 	}
 
 	char buf[160], param[80], svalue[80];
-	float value;
+	float fValue;
 	while (fgets(buf, 160, file) != NULL) {
 		// Skip comments and blank lines
 		if (buf[0] == ';' || buf[0] == '#')
@@ -664,7 +682,7 @@ void LoadParams() {
 			continue;
 
 		if (sscanf_s(buf, "%s = %s", param, 80, svalue, 80) > 0) {
-			value = (float )atof(svalue);
+			fValue = (float )atof(svalue);
 			if (_stricmp(param, TRACKER_TYPE) == 0) {
 				if (_stricmp(svalue, TRACKER_TYPE_FREEPIE) == 0) {
 					log_debug("Using FreePIE for tracking");
@@ -684,25 +702,68 @@ void LoadParams() {
 				}
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
-				g_fYawMultiplier = value;
+				g_fYawMultiplier = fValue;
 				log_debug("Yaw multiplier: %0.3f", g_fYawMultiplier);
 			}
 			else if (_stricmp(param, PITCH_MULTIPLIER) == 0) {
-				g_fPitchMultiplier = value;
+				g_fPitchMultiplier = fValue;
 				log_debug("Pitch multiplier: %0.3f", g_fPitchMultiplier);
 			}
 			else if (_stricmp(param, YAW_OFFSET) == 0) {
-				g_fYawOffset = value;
+				g_fYawOffset = fValue;
 				log_debug("Yaw offset: %0.3f", g_fYawOffset);
 			}
 			else if (_stricmp(param, PITCH_OFFSET) == 0) {
-				g_fPitchOffset = value;
+				g_fPitchOffset = fValue;
 				log_debug("Pitch offset: %0.3f", g_fPitchOffset);
 			}
 			else if (_stricmp(param, FREEPIE_SLOT) == 0) {
-				g_iFreePIESlot = (int )value;
+				g_iFreePIESlot = (int )fValue;
 				log_debug("FreePIE slot: %d", g_iFreePIESlot);
 			}
+
+			// Extra parameters to enable positional tracking
+			else if (_stricmp(param, "yaw_pitch_from_mouse_override") == 0) {
+				g_bYawPitchFromMouseOverride = (bool)fValue;
+			}
+			else if (_stricmp(param, POS_X_MULTIPLIER_VRPARAM) == 0) {
+				g_fPosXMultiplier = fValue;
+			}
+			else if (_stricmp(param, POS_Y_MULTIPLIER_VRPARAM) == 0) {
+				g_fPosYMultiplier = fValue;
+			}
+			else if (_stricmp(param, POS_Z_MULTIPLIER_VRPARAM) == 0) {
+				g_fPosZMultiplier = fValue;
+			}
+
+			else if (_stricmp(param, MIN_POSITIONAL_X_VRPARAM) == 0) {
+				g_fMinPositionX = fValue;
+			}
+			else if (_stricmp(param, MAX_POSITIONAL_X_VRPARAM) == 0) {
+				g_fMaxPositionX = fValue;
+			}
+			else if (_stricmp(param, MIN_POSITIONAL_Y_VRPARAM) == 0) {
+				g_fMinPositionY = fValue;
+			}
+			else if (_stricmp(param, MAX_POSITIONAL_Y_VRPARAM) == 0) {
+				g_fMaxPositionY = fValue;
+			}
+			else if (_stricmp(param, MIN_POSITIONAL_Z_VRPARAM) == 0) {
+				g_fMinPositionZ = fValue;
+			}
+			else if (_stricmp(param, MAX_POSITIONAL_Z_VRPARAM) == 0) {
+				g_fMaxPositionZ = fValue;
+			}
+			else if (_stricmp(param, "steamvr_pos_from_freepie") == 0) {
+				g_bSteamVRPosFromFreePIE = (bool)fValue;
+			}
+			else if (_stricmp(param, "xwa_units_to_meters_scale") == 0) {
+				g_fXWAUnitsToMetersScale = fValue;
+			}
+			else if (_stricmp(param, "flip_yz_axes") == 0) {
+				g_bFlipYZAxes = (bool)fValue;
+			}
+			
 		}
 	} // while ... read file
 	fclose(file);
@@ -725,6 +786,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 			break;
 		case TRACKER_STEAMVR:
 			InitSteamVR();
+			if (g_bSteamVRPosFromFreePIE)
+				InitFreePIE();
 			break;
 		case TRACKER_TRACKIR:
 			InitTrackIR();
@@ -744,6 +807,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 			// We can't shutdown SteamVR twice: we either shut it down here, or in ddraw.dll.
 			// It looks like the right order is to shut it down here.
 			ShutdownSteamVR();
+			if (g_bSteamVRPosFromFreePIE)
+				ShutdownFreePIE();
 			break;
 		case TRACKER_TRACKIR:
 			ShutdownTrackIR();

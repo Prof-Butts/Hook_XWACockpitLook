@@ -215,14 +215,17 @@ void ShutdownTrackIR()
 	FreeLibrary(hTrackIR);
 }
 
-bool ReadTrackIRData(float *yaw, float *pitch) {
+bool ReadTrackIRData(float *yaw, float *pitch, float *x, float *y, float *z) {
 	int error;
 	error = NP_GetData(&data);
 	if (error != NP_OK || data.wNPStatus != 0) {
 		log_debug("error: %d, wNPStatus: %d", error, data.wNPStatus);
 		return false;
 	}
-	*yaw = data.fNPYaw / 100;
+	*yaw   = data.fNPYaw   / 100.0f;
 	*pitch = data.fNPPitch / 100.0f;
+	*x     = data.fNPX;
+	*y	   = data.fNPY;
+	*z	   = data.fNPZ;
 	return true;
 }

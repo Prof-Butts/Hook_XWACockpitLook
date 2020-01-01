@@ -104,7 +104,7 @@ void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch) 
 	*roll = atan2(2.0f * q.x*q.w - 2.0f * q.y*q.z, 1.0f - 2.0f * sqx - 2.0f * sqz);
 }
 
-bool GetSteamVRPositionalData(float *yaw, float *pitch)
+bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, float *z)
 {
 	if (g_pHMD == NULL) {
 		log_debug("GetSteamVRPositional Data with g_pHMD = NULL");
@@ -136,6 +136,9 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch)
 		poseMatrix = trackedDevicePose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
 		q = rotationToQuaternion(trackedDevicePose.mDeviceToAbsoluteTracking);
 		quatToEuler(q, yaw, pitch, &roll);
+		*x = poseMatrix.m[0][3];
+		*y = poseMatrix.m[1][3];
+		*z = poseMatrix.m[2][3];
 		return true;
 	}
 	return false;

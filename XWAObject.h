@@ -852,43 +852,11 @@ struct PlayerDataEntry
 	__int16 cameraRoll;
 	__int16 cameraPitch;
 	__int16 cameraYaw;
-	/*
-	char cockpitXReference;
-	char field_B69;
-	char field_B6A;
-	char field_B6B;
-	*/
 	int cockpitXReference;
-	/*
-	char cockpitYReference;
-	char field_B6D;
-	__int16 field_B6E;
-	*/
 	int cockpitYReference;
-	/*
-	char cockpitZReference;
-	char field_B71;
-	char field_B72;
-	char field_B73;
-	*/
 	int cockpitZReference;
-
-	/*
-	char cockpitPitchReference;
-	char field_B75;
-	*/
 	__int16 cockpitPitchReference;
-
-	/*
-	char cockpitYawReference;
-	char field_B77;
-	*/
 	__int16 cockpitYawReference;
-
-	/*
-	char cockpitRollReference;
-	char field_B79;
-	*/
 	__int16 cockpitRollReference;
 
 	char field_B7A;
