@@ -318,7 +318,7 @@ void ComputeCockpitLean()
 	animTickX();
 	animTickY();
 	animTickZ();
-	Vector3 headPosFromKeyboard(g_HeadPos.x, g_HeadPos.y, g_HeadPos.z); // Regular keyboard functionality
+	Vector3 headPosFromKeyboard(-g_HeadPos.x, -g_HeadPos.y, -g_HeadPos.z); // Regular keyboard functionality
 
 	//headPos[0] = headPos[0] * g_fPosXMultiplier + headPosFromKeyboard[0];
 	//headPos[1] = headPos[1] * g_fPosYMultiplier + headPosFromKeyboard[1];
