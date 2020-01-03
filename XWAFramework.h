@@ -135,9 +135,16 @@ const auto mouseLook_X = (int*)0x9E9620;
 const auto mouseLookInverted = (__int8*)0x771298;
 const auto mouseLookResetPosition = (int*)0x9E962C;
 
-
+// Alt, Control and Shift key states:
+const auto s_XwaIsControlKeyPressed = (int *)0x006343DC;
+const auto s_XwaIsShiftKeyPressed = (int *)0x006343E0;
+const auto s_XwaIsAltKeyPressed = (int *)0x006343E4;
+// Call the following function to refresh the variables above:
+const auto XwaDIKeyboardUpdateShiftControlAltKeysPressedState = (void(*)())0x0042B880;
 
 // Unknowns
 
 const auto dword_7833D4 = (int*)0x7833D4;
 const auto dword_B07C6C = (int*)0xB07C6C;
+
+

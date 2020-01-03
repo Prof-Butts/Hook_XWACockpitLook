@@ -1,7 +1,12 @@
 /*
  * Copyright 2019, Justagai.
  * Extended for VR by Leo Reyes, 2019.
- * Justagai coded the whole mouse hook, I (Leo) just added support for FreePIE and SteamVR tracking.
+ * Justagai coded the whole mouse hook, I (blue_max) just added support for FreePIE and SteamVR tracking.
+ * December 2019: Added support for positional tracking by hijacking the cockpit shake variables.
+
+ The function that process keyboard input is L004FBA80. The pressed key is stored in the variable at 
+ address 0x08053C0. You may want to hook this function and filter the pressed key.
+
  */
 // TODO: Move the initialization of FreePIE/SteamVR to the dllmain's DLL_PROCESS_ATTACH (assuming this is possible)
 #include "cockpitlook.h"
@@ -235,10 +240,13 @@ bool g_bLeftKeyDown = false, g_bRightKeyDown = false, g_bUpKeyDown = false, g_bD
 bool g_bUpKeyDownShift = false, g_bDownKeyDownShift = false, g_bStickyArrowKeys = true;
 bool g_bResetHeadCenter = false, g_bSteamVRPosFromFreePIE = false;
 bool g_bFlipYZAxes = false;
-const float ANIM_INCR = 0.1f, MAX_LEAN_X = 1.5f, MAX_LEAN_Y = 1.5f, MAX_LEAN_Z = 1.5f;
+// if true then the arrow keys will modify the cockpit camera's yaw/pitch
+// if false, then the arrow keys will perform lean right/left up/down
+bool g_bToggleKeyboardCaps = false;
+const float ANIM_INCR = 0.1f, MAX_LEAN_X = 2.5f, MAX_LEAN_Y = 2.5f, MAX_LEAN_Z = 2.5f;
 // The MAX_LEAN values will be clamped by the limits from vrparams.cfg
 
-void animTickX() {
+void animTickX(Vector3 *headPos) {
 	if (g_bRightKeyDown)
 		g_HeadPosAnim.x -= ANIM_INCR;
 	else if (g_bLeftKeyDown)
@@ -251,13 +259,13 @@ void animTickX() {
 	}
 
 	// Range clamping
-	if (g_HeadPosAnim.x > 6.0f)  g_HeadPosAnim.x = 6.0f;
+	if (g_HeadPosAnim.x > 6.0f)   g_HeadPosAnim.x =  6.0f;
 	if (g_HeadPosAnim.x < -6.0f)  g_HeadPosAnim.x = -6.0f;
 
-	g_HeadPos.x = centeredSigmoid(g_HeadPosAnim.x) * MAX_LEAN_X;
+	headPos->x = centeredSigmoid(g_HeadPosAnim.x) * MAX_LEAN_X;
 }
 
-void animTickY() {
+void animTickY(Vector3 *headPos) {
 	if (g_bDownKeyDown)
 		g_HeadPosAnim.y += ANIM_INCR;
 	else if (g_bUpKeyDown)
@@ -270,13 +278,13 @@ void animTickY() {
 	}
 
 	// Range clamping
-	if (g_HeadPosAnim.y > 6.0f)  g_HeadPosAnim.y = 6.0f;
+	if (g_HeadPosAnim.y > 6.0f)   g_HeadPosAnim.y =  6.0f;
 	if (g_HeadPosAnim.y < -6.0f)  g_HeadPosAnim.y = -6.0f;
 
-	g_HeadPos.y = centeredSigmoid(g_HeadPosAnim.y) * MAX_LEAN_Y;
+	headPos->y = centeredSigmoid(g_HeadPosAnim.y) * MAX_LEAN_Y;
 }
 
-void animTickZ() {
+void animTickZ(Vector3 *headPos) {
 	if (g_bDownKeyDownShift)
 		g_HeadPosAnim.z -= ANIM_INCR;
 	else if (g_bUpKeyDownShift)
@@ -289,61 +297,50 @@ void animTickZ() {
 	}
 
 	// Range clamping
-	if (g_HeadPosAnim.z > 6.0f)  g_HeadPosAnim.z = 6.0f;
+	if (g_HeadPosAnim.z > 6.0f)   g_HeadPosAnim.z =  6.0f;
 	if (g_HeadPosAnim.z < -6.0f)  g_HeadPosAnim.z = -6.0f;
 
-	g_HeadPos.z = centeredSigmoid(g_HeadPosAnim.z) * MAX_LEAN_Z;
+	headPos->z = centeredSigmoid(g_HeadPosAnim.z) * MAX_LEAN_Z;
+	headPos->z = -headPos->z; // The z-axis is inverted in XWA w.r.t. the original view-centric definition
 }
 
 void ProcessKeyboard(__int16 keycodePressed) {
+	XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
 	// Update the keyboard flags
-	g_bLeftKeyDown = (keycodePressed == KeyCode_ARROWLEFT);
-	g_bRightKeyDown = (keycodePressed == KeyCode_ARROWRIGHT);
-	g_bUpKeyDown = (keycodePressed == KeyCode_ARROWUP);
-	g_bDownKeyDown = (keycodePressed == KeyCode_ARROWDOWN);
+	g_bLeftKeyDown     = (keycodePressed == KeyCode_ARROWLEFT);
+	g_bRightKeyDown    = (keycodePressed == KeyCode_ARROWRIGHT);
+	if (!*s_XwaIsShiftKeyPressed) { // Z and Y axes are swapped w.r.t. the original view-centric definition
+		g_bUpKeyDown   = (keycodePressed == KeyCode_ARROWUP);
+		g_bDownKeyDown = (keycodePressed == KeyCode_ARROWDOWN);
+		g_bUpKeyDownShift   = false;
+		g_bDownKeyDownShift = false;
+	}
+	else {
+		g_bUpKeyDownShift   = (keycodePressed == KeyCode_ARROWUP);
+		g_bDownKeyDownShift = (keycodePressed == KeyCode_ARROWDOWN);
+		g_bUpKeyDown   = false;
+		g_bDownKeyDown = false;
+	}
 	g_bResetHeadCenter = (keycodePressed == KeyCode_PERIOD);
+	if (keycodePressed == KeyCode_CAPSLOCK)
+		g_bToggleKeyboardCaps = !g_bToggleKeyboardCaps;
 	//if (keycodePressed == KeyCode_SHIFT)
+	//log_debug("keycode: %d, ACS: %d,%d,%d", keycodePressed, *s_XwaIsAltKeyPressed, *s_XwaIsControlKeyPressed, *s_XwaIsShiftKeyPressed);
 }
 
-void ComputeCockpitLean() 
+/*
+ * Update headPos using the keyboard
+ */
+void ComputeCockpitLean(Vector3 *headPos)
 {
-	Vector4 headPos = Vector4(0, 0, 0, 0);
-
 	if (g_bResetHeadCenter) {
-		g_HeadPos = { 0 };
 		g_HeadPosAnim = { 0 };
 	}
 	
 	// Perform the lean left/right etc animations
-	animTickX();
-	animTickY();
-	animTickZ();
-	Vector3 headPosFromKeyboard(-g_HeadPos.x, -g_HeadPos.y, -g_HeadPos.z); // Regular keyboard functionality
-
-	//headPos[0] = headPos[0] * g_fPosXMultiplier + headPosFromKeyboard[0];
-	//headPos[1] = headPos[1] * g_fPosYMultiplier + headPosFromKeyboard[1];
-	//headPos[2] = headPos[2] * g_fPosZMultiplier + headPosFromKeyboard[2];
-
-	headPos[0] = headPosFromKeyboard[0];
-	headPos[1] = headPosFromKeyboard[1];
-	headPos[2] = headPosFromKeyboard[2];
-
-	// Limits clamping
-	if (headPos[0] < g_fMinPositionX) headPos[0] = g_fMinPositionX;
-	if (headPos[1] < g_fMinPositionY) headPos[1] = g_fMinPositionY;
-	if (headPos[2] < g_fMinPositionZ) headPos[2] = g_fMinPositionZ;
-
-	if (headPos[0] > g_fMaxPositionX) headPos[0] = g_fMaxPositionX;
-	if (headPos[1] > g_fMaxPositionY) headPos[1] = g_fMaxPositionY;
-	if (headPos[2] > g_fMaxPositionZ) headPos[2] = g_fMaxPositionZ;
-
-	// Map the translation from global coordinates to heading coords
-	Vector4 Rs, Us, Fs;
-	Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
-	headPos = HeadingMatrix * headPos;
-	PlayerDataTable->cockpitXReference = (int)(g_fXWAUnitsToMetersScale * headPos[0]);
-	PlayerDataTable->cockpitYReference = (int)(g_fXWAUnitsToMetersScale * headPos[1]);
-	PlayerDataTable->cockpitZReference = (int)(g_fXWAUnitsToMetersScale * headPos[2]);
+	animTickX(headPos);
+	animTickY(headPos);
+	animTickZ(headPos);
 }
 
 /*******************************************************************/
@@ -383,40 +380,66 @@ int CockpitLookHook(int* params)
 		// Keyboard code for moving the cockpit camera angle
 		//__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
 
-		/*
-		if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
-			cockpitRefX -= 16;
-		if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
-			cockpitRefX += 16;
-	
-		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
-			cockpitRefY -= 16;
-		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWDOWN)
-			cockpitRefY += 16;
-
-			if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
-			cockpitRefZ -= 16;
-		if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWDOWN)
-			cockpitRefZ += 16;
-		*/
-
-		// DEBUG
-		//PlayerDataTable[playerIndex].cockpitXReference = -200;
-		// DEBUG
-
 		// Read tracking data.
 		switch (g_TrackerType) 
 		{
 			case TRACKER_NONE:
 			{
-				ComputeCockpitLean();
-				dataReady = false;
+				Vector3 headPos;
+				static float fake_yaw = 0.0f, fake_pitch = 0.0f;
+
+				if (g_bResetHeadCenter) 
+				{
+					fake_yaw = fake_pitch = 0.0f;
+					g_headCenter[0] = 0.0f;
+					g_headCenter[1] = 0.0f;
+					g_headCenter[2] = 0.0f;
+					g_HeadPosAnim = { 0 };
+				}
+
+				if (!g_bToggleKeyboardCaps) {
+					ComputeCockpitLean(&headPos);
+					headPos = -headPos;
+					
+					//Vector4 pos(headPos.x, headPos.y, headPos.z, 1.0f);
+					//g_headPos = (pos - g_headCenter);
+					g_headCenter.x = headPos.x;
+					g_headCenter.y = headPos.y;
+					g_headCenter.z = headPos.z;
+				} else {
+					if (keycodePressed == KeyCode_ARROWLEFT)  fake_yaw -= 10.0f;
+					if (keycodePressed == KeyCode_ARROWRIGHT) fake_yaw += 10.0f;
+					if (keycodePressed == KeyCode_ARROWDOWN)  fake_pitch -= 10.0f;
+					if (keycodePressed == KeyCode_ARROWUP)	  fake_pitch += 10.0f;
+				}
+				yaw   = fake_yaw;
+				pitch = fake_pitch;
+				g_headPos = g_headCenter;
+				// Apply the head's position directly if mouse look is enabled
+				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState) {
+					Vector4 Rs, Us, Fs;
+					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+					g_headPos = HeadingMatrix * g_headPos;
+					PlayerDataTable->cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
+					PlayerDataTable->cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
+					PlayerDataTable->cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
+					dataReady = false;
+				} 
+				else {
+					// If mouse look is disabled, then change the orientation and position of the camera
+					dataReady = true;
+				}
 			}
 			break;
 
 			case TRACKER_FREEPIE:
 			{
-				//Vector3 headPosFromKeyboard(g_HeadPos.x, g_HeadPos.y, g_HeadPos.z); // Regular keyboard functionality
+				//Vector3 headPosFromKeyboard(0,0,0);
+				//if (!g_bToggleKeyboardCaps) {
+					ComputeCockpitLean(&g_headPosFromKeyboard);
+					g_headPosFromKeyboard = -g_headPosFromKeyboard;
+				//}
+
 				// The Z-axis should now be inverted because of XWA's coord system
 				pitchSign = -1.0f;
 				if (ReadFreePIE(g_iFreePIESlot)) {
@@ -448,6 +471,10 @@ int CockpitLookHook(int* params)
 			case TRACKER_STEAMVR: 
 			{
 				float x, y, z;
+				
+				ComputeCockpitLean(&g_headPosFromKeyboard);
+				g_headPosFromKeyboard = -g_headPosFromKeyboard;
+
 				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &x, &y, &z);
 				// We need to invert the Z-axis because of XWA's coordinate system.
 				z = -z;
@@ -462,7 +489,6 @@ int CockpitLookHook(int* params)
 					x =  g_FreePIEData.x;
 					y =  g_FreePIEData.y;
 					z = -g_FreePIEData.z;
-					log_debug("Pos read from FreePIE: (%0.3f, %0.3f, %0.3f)", x, y, z);
 				}
 
 				yaw      *= RAD_TO_DEG * g_fYawMultiplier;
@@ -481,7 +507,12 @@ int CockpitLookHook(int* params)
 			case TRACKER_TRACKIR:
 			{
 				float x, y, z;
+				
+				ComputeCockpitLean(&g_headPosFromKeyboard);
+				g_headPosFromKeyboard = -g_headPosFromKeyboard;
+
 				if (ReadTrackIRData(&yaw, &pitch, &x, &y, &z)) {
+					z = -z;
 					yaw		 *= g_fYawMultiplier;
 					pitch	 *= g_fPitchMultiplier;
 					yawSign   = -1.0f; 
@@ -509,7 +540,7 @@ int CockpitLookHook(int* params)
 		if (dataReady) {
 			yaw   += g_fYawOffset;
 			pitch += g_fPitchOffset;
-			while (yaw < 0.0f)   yaw   += 360.0f;
+			while (yaw   < 0.0f) yaw   += 360.0f;
 			while (pitch < 0.0f) pitch += 360.0f;
 
 			//if (!bExternalCamera) {
