@@ -306,25 +306,36 @@ void animTickZ(Vector3 *headPos) {
 
 void ProcessKeyboard(__int16 keycodePressed) {
 	XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
-	// Update the keyboard flags
-	g_bLeftKeyDown     = (keycodePressed == KeyCode_ARROWLEFT);
-	g_bRightKeyDown    = (keycodePressed == KeyCode_ARROWRIGHT);
-	if (!*s_XwaIsShiftKeyPressed) { // Z and Y axes are swapped w.r.t. the original view-centric definition
-		g_bUpKeyDown   = (keycodePressed == KeyCode_ARROWUP);
-		g_bDownKeyDown = (keycodePressed == KeyCode_ARROWDOWN);
-		g_bUpKeyDownShift   = false;
-		g_bDownKeyDownShift = false;
-	}
-	else {
-		g_bUpKeyDownShift   = (keycodePressed == KeyCode_ARROWUP);
-		g_bDownKeyDownShift = (keycodePressed == KeyCode_ARROWDOWN);
-		g_bUpKeyDown   = false;
+
+	if (*s_XwaIsAltKeyPressed || *s_XwaIsControlKeyPressed) {
+		g_bLeftKeyDown = false;
+		g_bRightKeyDown = false;
+		g_bUpKeyDown = false;
 		g_bDownKeyDown = false;
+		g_bUpKeyDownShift = false;
+		g_bDownKeyDownShift = false;
+		return;
 	}
+	
+	if (*s_XwaIsShiftKeyPressed) {
+		// No Alt, No Ctrl, Shift Pressed
+		g_bUpKeyDownShift = (keycodePressed == KeyCode_ARROWUP);
+		g_bDownKeyDownShift = (keycodePressed == KeyCode_ARROWDOWN);
+		g_bUpKeyDown = false;
+		g_bDownKeyDown = false;
+		return;
+	}
+
+	// No Alt, No Ctrl, No Shift
+	g_bLeftKeyDown = (keycodePressed == KeyCode_ARROWLEFT);
+	g_bRightKeyDown = (keycodePressed == KeyCode_ARROWRIGHT);
+	g_bUpKeyDown = (keycodePressed == KeyCode_ARROWUP);
+	g_bDownKeyDown = (keycodePressed == KeyCode_ARROWDOWN);
+	g_bUpKeyDownShift = false;
+	g_bDownKeyDownShift = false;
 	g_bResetHeadCenter = (keycodePressed == KeyCode_PERIOD);
 	if (keycodePressed == KeyCode_CAPSLOCK)
 		g_bToggleKeyboardCaps = !g_bToggleKeyboardCaps;
-	//if (keycodePressed == KeyCode_SHIFT)
 	//log_debug("keycode: %d, ACS: %d,%d,%d", keycodePressed, *s_XwaIsAltKeyPressed, *s_XwaIsControlKeyPressed, *s_XwaIsShiftKeyPressed);
 }
 
