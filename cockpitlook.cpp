@@ -243,7 +243,7 @@ bool g_bFlipYZAxes = false;
 // if true then the arrow keys will modify the cockpit camera's yaw/pitch
 // if false, then the arrow keys will perform lean right/left up/down
 bool g_bToggleKeyboardCaps = false;
-const float ANIM_INCR = 0.1f, MAX_LEAN_X = 2.5f, MAX_LEAN_Y = 2.5f, MAX_LEAN_Z = 2.5f;
+const float ANIM_INCR = 0.1f, MAX_LEAN_X = 25.0f, MAX_LEAN_Y = 25.0f, MAX_LEAN_Z = 25.0f;
 // The MAX_LEAN values will be clamped by the limits from vrparams.cfg
 
 void animTickX(Vector3 *headPos) {
@@ -259,10 +259,11 @@ void animTickX(Vector3 *headPos) {
 	}
 
 	// Range clamping
-	if (g_HeadPosAnim.x > 6.0f)   g_HeadPosAnim.x =  6.0f;
-	if (g_HeadPosAnim.x < -6.0f)  g_HeadPosAnim.x = -6.0f;
+	//if (g_HeadPosAnim.x > 6.0f)   g_HeadPosAnim.x =  6.0f;
+	//if (g_HeadPosAnim.x < -6.0f)  g_HeadPosAnim.x = -6.0f;
 
-	headPos->x = centeredSigmoid(g_HeadPosAnim.x) * MAX_LEAN_X;
+	//headPos->x = centeredSigmoid(g_HeadPosAnim.x) * MAX_LEAN_X;
+	headPos->x = g_HeadPosAnim.x;
 }
 
 void animTickY(Vector3 *headPos) {
@@ -278,10 +279,11 @@ void animTickY(Vector3 *headPos) {
 	}
 
 	// Range clamping
-	if (g_HeadPosAnim.y > 6.0f)   g_HeadPosAnim.y =  6.0f;
-	if (g_HeadPosAnim.y < -6.0f)  g_HeadPosAnim.y = -6.0f;
+	//if (g_HeadPosAnim.y > 6.0f)   g_HeadPosAnim.y =  6.0f;
+	//if (g_HeadPosAnim.y < -6.0f)  g_HeadPosAnim.y = -6.0f;
 
-	headPos->y = centeredSigmoid(g_HeadPosAnim.y) * MAX_LEAN_Y;
+	//headPos->y = centeredSigmoid(g_HeadPosAnim.y) * MAX_LEAN_Y;
+	headPos->y = g_HeadPosAnim.y;
 }
 
 void animTickZ(Vector3 *headPos) {
@@ -297,10 +299,11 @@ void animTickZ(Vector3 *headPos) {
 	}
 
 	// Range clamping
-	if (g_HeadPosAnim.z > 6.0f)   g_HeadPosAnim.z =  6.0f;
-	if (g_HeadPosAnim.z < -6.0f)  g_HeadPosAnim.z = -6.0f;
+	//if (g_HeadPosAnim.z > 6.0f)   g_HeadPosAnim.z =  6.0f;
+	//if (g_HeadPosAnim.z < -6.0f)  g_HeadPosAnim.z = -6.0f;
 
-	headPos->z = centeredSigmoid(g_HeadPosAnim.z) * MAX_LEAN_Z;
+	//headPos->z = centeredSigmoid(g_HeadPosAnim.z) * MAX_LEAN_Z;
+	headPos->z = g_HeadPosAnim.z;
 	headPos->z = -headPos->z; // The z-axis is inverted in XWA w.r.t. the original view-centric definition
 }
 
