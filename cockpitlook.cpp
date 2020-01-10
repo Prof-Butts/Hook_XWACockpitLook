@@ -521,12 +521,18 @@ int CockpitLookHook(int* params)
 			case TRACKER_TRACKIR:
 			{
 				float x, y, z;
+				// These numbers were determined empirically by ual002:
+				const float scale_x = -0.0002f;
+				const float scale_y =  0.0002f;
+				const float scale_z = -0.0002f;
 				
 				ComputeCockpitLean(&g_headPosFromKeyboard);
 				g_headPosFromKeyboard = -g_headPosFromKeyboard;
 
 				if (ReadTrackIRData(&yaw, &pitch, &x, &y, &z)) {
-					z = -z;
+					x		 *= scale_x;
+					y		 *= scale_y;
+					z		 *= scale_z;
 					yaw		 *= g_fYawMultiplier;
 					pitch	 *= g_fPitchMultiplier;
 					yawSign   = -1.0f; 
