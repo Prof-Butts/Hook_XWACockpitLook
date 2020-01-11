@@ -36,6 +36,8 @@ extern bool g_bSteamVRInitialized;
 FILE *g_DebugFile = NULL;
 #endif
 
+void LoadParams();
+
 void log_debug(const char *format, ...)
 {
 	static char buf[300];
@@ -101,6 +103,7 @@ const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
 const int   DEFAULT_FREEPIE_SLOT = 0;
+const int   VK_L_KEY = 0x4c;
 
 // General types and globals
 typedef enum {
@@ -238,13 +241,15 @@ float g_fMinPositionY = -2.50f, g_fMaxPositionY = 2.50f;
 float g_fMinPositionZ = -2.50f, g_fMaxPositionZ = 2.50f;
 HeadPos g_HeadPosAnim = { 0 }, g_HeadPos = { 0 };
 bool g_bLeftKeyDown = false, g_bRightKeyDown = false, g_bUpKeyDown = false, g_bDownKeyDown = false;
-bool g_bUpKeyDownShift = false, g_bDownKeyDownShift = false, g_bStickyArrowKeys = true;
+bool g_bUpKeyDownShift = false, g_bDownKeyDownShift = false, g_bStickyArrowKeys = true, g_bLimitCockpitLean = true;
 bool g_bResetHeadCenter = false, g_bSteamVRPosFromFreePIE = false;
 bool g_bFlipYZAxes = false;
 // if true then the arrow keys will modify the cockpit camera's yaw/pitch
 // if false, then the arrow keys will perform lean right/left up/down
 bool g_bToggleKeyboardCaps = false;
-const float ANIM_INCR = 0.1f, MAX_LEAN_X = 25.0f, MAX_LEAN_Y = 25.0f, MAX_LEAN_Z = 25.0f;
+const float ANIM_INCR = 0.01f;
+float MAX_LEAN_X = 25.0f, MAX_LEAN_Y = 25.0f, MAX_LEAN_Z = 25.0f;
+const float RESET_ANIM_INCR = 2.0f * ANIM_INCR;
 // The MAX_LEAN values will be clamped by the limits from vrparams.cfg
 
 void animTickX(Vector3 *headPos) {
@@ -253,15 +258,17 @@ void animTickX(Vector3 *headPos) {
 	else if (g_bLeftKeyDown)
 		g_HeadPosAnim.x += ANIM_INCR;
 	else if (!g_bRightKeyDown && !g_bLeftKeyDown && !g_bStickyArrowKeys) {
-		if (g_HeadPosAnim.x < 0.0001)
-			g_HeadPosAnim.x += ANIM_INCR;
-		if (g_HeadPosAnim.x > 0.0001)
-			g_HeadPosAnim.x -= ANIM_INCR;
+		if (g_HeadPosAnim.x < 0.0)
+			g_HeadPosAnim.x += RESET_ANIM_INCR;
+		if (g_HeadPosAnim.x > 0.0)
+			g_HeadPosAnim.x -= RESET_ANIM_INCR;
 	}
 
 	// Range clamping
-	//if (g_HeadPosAnim.x > 6.0f)   g_HeadPosAnim.x =  6.0f;
-	//if (g_HeadPosAnim.x < -6.0f)  g_HeadPosAnim.x = -6.0f;
+	if (g_bLimitCockpitLean) {
+		if (g_HeadPosAnim.x >  MAX_LEAN_X)  g_HeadPosAnim.x =  MAX_LEAN_X;
+		if (g_HeadPosAnim.x < -MAX_LEAN_X)  g_HeadPosAnim.x = -MAX_LEAN_X;
+	}
 
 	//headPos->x = centeredSigmoid(g_HeadPosAnim.x) * MAX_LEAN_X;
 	headPos->x = g_HeadPosAnim.x;
@@ -269,19 +276,21 @@ void animTickX(Vector3 *headPos) {
 
 void animTickY(Vector3 *headPos) {
 	if (g_bDownKeyDown)
-		g_HeadPosAnim.y += ANIM_INCR;
-	else if (g_bUpKeyDown)
 		g_HeadPosAnim.y -= ANIM_INCR;
+	else if (g_bUpKeyDown)
+		g_HeadPosAnim.y += ANIM_INCR;
 	else if (!g_bDownKeyDown && !g_bUpKeyDown && !g_bStickyArrowKeys) {
-		if (g_HeadPosAnim.y < 0.0001)
-			g_HeadPosAnim.y += ANIM_INCR;
-		if (g_HeadPosAnim.y > 0.0001)
-			g_HeadPosAnim.y -= ANIM_INCR;
+		if (g_HeadPosAnim.y < 0.0)
+			g_HeadPosAnim.y += RESET_ANIM_INCR;
+		if (g_HeadPosAnim.y > 0.0)
+			g_HeadPosAnim.y -= RESET_ANIM_INCR;
 	}
 
 	// Range clamping
-	//if (g_HeadPosAnim.y > 6.0f)   g_HeadPosAnim.y =  6.0f;
-	//if (g_HeadPosAnim.y < -6.0f)  g_HeadPosAnim.y = -6.0f;
+	if (g_bLimitCockpitLean) {
+		if (g_HeadPosAnim.y >  MAX_LEAN_Y)  g_HeadPosAnim.y =  MAX_LEAN_Y;
+		if (g_HeadPosAnim.y < -MAX_LEAN_Y)  g_HeadPosAnim.y = -MAX_LEAN_Y;
+	}
 
 	//headPos->y = centeredSigmoid(g_HeadPosAnim.y) * MAX_LEAN_Y;
 	headPos->y = g_HeadPosAnim.y;
@@ -293,15 +302,17 @@ void animTickZ(Vector3 *headPos) {
 	else if (g_bUpKeyDownShift)
 		g_HeadPosAnim.z += ANIM_INCR;
 	else if (!g_bDownKeyDownShift && !g_bUpKeyDownShift && !g_bStickyArrowKeys) {
-		if (g_HeadPosAnim.z < 0.0001)
-			g_HeadPosAnim.z += ANIM_INCR;
-		if (g_HeadPosAnim.z > 0.0001)
-			g_HeadPosAnim.z -= ANIM_INCR;
+		if (g_HeadPosAnim.z < 0.0)
+			g_HeadPosAnim.z += RESET_ANIM_INCR;
+		if (g_HeadPosAnim.z > 0.0 /* 0.0001 */)
+			g_HeadPosAnim.z -= RESET_ANIM_INCR;
 	}
 
 	// Range clamping
-	//if (g_HeadPosAnim.z > 6.0f)   g_HeadPosAnim.z =  6.0f;
-	//if (g_HeadPosAnim.z < -6.0f)  g_HeadPosAnim.z = -6.0f;
+	if (g_bLimitCockpitLean) {
+		if (g_HeadPosAnim.z >  MAX_LEAN_Z)  g_HeadPosAnim.z =  MAX_LEAN_Z;
+		if (g_HeadPosAnim.z < -MAX_LEAN_Z)  g_HeadPosAnim.z = -MAX_LEAN_Z;
+	}
 
 	//headPos->z = centeredSigmoid(g_HeadPosAnim.z) * MAX_LEAN_Z;
 	headPos->z = g_HeadPosAnim.z;
@@ -309,9 +320,28 @@ void animTickZ(Vector3 *headPos) {
 }
 
 void ProcessKeyboard(__int16 keycodePressed) {
-	XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
+	static bool bLastLKeyState = false, bCurLKeyState = false;
 
-	if (*s_XwaIsAltKeyPressed || *s_XwaIsControlKeyPressed) {
+	//bool bControl = *s_XwaIsControlKeyPressed;
+	//bool bShift = *s_XwaIsShiftKeyPressed;
+	//bool bAlt = *s_XwaIsAltKeyPressed;
+	bool bCtrl		= GetAsyncKeyState(VK_CONTROL);
+	bool bShift		= GetAsyncKeyState(VK_SHIFT);
+	bool bAlt		= GetAsyncKeyState(VK_MENU);
+	bool bRightAlt	= GetAsyncKeyState(VK_RMENU);
+	bool bLeftAlt	= GetAsyncKeyState(VK_LMENU);
+	// L Key:
+	bLastLKeyState = bCurLKeyState;
+	bCurLKeyState = GetAsyncKeyState(VK_L_KEY);
+	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
+
+	if (bCtrl && bLastLKeyState && !bCurLKeyState)
+	{
+		log_debug("*********** RELOADING CockpitLookHook.cfg ***********");
+		LoadParams();
+	}
+
+	if (bAlt || bCtrl) {
 		g_bLeftKeyDown = false;
 		g_bRightKeyDown = false;
 		g_bUpKeyDown = false;
@@ -321,26 +351,33 @@ void ProcessKeyboard(__int16 keycodePressed) {
 		return;
 	}
 	
-	if (*s_XwaIsShiftKeyPressed) {
+	if (bShift) {
 		// No Alt, No Ctrl, Shift Pressed
-		g_bUpKeyDownShift = (keycodePressed == KeyCode_ARROWUP);
-		g_bDownKeyDownShift = (keycodePressed == KeyCode_ARROWDOWN);
+		//g_bUpKeyDownShift = (keycodePressed == KeyCode_ARROWUP);
+		g_bUpKeyDownShift = GetAsyncKeyState(VK_UP);
+		//g_bDownKeyDownShift = (keycodePressed == KeyCode_ARROWDOWN);
+		g_bDownKeyDownShift = GetAsyncKeyState(VK_DOWN);
 		g_bUpKeyDown = false;
 		g_bDownKeyDown = false;
 		return;
 	}
 
 	// No Alt, No Ctrl, No Shift
-	g_bLeftKeyDown = (keycodePressed == KeyCode_ARROWLEFT);
-	g_bRightKeyDown = (keycodePressed == KeyCode_ARROWRIGHT);
-	g_bUpKeyDown = (keycodePressed == KeyCode_ARROWUP);
-	g_bDownKeyDown = (keycodePressed == KeyCode_ARROWDOWN);
+	//g_bLeftKeyDown = (keycodePressed == KeyCode_ARROWLEFT);
+	g_bLeftKeyDown = GetAsyncKeyState(VK_LEFT);
+	//g_bRightKeyDown = (keycodePressed == KeyCode_ARROWRIGHT);
+	g_bRightKeyDown = GetAsyncKeyState(VK_RIGHT);
+	//g_bUpKeyDown = (keycodePressed == KeyCode_ARROWUP);
+	g_bUpKeyDown = GetAsyncKeyState(VK_UP);
+	//g_bDownKeyDown = (keycodePressed == KeyCode_ARROWDOWN);
+	g_bDownKeyDown = GetAsyncKeyState(VK_DOWN);
 	g_bUpKeyDownShift = false;
 	g_bDownKeyDownShift = false;
 	g_bResetHeadCenter = (keycodePressed == KeyCode_PERIOD);
 	if (keycodePressed == KeyCode_CAPSLOCK)
 		g_bToggleKeyboardCaps = !g_bToggleKeyboardCaps;
-	//log_debug("keycode: %d, ACS: %d,%d,%d", keycodePressed, *s_XwaIsAltKeyPressed, *s_XwaIsControlKeyPressed, *s_XwaIsShiftKeyPressed);
+	
+	//log_debug("keycode: 0x%X, ACS: %d,%d,%d", keycodePressed, *s_XwaIsAltKeyPressed, *s_XwaIsControlKeyPressed, *s_XwaIsShiftKeyPressed);
 }
 
 /*
@@ -382,7 +419,7 @@ int CockpitLookHook(int* params)
 	bool dataReady = false;
 	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
 
-	// Keyboard code for moving the cockpit camera angle
+	//XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
 	__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;	
 	ProcessKeyboard(keycodePressed);
 
@@ -820,13 +857,44 @@ void LoadParams() {
 			else if (_stricmp(param, "flip_yz_axes") == 0) {
 				g_bFlipYZAxes = (bool)fValue;
 			}
+			// Cockpit Lean
 			else if (_stricmp(param, "keyboard_lean") == 0) {
 				g_bKeyboardLean = (bool)fValue;
+			}
+			else if (_stricmp(param, "sticky_lean") == 0) {
+				g_bStickyArrowKeys = (bool)fValue;
+			}
+			else if (_stricmp(param, "limit_cockpit_lean") == 0) {
+				g_bLimitCockpitLean = (bool)fValue;
+			}
+
+			else if (_stricmp(param, "cockpit_lean_x_limit") == 0) {
+				MAX_LEAN_X = fValue;
+			}
+			else if (_stricmp(param, "cockpit_lean_y_limit") == 0) {
+				MAX_LEAN_Y = fValue;
+			}
+			else if (_stricmp(param, "cockpit_lean_z_limit") == 0) {
+				MAX_LEAN_Z = fValue;
 			}
 			
 		}
 	} // while ... read file
 	fclose(file);
+}
+
+void InitKeyboard()
+{
+	GetAsyncKeyState(VK_LEFT);
+	GetAsyncKeyState(VK_RIGHT);
+	GetAsyncKeyState(VK_UP);
+	GetAsyncKeyState(VK_DOWN);
+	GetAsyncKeyState(VK_SHIFT);
+	GetAsyncKeyState(VK_CONTROL);
+	GetAsyncKeyState(VK_MENU); // Alt Key
+	GetAsyncKeyState(VK_RMENU);
+	GetAsyncKeyState(VK_LMENU);
+	GetAsyncKeyState(VK_L_KEY);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
@@ -838,6 +906,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		g_hWnd = GetForegroundWindow();
 		// Load cockpitlook.cfg here and enable FreePIE, SteamVR or TrackIR
 		LoadParams();
+		InitKeyboard();
 		log_debug("Parameters loaded");
 		switch (g_TrackerType)
 		{
