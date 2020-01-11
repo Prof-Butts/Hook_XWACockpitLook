@@ -242,6 +242,7 @@ float g_fMinPositionZ = -2.50f, g_fMaxPositionZ = 2.50f;
 HeadPos g_HeadPosAnim = { 0 }, g_HeadPos = { 0 };
 bool g_bLeftKeyDown = false, g_bRightKeyDown = false, g_bUpKeyDown = false, g_bDownKeyDown = false;
 bool g_bUpKeyDownShift = false, g_bDownKeyDownShift = false, g_bStickyArrowKeys = true, g_bLimitCockpitLean = true;
+bool g_bInvertCockpitLeanY = false;
 bool g_bResetHeadCenter = false, g_bSteamVRPosFromFreePIE = false;
 bool g_bFlipYZAxes = false;
 // if true then the arrow keys will modify the cockpit camera's yaw/pitch
@@ -275,10 +276,11 @@ void animTickX(Vector3 *headPos) {
 }
 
 void animTickY(Vector3 *headPos) {
+	float sign = g_bInvertCockpitLeanY ? -1.0f : 1.0f;
 	if (g_bDownKeyDown)
-		g_HeadPosAnim.y -= ANIM_INCR;
+		g_HeadPosAnim.y +=  sign * ANIM_INCR;
 	else if (g_bUpKeyDown)
-		g_HeadPosAnim.y += ANIM_INCR;
+		g_HeadPosAnim.y += -sign * ANIM_INCR;
 	else if (!g_bDownKeyDown && !g_bUpKeyDown && !g_bStickyArrowKeys) {
 		if (g_HeadPosAnim.y < 0.0)
 			g_HeadPosAnim.y += RESET_ANIM_INCR;
@@ -459,10 +461,10 @@ int CockpitLookHook(int* params)
 					g_headCenter.y = headPos.y;
 					g_headCenter.z = headPos.z;
 				} else {
-					if (keycodePressed == KeyCode_ARROWLEFT)  fake_yaw -= 10.0f;
-					if (keycodePressed == KeyCode_ARROWRIGHT) fake_yaw += 10.0f;
-					if (keycodePressed == KeyCode_ARROWDOWN)  fake_pitch -= 10.0f;
-					if (keycodePressed == KeyCode_ARROWUP)	  fake_pitch += 10.0f;
+					if (g_bLeftKeyDown)  fake_yaw -= 1.0f;
+					if (g_bRightKeyDown) fake_yaw += 1.0f;
+					if (g_bDownKeyDown)  fake_pitch -= 1.0f;
+					if (g_bUpKeyDown)	 fake_pitch += 1.0f;
 				}
 				yaw   = fake_yaw;
 				pitch = fake_pitch;
@@ -877,7 +879,10 @@ void LoadParams() {
 			else if (_stricmp(param, "cockpit_lean_z_limit") == 0) {
 				MAX_LEAN_Z = fValue;
 			}
-			
+			else if (_stricmp(param, "invert_cockpit_lean_y") == 0) {
+				g_bInvertCockpitLeanY = (bool)fValue;
+			}
+
 		}
 	} // while ... read file
 	fclose(file);
