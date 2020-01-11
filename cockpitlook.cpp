@@ -118,6 +118,7 @@ float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
 float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
 int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
 bool	  g_bYawPitchFromMouseOverride = false;
+bool  g_bKeyboardLean = false;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
 
@@ -430,7 +431,7 @@ int CockpitLookHook(int* params)
 				pitch = fake_pitch;
 				g_headPos = g_headCenter;
 				// Apply the head's position directly if mouse look is enabled
-				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState) {
+				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState && g_bKeyboardLean) {
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
 					g_headPos = HeadingMatrix * g_headPos;
@@ -450,9 +451,10 @@ int CockpitLookHook(int* params)
 			{
 				//Vector3 headPosFromKeyboard(0,0,0);
 				//if (!g_bToggleKeyboardCaps) {
+				if (g_bKeyboardLean) {
 					ComputeCockpitLean(&g_headPosFromKeyboard);
 					g_headPosFromKeyboard = -g_headPosFromKeyboard;
-				//}
+				}
 
 				// The Z-axis should now be inverted because of XWA's coord system
 				pitchSign = -1.0f;
@@ -486,8 +488,10 @@ int CockpitLookHook(int* params)
 			{
 				float x, y, z;
 				
-				ComputeCockpitLean(&g_headPosFromKeyboard);
-				g_headPosFromKeyboard = -g_headPosFromKeyboard;
+				if (g_bKeyboardLean) {
+					ComputeCockpitLean(&g_headPosFromKeyboard);
+					g_headPosFromKeyboard = -g_headPosFromKeyboard;
+				}
 
 				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &x, &y, &z);
 				// We need to invert the Z-axis because of XWA's coordinate system.
@@ -526,8 +530,10 @@ int CockpitLookHook(int* params)
 				const float scale_y =  0.0002f;
 				const float scale_z = -0.0002f;
 				
-				ComputeCockpitLean(&g_headPosFromKeyboard);
-				g_headPosFromKeyboard = -g_headPosFromKeyboard;
+				if (g_bKeyboardLean) {
+					ComputeCockpitLean(&g_headPosFromKeyboard);
+					g_headPosFromKeyboard = -g_headPosFromKeyboard;
+				}
 
 				if (ReadTrackIRData(&yaw, &pitch, &x, &y, &z)) {
 					x		 *= scale_x;
@@ -813,6 +819,9 @@ void LoadParams() {
 			}
 			else if (_stricmp(param, "flip_yz_axes") == 0) {
 				g_bFlipYZAxes = (bool)fValue;
+			}
+			else if (_stricmp(param, "keyboard_lean") == 0) {
+				g_bKeyboardLean = (bool)fValue;
 			}
 			
 		}
