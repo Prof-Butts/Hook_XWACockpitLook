@@ -124,6 +124,7 @@ bool	  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
+int g_FreePIEOutputSlot = -1;
 
 /*********************************************************************/
 /*	Code used to enable leaning in the cockpit with the arrow keys   */
@@ -482,6 +483,17 @@ int CockpitLookHook(int* params)
 				else {
 					// If mouse look is disabled, then change the orientation and position of the camera
 					dataReady = true;
+				}
+
+				// Debug: Write the fake yaw/pitch and cockpit lean to FreePIE to fake a headset
+				if (g_FreePIEOutputSlot > -1) {
+					g_FreePIEData.yaw   = fake_yaw;
+					g_FreePIEData.pitch = fake_pitch;
+					g_FreePIEData.roll  = 0.0f;
+					g_FreePIEData.x =  g_headPos.x;
+					g_FreePIEData.y =  g_headPos.y;
+					g_FreePIEData.z = -g_headPos.z;
+					WriteFreePIE(g_FreePIEOutputSlot);
 				}
 			}
 			break;
@@ -883,6 +895,15 @@ void LoadParams() {
 				g_bInvertCockpitLeanY = (bool)fValue;
 			}
 
+			else if (_stricmp(param, "write_5dof_to_freepie_slot") == 0) {
+				g_FreePIEOutputSlot = (int)fValue;
+				if (g_FreePIEOutputSlot != -1) {
+					log_debug("Writing 5dof to slot %d", g_FreePIEOutputSlot);
+					InitFreePIE();
+				}
+			}
+			
+
 		}
 	} // while ... read file
 	fclose(file);
@@ -946,6 +967,10 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 			break;
 		case TRACKER_TRACKIR:
 			ShutdownTrackIR();
+			break;
+		case TRACKER_NONE:
+			if (g_FreePIEOutputSlot != -1)
+				ShutdownFreePIE();
 			break;
 		}
 		log_debug("Exiting Cockpitlook hook");
