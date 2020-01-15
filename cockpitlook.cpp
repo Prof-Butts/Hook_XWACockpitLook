@@ -121,7 +121,7 @@ float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
 float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
 int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
 bool	  g_bYawPitchFromMouseOverride = false;
-bool  g_bKeyboardLean = false;
+bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
 int g_FreePIEOutputSlot = -1;
@@ -462,10 +462,12 @@ int CockpitLookHook(int* params)
 					g_headCenter.y = headPos.y;
 					g_headCenter.z = headPos.z;
 				} else {
-					if (g_bLeftKeyDown)  fake_yaw -= 1.0f;
-					if (g_bRightKeyDown) fake_yaw += 1.0f;
-					if (g_bDownKeyDown)  fake_pitch -= 1.0f;
-					if (g_bUpKeyDown)	 fake_pitch += 1.0f;
+					if (g_bKeyboardLook) {
+						if (g_bLeftKeyDown)  fake_yaw -= 1.0f;
+						if (g_bRightKeyDown) fake_yaw += 1.0f;
+						if (g_bDownKeyDown)  fake_pitch -= 1.0f;
+						if (g_bUpKeyDown)	 fake_pitch += 1.0f;
+					}
 				}
 				yaw   = fake_yaw;
 				pitch = fake_pitch;
@@ -871,9 +873,12 @@ void LoadParams() {
 			else if (_stricmp(param, "flip_yz_axes") == 0) {
 				g_bFlipYZAxes = (bool)fValue;
 			}
-			// Cockpit Lean
+			// Cockpit Lean/Look
 			else if (_stricmp(param, "keyboard_lean") == 0) {
 				g_bKeyboardLean = (bool)fValue;
+			}
+			else if (_stricmp(param, "keyboard_look") == 0) {
+				g_bKeyboardLook = (bool)fValue;
 			}
 			else if (_stricmp(param, "sticky_lean") == 0) {
 				g_bStickyArrowKeys = (bool)fValue;
