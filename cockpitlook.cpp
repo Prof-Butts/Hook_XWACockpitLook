@@ -122,7 +122,7 @@ float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
 int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
 bool	  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
-Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0);
+Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
 int g_FreePIEOutputSlot = -1;
 
@@ -508,17 +508,22 @@ int CockpitLookHook(int* params)
 					ComputeCockpitLean(&g_headPosFromKeyboard);
 					g_headPosFromKeyboard = -g_headPosFromKeyboard;
 				}
+				else
+					g_headPosFromKeyboard.set(0, 0, 0);
 
 				// The Z-axis should now be inverted because of XWA's coord system
 				pitchSign = -1.0f;
 				if (ReadFreePIE(g_iFreePIESlot)) {
 					if (g_bResetHeadCenter) {
-						g_headCenter[0] =  g_FreePIEData.x;
-						g_headCenter[1] =  g_FreePIEData.y;
-						g_headCenter[2] = -g_FreePIEData.z;
+						g_headRotationHome.y = g_FreePIEData.yaw;
+						g_headRotationHome.x = g_FreePIEData.pitch;
+						g_headRotationHome.z = g_FreePIEData.roll;
+						g_headCenter.x =  g_FreePIEData.x;
+						g_headCenter.y =  g_FreePIEData.y;
+						g_headCenter.z = -g_FreePIEData.z;
 					}
-					yaw    = g_FreePIEData.yaw   * g_fYawMultiplier;
-					pitch  = g_FreePIEData.pitch * g_fPitchMultiplier;
+					yaw    = (g_FreePIEData.yaw   - g_headRotationHome.y) * g_fYawMultiplier;
+					pitch  = (g_FreePIEData.pitch - g_headRotationHome.x) * g_fPitchMultiplier;
 
 					if (g_bYawPitchFromMouseOverride) {
 						// If FreePIE could not be read, then get the yaw/pitch from the mouse:
@@ -545,6 +550,8 @@ int CockpitLookHook(int* params)
 					ComputeCockpitLean(&g_headPosFromKeyboard);
 					g_headPosFromKeyboard = -g_headPosFromKeyboard;
 				}
+				else
+					g_headPosFromKeyboard.set(0, 0, 0);
 
 				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &x, &y, &z);
 				// We need to invert the Z-axis because of XWA's coordinate system.
