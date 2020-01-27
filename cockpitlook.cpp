@@ -469,11 +469,19 @@ int CockpitLookHook(int* params)
 						if (g_bUpKeyDown)	 fake_pitch += 1.0f;
 					}
 				}
-				yaw   = fake_yaw;
-				pitch = fake_pitch;
-				g_headPos = g_headCenter;
+
+				if (g_bKeyboardLook) {
+					yaw   = fake_yaw;
+					pitch = fake_pitch;
+				}
+
+				if (g_bKeyboardLean)
+					g_headPos = g_headCenter;
+				else
+					g_headPos.set(0, 0, 0, 0);
+				
 				// Apply the head's position directly if mouse look is enabled
-				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState && g_bKeyboardLean) {
+				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState) {
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
 					g_headPos = HeadingMatrix * g_headPos;
@@ -482,8 +490,9 @@ int CockpitLookHook(int* params)
 					PlayerDataTable->cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
 					dataReady = false;
 				} 
-				else {
+				else if (!*mouseLook) {
 					// If mouse look is disabled, then change the orientation and position of the camera
+					// using the regular path
 					dataReady = true;
 				}
 
