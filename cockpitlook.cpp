@@ -430,7 +430,7 @@ int CockpitLookHook(int* params)
 		PlayerDataTable[playerIndex].cockpitDisplayed
 		&& !PlayerDataTable[playerIndex].gunnerTurretActive
 		&& PlayerDataTable[playerIndex].cockpitDisplayed2
-		&& *numberOfPlayersInGame == 1)
+		/* && *numberOfPlayersInGame == 1 */ )
 	{
 		// Keyboard code for moving the cockpit camera angle
 		//__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
@@ -485,9 +485,9 @@ int CockpitLookHook(int* params)
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
 					g_headPos = HeadingMatrix * g_headPos;
-					PlayerDataTable->cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
-					PlayerDataTable->cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
-					PlayerDataTable->cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
+					PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
+					PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
+					PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
 					dataReady = false;
 				} 
 				else if (!*mouseLook) {
@@ -536,8 +536,8 @@ int CockpitLookHook(int* params)
 
 					if (g_bYawPitchFromMouseOverride) {
 						// If FreePIE could not be read, then get the yaw/pitch from the mouse:
-						yaw   =  (float)PlayerDataTable[0].cockpitCameraYaw   / 32768.0f * 180.0f;
-						pitch = -(float)PlayerDataTable[0].cockpitCameraPitch / 32768.0f * 180.0f;
+						yaw   =  (float)PlayerDataTable[playerIndex].cockpitCameraYaw   / 32768.0f * 180.0f;
+						pitch = -(float)PlayerDataTable[playerIndex].cockpitCameraPitch / 32768.0f * 180.0f;
 					}
 
 					Vector4 pos(g_FreePIEData.x, g_FreePIEData.y, -g_FreePIEData.z, 1.0f);
@@ -664,9 +664,9 @@ int CockpitLookHook(int* params)
 				Vector4 Rs, Us, Fs;
 				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
 				g_headPos = HeadingMatrix * g_headPos;
-				PlayerDataTable->cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
-				PlayerDataTable->cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
-				PlayerDataTable->cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
+				PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
+				PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
+				PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
 			/*} else {
 				PlayerDataTable[playerIndex].cameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 				PlayerDataTable[playerIndex].cameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
@@ -718,7 +718,7 @@ int CockpitLookHook(int* params)
 				__int16 _mouseLook_Y = *mouseLook_Y;
 				if (*mouseLook_X || *mouseLook_Y)
 				{
-					//if (PlayerDataTable->hyperspacePhase)
+					//if (PlayerDataTable[playerIndex].hyperspacePhase)
 					//	log_debug("[DBG] [Mouse] [Hyper]: %d, %d", *mouseLook_X, *mouseLook_Y);
 
 					if (abs(*mouseLook_X) > 85 || abs(*mouseLook_Y) > 85)
