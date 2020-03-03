@@ -483,7 +483,7 @@ int CockpitLookHook(int* params)
 				else
 					g_headPos.set(0, 0, 0, 0);
 				
-				// Apply the head's position directly if mouse look is enabled
+				// Mouse Look is enabled, apply the head's position right here
 				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState) {
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
@@ -495,8 +495,10 @@ int CockpitLookHook(int* params)
 				} 
 				else if (!*mouseLook) {
 					// If mouse look is disabled, then change the orientation and position of the camera
-					// using the regular path
-					dataReady = true;
+					// using the regular path -- but only if the internal keyboard override is set! Otherwise
+					// we'll break the Joystick POV hat/Keypad look!
+					if (g_bKeyboardLook)
+						dataReady = true;
 				}
 
 				// Debug: Write the fake yaw/pitch and cockpit lean to FreePIE to fake a headset
@@ -642,6 +644,8 @@ int CockpitLookHook(int* params)
 			while (pitch < 0.0f) pitch += 360.0f;
 
 			//if (!bExternalCamera) {
+				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
+				// look around
 				PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 
