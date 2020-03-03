@@ -426,11 +426,14 @@ int CockpitLookHook(int* params)
 	__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;	
 	ProcessKeyboard(keycodePressed);
 
+	// This hook "works" for MP; but unfortunately, code in XWA keeps trying to sync all the mouse
+	// look parameters, so that makes MP unplayable. We won't be able to enable this hook in MP
+	// until the MP networking code has been translated/fixed to allow different mouse look params
 	if (//!PlayerDataTable[playerIndex].hyperspacePhase && // Enable mouse-look during hyperspace
 		PlayerDataTable[playerIndex].cockpitDisplayed
 		&& !PlayerDataTable[playerIndex].gunnerTurretActive
 		&& PlayerDataTable[playerIndex].cockpitDisplayed2
-		/* && *numberOfPlayersInGame == 1 */ )
+		&& *numberOfPlayersInGame == 1)
 	{
 		// Keyboard code for moving the cockpit camera angle
 		//__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
