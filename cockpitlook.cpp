@@ -684,7 +684,8 @@ int CockpitLookHook(int* params)
 		//       view and I want to use them for something else. I need to validate that this
 		//		 change didn't actually break the code.
 		//if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
-		if (*win32NumPad4Pressed || keycodePressed == KeyCode_NUMPAD3)
+		// NUMPAD1,NUMPAD3 rolls the craft; but it doesn't affect the yaw/pitch
+		if (*win32NumPad4Pressed || keycodePressed == KeyCode_NUMPAD4)
 			PlayerDataTable[playerIndex].cockpitCameraYaw -= 1200;
 
 		//if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
