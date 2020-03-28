@@ -103,7 +103,8 @@ const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
 const int   DEFAULT_FREEPIE_SLOT = 0;
-const int   VK_L_KEY = 0x4c;
+const int   VK_J_KEY = 0x4a;
+//const int   VK_L_KEY = 0x4c;
 
 // General types and globals
 typedef enum {
@@ -323,7 +324,7 @@ void animTickZ(Vector3 *headPos) {
 }
 
 void ProcessKeyboard(__int16 keycodePressed) {
-	static bool bLastLKeyState = false, bCurLKeyState = false;
+	static bool bLastLKeyState = false, bCurJKeyState = false;
 
 	//bool bControl = *s_XwaIsControlKeyPressed;
 	//bool bShift = *s_XwaIsShiftKeyPressed;
@@ -334,11 +335,14 @@ void ProcessKeyboard(__int16 keycodePressed) {
 	bool bRightAlt	= GetAsyncKeyState(VK_RMENU);
 	bool bLeftAlt	= GetAsyncKeyState(VK_LMENU);
 	// L Key:
-	bLastLKeyState = bCurLKeyState;
-	bCurLKeyState = GetAsyncKeyState(VK_L_KEY);
+	bLastLKeyState = bCurJKeyState;
+	bCurJKeyState = GetAsyncKeyState(VK_J_KEY);
+
 	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
 
-	if (bCtrl && bLastLKeyState && !bCurLKeyState)
+	// It's not a good idea to use Ctrl+L to reload the cockpit look hook settings because
+	// Ctrl+L is already used by the landing gear hook. So, let's use a different key: J
+	if (bCtrl && bLastLKeyState && !bCurJKeyState)
 	{
 		log_debug("*********** RELOADING CockpitLookHook.cfg ***********");
 		LoadParams();
@@ -949,7 +953,7 @@ void InitKeyboard()
 	GetAsyncKeyState(VK_MENU); // Alt Key
 	GetAsyncKeyState(VK_RMENU);
 	GetAsyncKeyState(VK_LMENU);
-	GetAsyncKeyState(VK_L_KEY);
+	GetAsyncKeyState(VK_J_KEY);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
