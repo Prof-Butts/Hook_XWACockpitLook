@@ -704,8 +704,6 @@ int CockpitLookHook(int* params)
 						g_headPos = g_prevHeadingMatrix * g_headPos;
 					else
 						g_headPos = HeadingMatrix * g_headPos;
-					log_debug("[%d], %0.3f, %0.3f, %0.3f",
-						g_iHyperspaceFrame, g_headPos.x, g_headPos.y, g_headPos.z);
 					PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
 					PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
 					PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
@@ -737,8 +735,6 @@ int CockpitLookHook(int* params)
 							g_headPos = g_prevHeadingMatrix * g_headPos;
 						else
 							g_headPos = HeadingMatrix * g_headPos;
-						log_debug("[%d], %0.3f, %0.3f, %0.3f",
-							g_iHyperspaceFrame, g_headPos.x, g_headPos.y, g_headPos.z);
 						PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
 						PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
 						PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
@@ -916,13 +912,19 @@ int CockpitLookHook(int* params)
 				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 				if (g_bCockpitInertiaEnabled) {
 					float XDisp = 0.0f, YDisp = 0.0f;
-					ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
+					if (g_bInHyperspace)
+						ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, playerIndex, &XDisp, &YDisp);
+					else
+						ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
 					// Apply the inertia:
 					g_headPos.x += XDisp;
 					g_headPos.y += YDisp;
 				}
 
-				g_headPos = HeadingMatrix * g_headPos;
+				if (g_bInHyperspace)
+					g_headPos = g_prevHeadingMatrix * g_headPos;
+				else
+					g_headPos = HeadingMatrix * g_headPos;
 				PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
 				PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
 				PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
