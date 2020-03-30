@@ -36,6 +36,89 @@ extern bool g_bSteamVRInitialized;
 FILE *g_DebugFile = NULL;
 #endif
 
+/*
+ * HYPERSPACE variables
+ */
+enum HyperspacePhaseEnum {
+	HS_INIT_ST = 0,				// Initial state, we're not even in Hyperspace
+	HS_HYPER_ENTER_ST = 1,		// We're entering hyperspace
+	HS_HYPER_TUNNEL_ST = 2,		// Traveling through the blue Hyperspace tunnel
+	HS_HYPER_EXIT_ST = 3,		// HyperExit streaks are being rendered
+};
+HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST;
+bool g_bHyperspaceFirstFrame = false, g_bInHyperspace = false, g_bHyperspaceLastFrame = false;
+int g_iHyperspaceFrame = -1;
+Vector4 g_LastFsBeforeHyperspace;
+Matrix4 g_prevHeadingMatrix;
+
+/*
+ * Updates the hyperspace FSM. This is a "lightweight" version of the code in ddraw.
+ * Here, we mostly care about how to handle cockpit inertia when we jump into hyperspace.
+ * The problem is that XWA will snap the camera when entering hyperspace, and that will
+ * cause this hook to miscalculate the inertia on that frame. We need to ignore the frame
+ * where the head snaps since ddraw will restore the previous camera orientation on the next
+ * frame.
+ */
+void UpdateHyperspaceState(int playerIndex) {
+	// Reset the Hyperspace FSM regardless of the previous state. This helps reset the
+	// state if we quit on the middle of a movie that is playing back the hyperspace
+	// effect.
+	if (PlayerDataTable[playerIndex].hyperspacePhase == 0)
+		g_HyperspacePhaseFSM = HS_INIT_ST;
+
+	switch (g_HyperspacePhaseFSM) {
+	case HS_INIT_ST:
+		g_bInHyperspace = false;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceLastFrame = false;
+		g_iHyperspaceFrame = -1;
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 2) {
+			// Hyperspace has *just* been engaged. Save the current cockpit camera heading so we can restore it
+			g_bHyperspaceFirstFrame = true;
+			g_bInHyperspace = true;
+			g_iHyperspaceFrame = 0;
+			//if (PlayerDataTable[*playerIndex].cockpitCameraYaw != g_fLastCockpitCameraYaw ||
+			//	PlayerDataTable[*playerIndex].cockpitCameraPitch != g_fLastCockpitCameraPitch)
+			//	g_bHyperHeadSnapped = true;
+			//if (*numberOfPlayersInGame == 1) {
+			//	PlayerDataTable[*playerIndex].cockpitCameraYaw = g_fLastCockpitCameraYaw;
+			//	PlayerDataTable[*playerIndex].cockpitCameraPitch = g_fLastCockpitCameraPitch;
+			//}
+			g_HyperspacePhaseFSM = HS_HYPER_ENTER_ST;
+		}
+		break;
+	case HS_HYPER_ENTER_ST:
+		g_bInHyperspace = true;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceLastFrame = false;
+		g_iHyperspaceFrame++;
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 4)
+			g_HyperspacePhaseFSM = HS_HYPER_TUNNEL_ST;
+		break;
+	case HS_HYPER_TUNNEL_ST:
+		g_bInHyperspace = true;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceLastFrame = false;
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 3) {
+			//log_debug("[DBG] [FSM] HS_HYPER_TUNNEL_ST --> HS_HYPER_EXIT_ST");
+			g_bHyperspaceLastFrame = true;
+			g_bInHyperspace = false;
+			g_HyperspacePhaseFSM = HS_HYPER_EXIT_ST;
+		}
+		break;
+	case HS_HYPER_EXIT_ST:
+		g_bInHyperspace = false;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceLastFrame = false;
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 0) {
+			g_HyperspacePhaseFSM = HS_INIT_ST;
+			//g_bInHyperspace = false;
+			g_iHyperspaceFrame = -1;
+		}
+		break;
+	}
+}
+
 void LoadParams();
 
 void log_debug(const char *format, ...)
@@ -75,10 +158,10 @@ const char *TRACKER_TYPE				= "tracker_type"; // Defines which tracker to use
 const char *TRACKER_TYPE_FREEPIE		= "FreePIE"; // Use FreePIE as the tracker
 const char *TRACKER_TYPE_STEAMVR		= "SteamVR"; // Use SteamVR as the tracker
 const char *TRACKER_TYPE_TRACKIR		= "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
-const char *TRACKER_TYPE_NONE		= "None";
-const char *YAW_MULTIPLIER			= "yaw_multiplier";
+const char *TRACKER_TYPE_NONE			= "None";
+const char *YAW_MULTIPLIER				= "yaw_multiplier";
 const char *PITCH_MULTIPLIER			= "pitch_multiplier";
-const char *YAW_OFFSET				= "yaw_offset";
+const char *YAW_OFFSET					= "yaw_offset";
 const char *PITCH_OFFSET				= "pitch_offset";
 const char *FREEPIE_SLOT				= "freepie_slot";
 
@@ -119,15 +202,14 @@ TrackerType g_TrackerType = TRACKER_NONE;
 
 float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
-//float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
 float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
-float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
-int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
-bool	  g_bYawPitchFromMouseOverride = false;
+float g_fPitchOffset	 = DEFAULT_PITCH_OFFSET;
+int   g_iFreePIESlot	 = DEFAULT_FREEPIE_SLOT;
+bool  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
-Vector4 g_prevRs(1, 0, 0, 0), g_prevFs(0, 0, 1, 0), g_prevUs(0, 1, 0, 0);
+Vector4 g_prevFs(0, 0, 1, 0);
 int g_FreePIEOutputSlot = -1;
 
 /*********************************************************************/
@@ -151,10 +233,10 @@ void InitHeadingMatrix() {
 	rotX.identity();
 	rotX.rotateX(90.0f);
 	refl.set(
-		1, 0, 0, 0,
+		1,  0, 0, 0,
 		0, -1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, 0, 1
+		0,  0, 1, 0,
+		0,  0, 0, 1
 	);
 	g_rotXrefl = refl * rotX;
 }
@@ -166,16 +248,22 @@ void InitHeadingMatrix() {
  * Fs: The "Forward" vector in global coordinates
  * A viewMatrix that maps [Rs, Us, Fs] to the major [X, Y, Z] axes
  */
-Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool invert = false)
+Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool invert = false)
 {
 	const float DEG2RAD = 3.141593f / 180;
 	float yaw, pitch, roll;
 	Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
 	Vector4 T, B, N;
 	// Compute the full rotation
-	yaw   = PlayerDataTable[0].yaw   / 65536.0f * 360.0f;
-	pitch = PlayerDataTable[0].pitch / 65536.0f * 360.0f;
-	roll  = PlayerDataTable[0].roll  / 65536.0f * 360.0f;
+	yaw   = PlayerDataTable[playerIndex].yaw   / 65536.0f * 360.0f;
+	pitch = PlayerDataTable[playerIndex].pitch / 65536.0f * 360.0f;
+	roll  = PlayerDataTable[playerIndex].roll  / 65536.0f * 360.0f;
+
+	// yaw-pitch-roll gets reset to: ypr: 0.000, 90.000, 0.000 when entering hyperspace
+	/*if (!g_bInHyperspace)
+		log_debug("ypr: %0.3f, %0.3f, %0.3f", yaw, pitch, roll);
+	else
+		log_debug("[H] ypr: %0.3f, %0.3f, %0.3f", yaw, pitch, roll);*/
 
 	// To test how (x,y,z) is aligned with either the Y+ or Z+ axis, just multiply rotMatrixPitch * rotMatrixYaw * (x,y,z)
 	//Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
@@ -215,20 +303,6 @@ Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool inve
 	B = rotMatrixFull * B;
 	N = rotMatrixFull * N;
 	// Our TBN basis is now in absolute coordinates
-	/*
-	Matrix4 rotX, refl;
-	rotX.identity();
-	rotX.rotateX(90.0f);
-	refl.set(
-		1,  0,  0,  0,
-		0, -1,  0,  0,
-		0,  0,  1,  0,
-		0,  0,  0,  1
-	);
-	Fs = refl * rotX * N;
-	Us = refl * rotX * B;
-	Rs = refl * rotX * T;
-	*/
 	Fs = g_rotXrefl * N;
 	Us = g_rotXrefl * B;
 	Rs = g_rotXrefl * T;
@@ -255,6 +329,12 @@ Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool inve
 		);
 		// Rs, Us, Fs is an orthonormal basis
 	}
+
+	// Store data for the next frame if we're not in hyperspace
+	if (!g_bInHyperspace) {
+		g_LastFsBeforeHyperspace = Fs;
+		g_prevHeadingMatrix = viewMatrix;
+	}
 	return viewMatrix;
 }
 
@@ -263,23 +343,44 @@ Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool inve
  * Input: The current Heading matrix H, the current forward vector Fs
  * Output: The X,Y displacement
  */
-void ComputeInertia(const Matrix4 &H, const Vector4 &Fs, float *XDisp, float *YDisp) {
+void ComputeInertia(const Matrix4 &H, Vector4 Fs, int playerIndex, float *XDisp, float *YDisp) {
 	static bool bFirstFrame = true;
+	static float LastXDisp = 0.0f, LastYDisp = 0.0f;
 	static time_t prevT = 0;
 	time_t curT = time(NULL);
 	// Reset the first frame if the time between successive queries is too big: this
 	// implies the game was either paused or a new mission was loaded
 	bFirstFrame = curT - prevT > 2; // Reset if 2+s have elapsed
 	// Skip the very first frame: there's no inertia to compute yet
-	if (bFirstFrame || !g_bCockpitInertiaEnabled)
+	if (bFirstFrame || !g_bCockpitInertiaEnabled || g_bHyperspaceLastFrame)
 	{
 		bFirstFrame = false;
 		*XDisp = *YDisp = 0.0f;
+		LastXDisp = LastYDisp = 0.0f;
 		// Update the previous heading vectors
 		g_prevFs = Fs;
 		prevT = curT;
 		return;
 	}
+
+	/*
+	if (g_bInHyperspace) {
+		const float incr = 0.001f;
+		// It looks like not only is the cockpit camera snapped on the first hyperspace frame;
+		// but the craft's orientation is also snapped. So, there's no point in using H or HT,
+		// we just need to fade the inertia to 0 slowly
+		if (LastXDisp > 0) LastXDisp -= incr; else if (LastXDisp < 0) LastXDisp += incr;
+		if (LastYDisp > 0) LastYDisp -= incr; else if (LastYDisp < 0) LastYDisp += incr;
+		// Snap to 0 if we're close enough
+		if (fabs(LastXDisp) < incr) LastXDisp = 0.0f;
+		if (fabs(LastYDisp) < incr) LastYDisp = 0.0f;
+		*XDisp = LastXDisp;
+		*YDisp = LastYDisp;
+		//log_debug("[H] [%d] X,Y: %0.3f, %0.3f", g_iHyperspaceFrames, *XDisp, *YDisp);
+		return;
+	}
+	*/
+
 	Matrix4 HT = H;
 	HT.transpose();
 	// Multiplying the current Rs, Us, Fs with H will yield the major axes:
@@ -301,10 +402,15 @@ void ComputeInertia(const Matrix4 &H, const Vector4 &Fs, float *XDisp, float *YD
 	*YDisp = g_fCockpitInertia * diffZ.y;
 	if (*XDisp < -g_fCockpitMaxInertia) *XDisp = -g_fCockpitMaxInertia; else if (*XDisp > g_fCockpitMaxInertia) *XDisp = g_fCockpitMaxInertia;
 	if (*YDisp < -g_fCockpitMaxInertia) *YDisp = -g_fCockpitMaxInertia; else if (*YDisp > g_fCockpitMaxInertia) *YDisp = g_fCockpitMaxInertia;
+	LastXDisp = *XDisp;
+	LastYDisp = *YDisp;
 
 	// Update the previous heading smoothly, otherwise the cockpit may shake a bit
 	g_prevFs = 0.1f * Fs + 0.9f * g_prevFs;
 	prevT = curT;
+
+	//if (g_HyperspacePhaseFSM == HS_HYPER_ENTER_ST || g_HyperspacePhaseFSM == HS_INIT_ST)
+	//	log_debug("[%d] X,Y: %0.3f, %0.3f", g_iHyperspaceFrames, *XDisp, *YDisp);
 }
 
 typedef struct HeadPosStruct {
@@ -519,6 +625,9 @@ int CockpitLookHook(int* params)
 	__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;	
 	ProcessKeyboard(keycodePressed);
 
+	// Update the Hyperspace FSM
+	UpdateHyperspaceState(playerIndex);
+
 	// This hook "works" for MP; but unfortunately, code in XWA keeps trying to sync all the mouse
 	// look parameters, so that makes MP unplayable. We won't be able to enable this hook in MP
 	// until the MP networking code has been translated/fixed to allow different mouse look params
@@ -579,19 +688,27 @@ int CockpitLookHook(int* params)
 				// Mouse Look is enabled, apply the head's position right here
 				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState) {
 					Vector4 Rs, Us, Fs;
-					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 					if (g_bCockpitInertiaEnabled) {
 						float XDisp = 0.0f, YDisp = 0.0f;
-						ComputeInertia(HeadingMatrix, Fs, &XDisp, &YDisp);
+						if (g_bInHyperspace)
+							ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, playerIndex, &XDisp, &YDisp);
+						else
+							ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
 						// Apply the inertia:
 						g_headPos.x += XDisp;
 						g_headPos.y += YDisp;
 					}
 
-					g_headPos = HeadingMatrix * g_headPos;
-					PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
-					PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
-					PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
+					if (g_bInHyperspace)
+						g_headPos = g_prevHeadingMatrix * g_headPos;
+					else
+						g_headPos = HeadingMatrix * g_headPos;
+					log_debug("[%d], %0.3f, %0.3f, %0.3f",
+						g_iHyperspaceFrame, g_headPos.x, g_headPos.y, g_headPos.z);
+					PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+					PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+					PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 					dataReady = false;
 				} 
 				else if (!*mouseLook) {
@@ -604,19 +721,27 @@ int CockpitLookHook(int* params)
 						// mouseLook is off and keyboardlook is disabled, apply cockpit inertia here.
 						// I'm sure this section and the above can be refactored...
 						Vector4 Rs, Us, Fs;
-						Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+						Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 						if (g_bCockpitInertiaEnabled) {
 							float XDisp = 0.0f, YDisp = 0.0f;
-							ComputeInertia(HeadingMatrix, Fs, &XDisp, &YDisp);
+							if (g_bInHyperspace)
+								ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, playerIndex, &XDisp, &YDisp);
+							else
+								ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
 							// Apply the inertia:
 							g_headPos.x += XDisp;
 							g_headPos.y += YDisp;
 						}
 
-						g_headPos = HeadingMatrix * g_headPos;
-						PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
-						PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
-						PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
+						if (g_bInHyperspace)
+							g_headPos = g_prevHeadingMatrix * g_headPos;
+						else
+							g_headPos = HeadingMatrix * g_headPos;
+						log_debug("[%d], %0.3f, %0.3f, %0.3f",
+							g_iHyperspaceFrame, g_headPos.x, g_headPos.y, g_headPos.z);
+						PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+						PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+						PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 					}
 				}
 
@@ -788,19 +913,19 @@ int CockpitLookHook(int* params)
 				// end of the frame (?)
 
 				Vector4 Rs, Us, Fs;
-				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 				if (g_bCockpitInertiaEnabled) {
 					float XDisp = 0.0f, YDisp = 0.0f;
-					ComputeInertia(HeadingMatrix, Fs, &XDisp, &YDisp);
+					ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
 					// Apply the inertia:
 					g_headPos.x += XDisp;
 					g_headPos.y += YDisp;
 				}
 
 				g_headPos = HeadingMatrix * g_headPos;
-				PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
-				PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
-				PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
+				PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+				PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+				PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 			/*} else {
 				PlayerDataTable[playerIndex].cameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 				PlayerDataTable[playerIndex].cameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
