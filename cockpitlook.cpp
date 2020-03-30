@@ -103,7 +103,9 @@ const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
 const int   DEFAULT_FREEPIE_SLOT = 0;
-const int   VK_J_KEY = 0x4a;
+const int   VK_I_KEY = 0x49; // Ctrl+I is used to toggle cockpit inertia
+const int   VK_J_KEY = 0x4a; // Ctrl+J is used to reload the cockpitlook.cfg params
+//const int   VK_K_KEY = 0x4b;
 //const int   VK_L_KEY = 0x4c;
 
 // General types and globals
@@ -125,11 +127,37 @@ bool	  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
+Vector4 g_prevRs(1, 0, 0, 0), g_prevFs(0, 0, 1, 0), g_prevUs(0, 1, 0, 0);
 int g_FreePIEOutputSlot = -1;
+
+/*********************************************************************/
+/* Cockpit Inertia													 */
+/*********************************************************************/
+bool g_bCockpitInertiaEnabled = false;
+float g_fCockpitInertia = 0.35f;
+float g_fCockpitMaxInertia = 0.2f;
 
 /*********************************************************************/
 /*	Code used to enable leaning in the cockpit with the arrow keys   */
 /*********************************************************************/
+// In XWA, the Y+ axis points forward (towards the horizon) and Z+ points up.
+// To make this consistent with regular PixelShader coords, we need to swap these
+// coordinates using a rotation and reflection. The following matrix stores that
+// transformation and is only used in GetCurrentHeadingMatrix().
+Matrix4 g_rotXrefl;
+
+void InitHeadingMatrix() {
+	Matrix4 rotX, refl;
+	rotX.identity();
+	rotX.rotateX(90.0f);
+	refl.set(
+		1, 0, 0, 0,
+		0, -1, 0, 0,
+		0, 0, 1, 0,
+		0, 0, 0, 1
+	);
+	g_rotXrefl = refl * rotX;
+}
 
 /*
  * Compute the current ship's orientation. Returns:
@@ -187,6 +215,7 @@ Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool inve
 	B = rotMatrixFull * B;
 	N = rotMatrixFull * N;
 	// Our TBN basis is now in absolute coordinates
+	/*
 	Matrix4 rotX, refl;
 	rotX.identity();
 	rotX.rotateX(90.0f);
@@ -199,6 +228,10 @@ Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool inve
 	Fs = refl * rotX * N;
 	Us = refl * rotX * B;
 	Rs = refl * rotX * T;
+	*/
+	Fs = g_rotXrefl * N;
+	Us = g_rotXrefl * B;
+	Rs = g_rotXrefl * T;
 	Fs.w = 0; Rs.w = 0; Us.w = 0;
 	// This transform chain gets us the orientation of the craft in XWA's coord system:
 	// [1,0,0] is right, [0,1,0] is forward, [0,0,1] is up
@@ -223,6 +256,55 @@ Matrix4 GetCurrentHeadingMatrix(Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool inve
 		// Rs, Us, Fs is an orthonormal basis
 	}
 	return viewMatrix;
+}
+
+/*
+ * Computes cockpit inertia
+ * Input: The current Heading matrix H, the current forward vector Fs
+ * Output: The X,Y displacement
+ */
+void ComputeInertia(const Matrix4 &H, const Vector4 &Fs, float *XDisp, float *YDisp) {
+	static bool bFirstFrame = true;
+	static time_t prevT = 0;
+	time_t curT = time(NULL);
+	// Reset the first frame if the time between successive queries is too big: this
+	// implies the game was either paused or a new mission was loaded
+	bFirstFrame = curT - prevT > 2; // Reset if 2+s have elapsed
+	// Skip the very first frame: there's no inertia to compute yet
+	if (bFirstFrame || !g_bCockpitInertiaEnabled)
+	{
+		bFirstFrame = false;
+		*XDisp = *YDisp = 0.0f;
+		// Update the previous heading vectors
+		g_prevFs = Fs;
+		prevT = curT;
+		return;
+	}
+	Matrix4 HT = H;
+	HT.transpose();
+	// Multiplying the current Rs, Us, Fs with H will yield the major axes:
+	//Vector4 X = HT * Rs; // --> always returns [1, 0, 0]
+	//Vector4 Y = HT * Us; // --> always returns [0, 1, 0]
+	//Vector4 Z = HT * Fs; // --> always returns [0, 0, 1]
+	//log_debug("[DBG] X: [%0.3f, %0.3f, %0.3f], Y: [%0.3f, %0.3f, %0.3f], Z: [%0.3f, %0.3f, %0.3f]",
+	//	X.x, X.y, X.z, Y.x, Y.y, Y.z, Z.x, Z.y, Z.z);
+
+	//Vector4 X = HT * g_prevRs; // --> returns something close to [1, 0, 0]
+	//Vector4 Y = HT * g_prevUs; // --> returns something close to [0, 1, 0]
+	Vector4 Z = HT * g_prevFs; // --> returns something close to [0, 0, 1]
+	//log_debug("[DBG] X: [%0.3f, %0.3f, %0.3f], Y: [%0.3f, %0.3f, %0.3f], Z: [%0.3f, %0.3f, %0.3f]",
+	//	X.x, X.y, X.z, Y.x, Y.y, Y.z, Z.x, Z.y, Z.z);
+	Vector4 curFs(0, 0, 1, 0);
+	Vector4 diffZ = curFs - Z;
+
+	*XDisp = g_fCockpitInertia * diffZ.x;
+	*YDisp = g_fCockpitInertia * diffZ.y;
+	if (*XDisp < -g_fCockpitMaxInertia) *XDisp = -g_fCockpitMaxInertia; else if (*XDisp > g_fCockpitMaxInertia) *XDisp = g_fCockpitMaxInertia;
+	if (*YDisp < -g_fCockpitMaxInertia) *YDisp = -g_fCockpitMaxInertia; else if (*YDisp > g_fCockpitMaxInertia) *YDisp = g_fCockpitMaxInertia;
+
+	// Update the previous heading smoothly, otherwise the cockpit may shake a bit
+	g_prevFs = 0.1f * Fs + 0.9f * g_prevFs;
+	prevT = curT;
 }
 
 typedef struct HeadPosStruct {
@@ -324,7 +406,8 @@ void animTickZ(Vector3 *headPos) {
 }
 
 void ProcessKeyboard(__int16 keycodePressed) {
-	static bool bLastLKeyState = false, bCurJKeyState = false;
+	static bool bLastIKeyState = false, bLastJKeyState = false;
+	static bool bCurIKeyState = false, bCurJKeyState = false;
 
 	//bool bControl = *s_XwaIsControlKeyPressed;
 	//bool bShift = *s_XwaIsShiftKeyPressed;
@@ -334,18 +417,24 @@ void ProcessKeyboard(__int16 keycodePressed) {
 	bool bAlt		= GetAsyncKeyState(VK_MENU);
 	bool bRightAlt	= GetAsyncKeyState(VK_RMENU);
 	bool bLeftAlt	= GetAsyncKeyState(VK_LMENU);
-	// L Key:
-	bLastLKeyState = bCurJKeyState;
+	// I,J key states:
+	bLastIKeyState = bCurIKeyState;
+	bLastJKeyState = bCurJKeyState;
 	bCurJKeyState = GetAsyncKeyState(VK_J_KEY);
+	bCurIKeyState = GetAsyncKeyState(VK_I_KEY);
 
 	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
 
 	// It's not a good idea to use Ctrl+L to reload the cockpit look hook settings because
 	// Ctrl+L is already used by the landing gear hook. So, let's use a different key: J
-	if (bCtrl && bLastLKeyState && !bCurJKeyState)
+	if (bCtrl && bLastJKeyState && !bCurJKeyState)
 	{
 		log_debug("*********** RELOADING CockpitLookHook.cfg ***********");
 		LoadParams();
+	}
+
+	if (bCtrl && bLastIKeyState && !bCurIKeyState) {
+		g_bCockpitInertiaEnabled = !g_bCockpitInertiaEnabled;
 	}
 
 	if (bAlt || bCtrl) {
@@ -491,6 +580,14 @@ int CockpitLookHook(int* params)
 				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState) {
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+					if (g_bCockpitInertiaEnabled) {
+						float XDisp = 0.0f, YDisp = 0.0f;
+						ComputeInertia(HeadingMatrix, Fs, &XDisp, &YDisp);
+						// Apply the inertia:
+						g_headPos.x += XDisp;
+						g_headPos.y += YDisp;
+					}
+
 					g_headPos = HeadingMatrix * g_headPos;
 					PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
 					PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
@@ -503,6 +600,24 @@ int CockpitLookHook(int* params)
 					// we'll break the Joystick POV hat/Keypad look!
 					if (g_bKeyboardLook)
 						dataReady = true;
+					else {
+						// mouseLook is off and keyboardlook is disabled, apply cockpit inertia here.
+						// I'm sure this section and the above can be refactored...
+						Vector4 Rs, Us, Fs;
+						Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+						if (g_bCockpitInertiaEnabled) {
+							float XDisp = 0.0f, YDisp = 0.0f;
+							ComputeInertia(HeadingMatrix, Fs, &XDisp, &YDisp);
+							// Apply the inertia:
+							g_headPos.x += XDisp;
+							g_headPos.y += YDisp;
+						}
+
+						g_headPos = HeadingMatrix * g_headPos;
+						PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
+						PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
+						PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[2]);
+					}
 				}
 
 				// Debug: Write the fake yaw/pitch and cockpit lean to FreePIE to fake a headset
@@ -674,6 +789,14 @@ int CockpitLookHook(int* params)
 
 				Vector4 Rs, Us, Fs;
 				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(Rs, Us, Fs, true);
+				if (g_bCockpitInertiaEnabled) {
+					float XDisp = 0.0f, YDisp = 0.0f;
+					ComputeInertia(HeadingMatrix, Fs, &XDisp, &YDisp);
+					// Apply the inertia:
+					g_headPos.x += XDisp;
+					g_headPos.y += YDisp;
+				}
+
 				g_headPos = HeadingMatrix * g_headPos;
 				PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[0]);
 				PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos[1]);
@@ -927,6 +1050,15 @@ void LoadParams() {
 			else if (_stricmp(param, "invert_cockpit_lean_y") == 0) {
 				g_bInvertCockpitLeanY = (bool)fValue;
 			}
+			else if (_stricmp(param, "cockpit_inertia_enabled") == 0) {
+				g_bCockpitInertiaEnabled = (bool)fValue;
+			}
+			else if (_stricmp(param, "cockpit_inertia") == 0) {
+				g_fCockpitInertia = fValue;
+			}
+			else if (_stricmp(param, "cockpit_max_inertia") == 0) {
+				g_fCockpitMaxInertia = fValue;
+			}
 
 			else if (_stricmp(param, "write_5dof_to_freepie_slot") == 0) {
 				g_FreePIEOutputSlot = (int)fValue;
@@ -965,8 +1097,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		g_hWnd = GetForegroundWindow();
 		// Load cockpitlook.cfg here and enable FreePIE, SteamVR or TrackIR
 		LoadParams();
-		InitKeyboard();
 		log_debug("Parameters loaded");
+		InitKeyboard();
+		InitHeadingMatrix();
 		switch (g_TrackerType)
 		{
 		case TRACKER_FREEPIE:
