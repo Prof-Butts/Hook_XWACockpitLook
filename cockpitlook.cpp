@@ -869,9 +869,8 @@ int CockpitLookHook(int* params)
 					}
 					Vector4 pos(x, y, z, 1.0f);
 					g_headPos = (pos - g_headCenter);
-
-					dataReady = true;
 				}
+				dataReady = true;
 			}
 			break;
 		}
