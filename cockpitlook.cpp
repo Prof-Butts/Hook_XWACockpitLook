@@ -36,91 +36,6 @@ extern bool g_bSteamVRInitialized;
 FILE *g_DebugFile = NULL;
 #endif
 
-/*
- * HYPERSPACE variables
- */
-enum HyperspacePhaseEnum {
-	HS_INIT_ST = 0,				// Initial state, we're not even in Hyperspace
-	HS_HYPER_ENTER_ST = 1,		// We're entering hyperspace
-	HS_HYPER_TUNNEL_ST = 2,		// Traveling through the blue Hyperspace tunnel
-	HS_HYPER_EXIT_ST = 3,		// HyperExit streaks are being rendered
-};
-HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST;
-bool g_bHyperspaceFirstFrame = false, g_bInHyperspace = false, g_bHyperspaceLastFrame = false;
-int g_iHyperspaceFrame = -1;
-Vector4 g_LastFsBeforeHyperspace;
-Matrix4 g_prevHeadingMatrix;
-
-/*
- * Updates the hyperspace FSM. This is a "lightweight" version of the code in ddraw.
- * Here, we mostly care about how to handle cockpit inertia when we jump into hyperspace.
- * The problem is that XWA will snap the camera when entering hyperspace, and that will
- * cause this hook to miscalculate the inertia on that frame. We need to ignore the frame
- * where the head snaps since ddraw will restore the previous camera orientation on the next
- * frame.
- */
-void UpdateHyperspaceState(int playerIndex) {
-	// Reset the Hyperspace FSM regardless of the previous state. This helps reset the
-	// state if we quit on the middle of a movie that is playing back the hyperspace
-	// effect.
-	if (PlayerDataTable[playerIndex].hyperspacePhase == 0)
-		g_HyperspacePhaseFSM = HS_INIT_ST;
-
-	switch (g_HyperspacePhaseFSM) {
-	case HS_INIT_ST:
-		g_bInHyperspace = false;
-		g_bHyperspaceFirstFrame = false;
-		g_bHyperspaceLastFrame = false;
-		g_iHyperspaceFrame = -1;
-		if (PlayerDataTable[playerIndex].hyperspacePhase == 2) {
-			// Hyperspace has *just* been engaged. Save the current cockpit camera heading so we can restore it
-			g_bHyperspaceFirstFrame = true;
-			g_bInHyperspace = true;
-			g_iHyperspaceFrame = 0;
-			//if (PlayerDataTable[*playerIndex].cockpitCameraYaw != g_fLastCockpitCameraYaw ||
-			//	PlayerDataTable[*playerIndex].cockpitCameraPitch != g_fLastCockpitCameraPitch)
-			//	g_bHyperHeadSnapped = true;
-			//if (*numberOfPlayersInGame == 1) {
-			//	PlayerDataTable[*playerIndex].cockpitCameraYaw = g_fLastCockpitCameraYaw;
-			//	PlayerDataTable[*playerIndex].cockpitCameraPitch = g_fLastCockpitCameraPitch;
-			//}
-			g_HyperspacePhaseFSM = HS_HYPER_ENTER_ST;
-		}
-		break;
-	case HS_HYPER_ENTER_ST:
-		g_bInHyperspace = true;
-		g_bHyperspaceFirstFrame = false;
-		g_bHyperspaceLastFrame = false;
-		g_iHyperspaceFrame++;
-		if (PlayerDataTable[playerIndex].hyperspacePhase == 4)
-			g_HyperspacePhaseFSM = HS_HYPER_TUNNEL_ST;
-		break;
-	case HS_HYPER_TUNNEL_ST:
-		g_bInHyperspace = true;
-		g_bHyperspaceFirstFrame = false;
-		g_bHyperspaceLastFrame = false;
-		if (PlayerDataTable[playerIndex].hyperspacePhase == 3) {
-			//log_debug("[DBG] [FSM] HS_HYPER_TUNNEL_ST --> HS_HYPER_EXIT_ST");
-			g_bHyperspaceLastFrame = true;
-			g_bInHyperspace = false;
-			g_HyperspacePhaseFSM = HS_HYPER_EXIT_ST;
-		}
-		break;
-	case HS_HYPER_EXIT_ST:
-		g_bInHyperspace = false;
-		g_bHyperspaceFirstFrame = false;
-		g_bHyperspaceLastFrame = false;
-		if (PlayerDataTable[playerIndex].hyperspacePhase == 0) {
-			g_HyperspacePhaseFSM = HS_INIT_ST;
-			//g_bInHyperspace = false;
-			g_iHyperspaceFrame = -1;
-		}
-		break;
-	}
-}
-
-void LoadParams();
-
 void log_debug(const char *format, ...)
 {
 	static char buf[300];
@@ -152,6 +67,110 @@ void log_debug(const char *format, ...)
 
 	va_end(args);
 }
+
+/*
+ * HYPERSPACE variables
+ */
+enum HyperspacePhaseEnum {
+	HS_INIT_ST = 0,				// Initial state, we're not even in Hyperspace
+	HS_HYPER_ENTER_ST = 1,		// We're entering hyperspace
+	HS_HYPER_TUNNEL_ST = 2,		// Traveling through the blue Hyperspace tunnel
+	HS_HYPER_EXIT_ST = 3,		// HyperExit streaks are being rendered
+};
+HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST;
+bool g_bHyperspaceFirstFrame = false, g_bInHyperspace = false, g_bHyperspaceLastFrame = false, g_bHyperspaceTunnelLastFrame = false;
+int g_iHyperspaceFrame = -1;
+Vector4 g_LastFsBeforeHyperspace;
+Matrix4 g_prevHeadingMatrix;
+float g_fLastSpeedBeforeHyperspace = 0.0f;
+
+/*
+ * Updates the hyperspace FSM. This is a "lightweight" version of the code in ddraw.
+ * Here, we mostly care about how to handle cockpit inertia when we jump into hyperspace.
+ * The problem is that XWA will snap the camera when entering hyperspace, and that will
+ * cause this hook to miscalculate the inertia on that frame. We need to ignore the frame
+ * where the head snaps since ddraw will restore the previous camera orientation on the next
+ * frame.
+ */
+void UpdateHyperspaceState(int playerIndex) {
+	// Reset the Hyperspace FSM regardless of the previous state. This helps reset the
+	// state if we quit on the middle of a movie that is playing back the hyperspace
+	// effect. If we do reset the FSM, we need to update the control variables too:
+	if (PlayerDataTable[playerIndex].hyperspacePhase == 0) {
+		g_bInHyperspace = false;
+		g_bHyperspaceLastFrame = (g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST);
+		g_iHyperspaceFrame = -1;
+		g_HyperspacePhaseFSM = HS_INIT_ST;
+	}
+
+	switch (g_HyperspacePhaseFSM) {
+	case HS_INIT_ST:
+		g_bInHyperspace = false;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceTunnelLastFrame = false;
+		//g_bHyperspaceLastFrame = false; // No need to update this here, we do it at the beginning of this function
+		g_iHyperspaceFrame = -1;
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 2) {
+			// Hyperspace has *just* been engaged. Save the current cockpit camera heading so we can restore it
+			g_bHyperspaceFirstFrame = true;
+			g_bInHyperspace = true;
+			g_iHyperspaceFrame = 0;
+			//if (PlayerDataTable[*playerIndex].cockpitCameraYaw != g_fLastCockpitCameraYaw ||
+			//	PlayerDataTable[*playerIndex].cockpitCameraPitch != g_fLastCockpitCameraPitch)
+			//	g_bHyperHeadSnapped = true;
+			//if (*numberOfPlayersInGame == 1) {
+			//	PlayerDataTable[*playerIndex].cockpitCameraYaw = g_fLastCockpitCameraYaw;
+			//	PlayerDataTable[*playerIndex].cockpitCameraPitch = g_fLastCockpitCameraPitch;
+			//}
+			g_HyperspacePhaseFSM = HS_HYPER_ENTER_ST;
+		}
+		break;
+	case HS_HYPER_ENTER_ST:
+		g_bInHyperspace = true;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceTunnelLastFrame = false;
+		g_bHyperspaceLastFrame = false;
+		g_iHyperspaceFrame++;
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 4)
+			g_HyperspacePhaseFSM = HS_HYPER_TUNNEL_ST;
+		break;
+	case HS_HYPER_TUNNEL_ST:
+		g_bInHyperspace = true;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceTunnelLastFrame = false;
+		g_bHyperspaceLastFrame = false;
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 3) {
+			log_debug("[DBG] [FSM] HS_HYPER_TUNNEL_ST --> HS_HYPER_EXIT_ST");
+			g_bHyperspaceTunnelLastFrame = true;
+			//g_bInHyperspace = true;
+			g_HyperspacePhaseFSM = HS_HYPER_EXIT_ST;
+		}
+		break;
+	case HS_HYPER_EXIT_ST:
+		g_bInHyperspace = true;
+		g_bHyperspaceFirstFrame = false;
+		g_bHyperspaceTunnelLastFrame = false;
+		g_bHyperspaceLastFrame = false;
+		// If we're playing back a film, we may stop the movie while in hyperspace. In
+		// that case, we need to "hard-reset" the FSM to its initial state as soon as
+		// we see hyperspacePhase == 0 or we'll mess up the state. However, that means
+		// that the final transition must also be done at the beginning of this
+		// function
+		/*
+		if (PlayerDataTable[playerIndex].hyperspacePhase == 0) {
+			log_debug("[DBG] [FSM] HS_HYPER_EXIT_ST --> HS_INIT_ST");
+			g_bInHyperspace = false;
+			g_bHyperspaceLastFrame = true;
+			log_debug("g_bHyperspaceLastFrame <- true");
+			g_iHyperspaceFrame = -1;
+			g_HyperspacePhaseFSM = HS_INIT_ST;
+		}
+		*/
+		break;
+	}
+}
+
+void LoadParams();
 
 // cockpitlook.cfg parameter names
 const char *TRACKER_TYPE				= "tracker_type"; // Defines which tracker to use
@@ -216,7 +235,7 @@ int g_FreePIEOutputSlot = -1;
 /* Cockpit Inertia													 */
 /*********************************************************************/
 bool g_bCockpitInertiaEnabled = false;
-float g_fCockpitInertia = 0.35f;
+float g_fCockpitInertia = 0.35f, g_fCockpitSpeedInertia = 0.005f;
 float g_fCockpitMaxInertia = 0.2f;
 
 /*********************************************************************/
@@ -331,9 +350,10 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 	}
 
 	// Store data for the next frame if we're not in hyperspace
-	if (!g_bInHyperspace) {
+	if (!g_bInHyperspace || g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST) {
 		g_LastFsBeforeHyperspace = Fs;
 		g_prevHeadingMatrix = viewMatrix;
+		g_fLastSpeedBeforeHyperspace = (float)PlayerDataTable[playerIndex].currentSpeed;
 	}
 	return viewMatrix;
 }
@@ -343,43 +363,24 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
  * Input: The current Heading matrix H, the current forward vector Fs
  * Output: The X,Y displacement
  */
-void ComputeInertia(const Matrix4 &H, Vector4 Fs, int playerIndex, float *XDisp, float *YDisp) {
+void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerIndex, float *XDisp, float *YDisp, float *ZDisp) {
 	static bool bFirstFrame = true;
-	static float LastXDisp = 0.0f, LastYDisp = 0.0f;
+	static float fLastSpeed = 0.0f;
 	static time_t prevT = 0;
 	time_t curT = time(NULL);
 	// Reset the first frame if the time between successive queries is too big: this
 	// implies the game was either paused or a new mission was loaded
 	bFirstFrame = curT - prevT > 2; // Reset if 2+s have elapsed
 	// Skip the very first frame: there's no inertia to compute yet
-	if (bFirstFrame || !g_bCockpitInertiaEnabled || g_bHyperspaceLastFrame)
+	if (bFirstFrame || !g_bCockpitInertiaEnabled || g_bHyperspaceTunnelLastFrame)
 	{
 		bFirstFrame = false;
-		*XDisp = *YDisp = 0.0f;
-		LastXDisp = LastYDisp = 0.0f;
+		*XDisp = *YDisp = *ZDisp = 0.0f;
 		// Update the previous heading vectors
 		g_prevFs = Fs;
 		prevT = curT;
 		return;
 	}
-
-	/*
-	if (g_bInHyperspace) {
-		const float incr = 0.001f;
-		// It looks like not only is the cockpit camera snapped on the first hyperspace frame;
-		// but the craft's orientation is also snapped. So, there's no point in using H or HT,
-		// we just need to fade the inertia to 0 slowly
-		if (LastXDisp > 0) LastXDisp -= incr; else if (LastXDisp < 0) LastXDisp += incr;
-		if (LastYDisp > 0) LastYDisp -= incr; else if (LastYDisp < 0) LastYDisp += incr;
-		// Snap to 0 if we're close enough
-		if (fabs(LastXDisp) < incr) LastXDisp = 0.0f;
-		if (fabs(LastYDisp) < incr) LastYDisp = 0.0f;
-		*XDisp = LastXDisp;
-		*YDisp = LastYDisp;
-		//log_debug("[H] [%d] X,Y: %0.3f, %0.3f", g_iHyperspaceFrames, *XDisp, *YDisp);
-		return;
-	}
-	*/
 
 	Matrix4 HT = H;
 	HT.transpose();
@@ -400,14 +401,22 @@ void ComputeInertia(const Matrix4 &H, Vector4 Fs, int playerIndex, float *XDisp,
 
 	*XDisp = g_fCockpitInertia * diffZ.x;
 	*YDisp = g_fCockpitInertia * diffZ.y;
+	//ZDisp can be g_fCockpitInertia * diffZ.z to compute roll; but let's do accel/decel instead
+	*ZDisp = -g_fCockpitSpeedInertia * (fCurSpeed - fLastSpeed);
 	if (*XDisp < -g_fCockpitMaxInertia) *XDisp = -g_fCockpitMaxInertia; else if (*XDisp > g_fCockpitMaxInertia) *XDisp = g_fCockpitMaxInertia;
 	if (*YDisp < -g_fCockpitMaxInertia) *YDisp = -g_fCockpitMaxInertia; else if (*YDisp > g_fCockpitMaxInertia) *YDisp = g_fCockpitMaxInertia;
-	LastXDisp = *XDisp;
-	LastYDisp = *YDisp;
+	if (*ZDisp < -g_fCockpitMaxInertia) *ZDisp = -g_fCockpitMaxInertia; else if (*ZDisp > g_fCockpitMaxInertia) *ZDisp = g_fCockpitMaxInertia;
 
 	// Update the previous heading smoothly, otherwise the cockpit may shake a bit
 	g_prevFs = 0.1f * Fs + 0.9f * g_prevFs;
+	fLastSpeed = 0.1f * fCurSpeed + 0.9f * fLastSpeed;
 	prevT = curT;
+
+	if (g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST || g_bHyperspaceLastFrame) 
+	{
+		*ZDisp = 0.0f;
+		fLastSpeed = fCurSpeed;
+	}
 
 	//if (g_HyperspacePhaseFSM == HS_HYPER_ENTER_ST || g_HyperspacePhaseFSM == HS_INIT_ST)
 	//	log_debug("[%d] X,Y: %0.3f, %0.3f", g_iHyperspaceFrames, *XDisp, *YDisp);
@@ -690,14 +699,15 @@ int CockpitLookHook(int* params)
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 					if (g_bCockpitInertiaEnabled) {
-						float XDisp = 0.0f, YDisp = 0.0f;
+						float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 						if (g_bInHyperspace)
-							ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, playerIndex, &XDisp, &YDisp);
+							ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
 						else
-							ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
+							ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 						// Apply the inertia:
 						g_headPos.x += XDisp;
 						g_headPos.y += YDisp;
+						g_headPos.z += ZDisp;
 					}
 
 					if (g_bInHyperspace)
@@ -721,14 +731,15 @@ int CockpitLookHook(int* params)
 						Vector4 Rs, Us, Fs;
 						Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 						if (g_bCockpitInertiaEnabled) {
-							float XDisp = 0.0f, YDisp = 0.0f;
+							float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 							if (g_bInHyperspace)
-								ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, playerIndex, &XDisp, &YDisp);
+								ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
 							else
-								ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
+								ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 							// Apply the inertia:
 							g_headPos.x += XDisp;
 							g_headPos.y += YDisp;
+							g_headPos.z += ZDisp;
 						}
 
 						if (g_bInHyperspace)
@@ -910,14 +921,15 @@ int CockpitLookHook(int* params)
 				Vector4 Rs, Us, Fs;
 				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 				if (g_bCockpitInertiaEnabled) {
-					float XDisp = 0.0f, YDisp = 0.0f;
+					float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 					if (g_bInHyperspace)
-						ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, playerIndex, &XDisp, &YDisp);
+						ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
 					else
-						ComputeInertia(HeadingMatrix, Fs, playerIndex, &XDisp, &YDisp);
+						ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 					// Apply the inertia:
 					g_headPos.x += XDisp;
 					g_headPos.y += YDisp;
+					g_headPos.z += ZDisp;
 				}
 
 				if (g_bInHyperspace)
@@ -1185,7 +1197,10 @@ void LoadParams() {
 			else if (_stricmp(param, "cockpit_max_inertia") == 0) {
 				g_fCockpitMaxInertia = fValue;
 			}
-
+			else if (_stricmp(param, "cockpit_speed_inertia") == 0) {
+				g_fCockpitSpeedInertia = fValue;
+			}
+			
 			else if (_stricmp(param, "write_5dof_to_freepie_slot") == 0) {
 				g_FreePIEOutputSlot = (int)fValue;
 				if (g_FreePIEOutputSlot != -1) {
