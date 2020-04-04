@@ -140,7 +140,7 @@ void UpdateHyperspaceState(int playerIndex) {
 		g_bHyperspaceTunnelLastFrame = false;
 		g_bHyperspaceLastFrame = false;
 		if (PlayerDataTable[playerIndex].hyperspacePhase == 3) {
-			log_debug("[DBG] [FSM] HS_HYPER_TUNNEL_ST --> HS_HYPER_EXIT_ST");
+			//log_debug("[DBG] [FSM] HS_HYPER_TUNNEL_ST --> HS_HYPER_EXIT_ST");
 			g_bHyperspaceTunnelLastFrame = true;
 			//g_bInHyperspace = true;
 			g_HyperspacePhaseFSM = HS_HYPER_EXIT_ST;
@@ -627,7 +627,7 @@ int CockpitLookHook(int* params)
 	int playerIndex = params[-10]; // Using -10 instead of -6, prevents this hook from crashing in Multiplayer
 	float yaw = 0.0f, pitch = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
-	bool dataReady = false;
+	bool dataReady = false, enableTrackedYawPitch = true;
 	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
 
 	//XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
@@ -860,13 +860,24 @@ int CockpitLookHook(int* params)
 					g_headPosFromKeyboard = -g_headPosFromKeyboard;
 				}
 
+				/*
+				 * TrackIR is a bit special. If TrackIR is installed; but turned off, then
+				 * ReadTrackIRData will return false; but if we want to apply cockpit inertia
+				 * then we need to set dataReady = true. However, setting dataReady = true will
+				 * also write the yaw/pitch, which will disable the POV/Keypad when TrackIR is
+				 * off. So, we need another flag (enableTrackedYawPitch) to prevent writing to
+				 * yaw/pitch; but allow writing to cockpitX/Y/ZReference.
+				 * If TrackIR is on, we allow writing to yaw/pitch and cockpitX/Y/ZReference.
+				 * This will disable the POV hat; but you probably don't need it if you're using
+				 * your head to look around.
+				 */
 				if (ReadTrackIRData(&yaw, &pitch, &x, &y, &z)) {
-					x		 *= scale_x;
-					y		 *= scale_y;
-					z		 *= scale_z;
-					yaw		 *= g_fYawMultiplier;
-					pitch	 *= g_fPitchMultiplier;
-					yawSign   = -1.0f; 
+					x		 *=  scale_x;
+					y		 *=  scale_y;
+					z		 *=  scale_z;
+					yaw		 *=  g_fYawMultiplier;
+					pitch	 *=  g_fPitchMultiplier;
+					yawSign   = -1.0f;
 					pitchSign = -1.0f;
 
 					if (g_bFlipYZAxes) {
@@ -880,8 +891,14 @@ int CockpitLookHook(int* params)
 					}
 					Vector4 pos(x, y, z, 1.0f);
 					g_headPos = (pos - g_headCenter);
+					enableTrackedYawPitch = true;
+				}
+				else {
+					g_headPos.set(0, 0, 0, 0);
+					enableTrackedYawPitch = false;
 				}
 				dataReady = true;
+				
 			}
 			break;
 		}
@@ -896,8 +913,10 @@ int CockpitLookHook(int* params)
 			//if (!bExternalCamera) {
 				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
 				// look around
-				PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
-				PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+				if (enableTrackedYawPitch) {
+					PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+					PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
 				g_headPos[1] = g_headPos[1] * g_fPosYMultiplier + g_headPosFromKeyboard[1];
