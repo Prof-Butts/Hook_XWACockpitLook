@@ -236,7 +236,7 @@ int g_FreePIEOutputSlot = -1;
 /*********************************************************************/
 bool g_bCockpitInertiaEnabled = false;
 float g_fCockpitInertia = 0.35f, g_fCockpitSpeedInertia = 0.005f;
-float g_fCockpitMaxInertia = 0.2f;
+float g_fCockpitMaxInertia = 0.2f, g_fExtInertia = 1.0f;
 
 /*********************************************************************/
 /*	Code used to enable leaning in the cockpit with the arrow keys   */
@@ -245,9 +245,10 @@ float g_fCockpitMaxInertia = 0.2f;
 // To make this consistent with regular PixelShader coords, we need to swap these
 // coordinates using a rotation and reflection. The following matrix stores that
 // transformation and is only used in GetCurrentHeadingMatrix().
-Matrix4 g_rotXrefl;
+Matrix4 g_ReflRotX;
 
 void InitHeadingMatrix() {
+	/*
 	Matrix4 rotX, refl;
 	rotX.identity();
 	rotX.rotateX(90.0f);
@@ -257,7 +258,16 @@ void InitHeadingMatrix() {
 		0,  0, 1, 0,
 		0,  0, 0, 1
 	);
-	g_rotXrefl = refl * rotX;
+	g_ReflRotX = refl * rotX;
+	*/
+	
+	g_ReflRotX.set(
+		1.0, 0.0, 0.0, 0.0, // 1st column
+		0.0, 0.0, 1.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 0.0, 1.0
+	);
+	
 }
 
 /*
@@ -322,9 +332,9 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 	B = rotMatrixFull * B;
 	N = rotMatrixFull * N;
 	// Our TBN basis is now in absolute coordinates
-	Fs = g_rotXrefl * N;
-	Us = g_rotXrefl * B;
-	Rs = g_rotXrefl * T;
+	Fs = g_ReflRotX * N;
+	Us = g_ReflRotX * B;
+	Rs = g_ReflRotX * T;
 	Fs.w = 0; Rs.w = 0; Us.w = 0;
 	// This transform chain gets us the orientation of the craft in XWA's coord system:
 	// [1,0,0] is right, [0,1,0] is forward, [0,0,1] is up
@@ -627,6 +637,7 @@ int CockpitLookHook(int* params)
 	int playerIndex = params[-10]; // Using -10 instead of -6, prevents this hook from crashing in Multiplayer
 	float yaw = 0.0f, pitch = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
+	float yawInertia = 0.0f, pitchInertia = 0.0f, lastYawInertia = 0.0f, lastPitchInertia = 0.0f;
 	bool dataReady = false, enableTrackedYawPitch = true;
 	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
 
@@ -708,6 +719,9 @@ int CockpitLookHook(int* params)
 						g_headPos.x += XDisp;
 						g_headPos.y += YDisp;
 						g_headPos.z += ZDisp;
+
+						lastYawInertia = yawInertia; lastPitchInertia = pitchInertia;
+						yawInertia = XDisp; pitchInertia = YDisp;
 					}
 
 					if (g_bInHyperspace)
@@ -740,6 +754,9 @@ int CockpitLookHook(int* params)
 							g_headPos.x += XDisp;
 							g_headPos.y += YDisp;
 							g_headPos.z += ZDisp;
+							
+							lastYawInertia = yawInertia; lastPitchInertia = pitchInertia;
+							yawInertia = XDisp; pitchInertia = YDisp;
 						}
 
 						if (g_bInHyperspace)
@@ -949,6 +966,9 @@ int CockpitLookHook(int* params)
 					g_headPos.x += XDisp;
 					g_headPos.y += YDisp;
 					g_headPos.z += ZDisp;
+
+					lastYawInertia = yawInertia; lastPitchInertia = pitchInertia;
+					yawInertia = XDisp; pitchInertia = YDisp;
 				}
 
 				if (g_bInHyperspace)
@@ -1063,6 +1083,16 @@ int CockpitLookHook(int* params)
 			}
 			if (*mouseLookWasNotEnabled)
 				*mouseLookWasNotEnabled = 0;
+		}
+
+		// Cockpit inertia in external view (this is probably not the right place to do this)
+		if (bExternalCamera) {
+			static short cameraYaw = PlayerDataTable[playerIndex].cameraYaw; // -(short)(lastYawInertia * g_fExtInertia);
+			static short cameraPitch = PlayerDataTable[playerIndex].cameraPitch + (short)(-0.05f * 32768.0f); // -(short)(lastPitchInertia * g_fExtInertia);
+			PlayerDataTable[playerIndex].cameraYaw = cameraYaw + (short)(yawInertia * g_fExtInertia);
+			PlayerDataTable[playerIndex].cameraPitch = cameraPitch + (short)(pitchInertia * g_fExtInertia);
+			//if (fabs(yawInertia) > 0.0001f || fabs(pitchInertia) > 0.0001f)
+			//	log_debug("yaw/pitchInertia: %0.6f, %0.6f", yawInertia, pitchInertia);
 		}
 	}
 	
@@ -1218,6 +1248,9 @@ void LoadParams() {
 			}
 			else if (_stricmp(param, "cockpit_speed_inertia") == 0) {
 				g_fCockpitSpeedInertia = fValue;
+			}
+			else if (_stricmp(param, "external_inertia") == 0) {
+				g_fExtInertia = fValue;
 			}
 			
 			else if (_stricmp(param, "write_5dof_to_freepie_slot") == 0) {
