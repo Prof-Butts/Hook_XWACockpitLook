@@ -234,9 +234,11 @@ int g_FreePIEOutputSlot = -1;
 /*********************************************************************/
 /* Cockpit Inertia													 */
 /*********************************************************************/
-bool g_bCockpitInertiaEnabled = false;
+bool g_bCockpitInertiaEnabled = false, g_bExtInertiaEnabled = false;
 float g_fCockpitInertia = 0.35f, g_fCockpitSpeedInertia = 0.005f;
-float g_fCockpitMaxInertia = 0.2f, g_fExtInertia = -16384.0f, g_fExtMaxInertia = 0.1f;
+float g_fCockpitMaxInertia = 0.2f, g_fExtInertia = -16384.0f, g_fExtMaxInertia = 0.025f;
+short g_externalTilt = -1820; // -10 degrees
+// tilt = degrees * 32768 / 180
 
 /*********************************************************************/
 /*	Code used to enable leaning in the cockpit with the arrow keys   */
@@ -1100,7 +1102,7 @@ int CockpitLookHook(int* params)
 		}
 
 		// Cockpit inertia in external view
-		if (bExternalCamera) {
+		if (g_bExtInertiaEnabled && bExternalCamera) {
 			float x;
 			// Save the current yaw/pitch before adding external view inertia, we'll restore this values the
 			// next time we enter this hook
@@ -1125,10 +1127,13 @@ int CockpitLookHook(int* params)
 			// so we multiply it by the smooth L to extend it back to the right range:
 			yawInertia *= L; pitchInertia *= L;
 			PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
-			PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(-0.05f * 32768.0f) + (short)(pitchInertia * g_fExtInertia);
+			//PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(-0.05f * 32768.0f) + (short)(pitchInertia * g_fExtInertia);
+			PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
 			//if (fabs(yawInertia) > 0.0001f || fabs(pitchInertia) > 0.0001f)
 			//	log_debug("yaw/pitchInertia: %0.6f, %0.6f", yawInertia, pitchInertia);
 		}
+		// Add the tilt even if external inertia is off:
+		PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
 	}
 	
 //out:
@@ -1284,11 +1289,17 @@ void LoadParams() {
 			else if (_stricmp(param, "cockpit_speed_inertia") == 0) {
 				g_fCockpitSpeedInertia = fValue;
 			}
+			else if (_stricmp(param, "external_inertia_enabled") == 0) {
+				g_bExtInertiaEnabled = (bool)fValue;
+			}
 			else if (_stricmp(param, "external_inertia") == 0) {
 				g_fExtInertia = -fValue * 16384.0f;
 			}
 			else if (_stricmp(param, "external_max_inertia") == 0) {
 				g_fExtMaxInertia = fValue;
+			}
+			else if (_stricmp(param, "external_tilt") == 0) {
+				g_externalTilt = (short)(fValue * 32768.0f / 180.0f);
 			}
 			
 			else if (_stricmp(param, "write_5dof_to_freepie_slot") == 0) {
