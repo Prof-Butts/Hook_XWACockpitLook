@@ -640,6 +640,11 @@ int CockpitLookHook(int* params)
 	float yawInertia = 0.0f, pitchInertia = 0.0f, lastYawInertia = 0.0f, lastPitchInertia = 0.0f;
 	bool dataReady = false, enableTrackedYawPitch = true;
 	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
+	static short lastCameraYaw = 0, lastCameraPitch = 0;
+
+	// Restore the position of the camera before adding external view inertia
+	PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
+	PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
 
 	//XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
 	__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;	
@@ -1085,12 +1090,21 @@ int CockpitLookHook(int* params)
 				*mouseLookWasNotEnabled = 0;
 		}
 
-		// Cockpit inertia in external view (this is probably not the right place to do this)
+		// Cockpit inertia in external view
 		if (bExternalCamera) {
-			static short cameraYaw = PlayerDataTable[playerIndex].cameraYaw; // -(short)(lastYawInertia * g_fExtInertia);
-			static short cameraPitch = PlayerDataTable[playerIndex].cameraPitch + (short)(-0.05f * 32768.0f); // -(short)(lastPitchInertia * g_fExtInertia);
-			PlayerDataTable[playerIndex].cameraYaw = cameraYaw + (short)(yawInertia * g_fExtInertia);
-			PlayerDataTable[playerIndex].cameraPitch = cameraPitch + (short)(pitchInertia * g_fExtInertia);
+			// Save the current yaw/pitch before adding external view inertia
+			lastCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
+			lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
+
+			// Apply inertia
+			float L = sqrt(yawInertia*yawInertia + pitchInertia * pitchInertia);
+			yawInertia /= L;
+			pitchInertia /= L;
+			if (L > g_fCockpitMaxInertia) L = g_fCockpitMaxInertia;
+			yawInertia *= L;
+			pitchInertia *= L;
+			PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
+			PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(-0.05f * 32768.0f) + (short)(pitchInertia * g_fExtInertia);
 			//if (fabs(yawInertia) > 0.0001f || fabs(pitchInertia) > 0.0001f)
 			//	log_debug("yaw/pitchInertia: %0.6f, %0.6f", yawInertia, pitchInertia);
 		}
