@@ -215,7 +215,8 @@ const int   VK_J_KEY = 0x4a; // Ctrl+J is used to reload the cockpitlook.cfg par
 //const int   VK_K_KEY = 0x4b;
 //const int   VK_L_KEY = 0x4c;
 const int VK_X_KEY = 0x58; // Ctrl+X is used to dump debug info
-bool g_bNumPadAdd = false, g_bNumPadSub = false;
+bool g_bNumPadAdd = false, g_bNumPadSub = false, g_bCtrl = false;
+bool g_bNumPad7 = false, g_bNumPad9 = false;
 
 // General types and globals
 typedef enum {
@@ -565,13 +566,15 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	//bool bControl = *s_XwaIsControlKeyPressed;
 	//bool bShift = *s_XwaIsShiftKeyPressed;
 	//bool bAlt = *s_XwaIsAltKeyPressed;
-	bool bCtrl		= GetAsyncKeyState(VK_CONTROL);
+	g_bCtrl			= GetAsyncKeyState(VK_CONTROL);
 	bool bShift		= GetAsyncKeyState(VK_SHIFT);
 	bool bAlt		= GetAsyncKeyState(VK_MENU);
 	bool bRightAlt	= GetAsyncKeyState(VK_RMENU);
 	bool bLeftAlt	= GetAsyncKeyState(VK_LMENU);
 	g_bNumPadAdd	= GetAsyncKeyState(VK_ADD);
 	g_bNumPadSub	= GetAsyncKeyState(VK_SUBTRACT);
+	g_bNumPad7		= GetAsyncKeyState(VK_NUMPAD7);
+	g_bNumPad9		= GetAsyncKeyState(VK_NUMPAD9);
 	// I,J key states:
 	bLastIKeyState = bCurIKeyState;
 	bLastJKeyState = bCurJKeyState;
@@ -584,22 +587,22 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 
 	// It's not a good idea to use Ctrl+L to reload the cockpit look hook settings because
 	// Ctrl+L is already used by the landing gear hook. So, let's use a different key: J
-	if (bCtrl && bLastJKeyState && !bCurJKeyState)
+	if (g_bCtrl && bLastJKeyState && !bCurJKeyState)
 	{
 		log_debug("*********** RELOADING CockpitLookHook.cfg ***********");
 		LoadParams();
 	}
 
 	// Ctrl+X: Dump debug info
-	if (bCtrl && bLastXKeyState && !bCurXKeyState) {
+	if (g_bCtrl && bLastXKeyState && !bCurXKeyState) {
 		DumpDebugInfo(playerIndex);
 	}
 
-	if (bCtrl && bLastIKeyState && !bCurIKeyState) {
+	if (g_bCtrl && bLastIKeyState && !bCurIKeyState) {
 		g_bCockpitInertiaEnabled = !g_bCockpitInertiaEnabled;
 	}
 
-	if (bAlt || bCtrl) {
+	if (bAlt || g_bCtrl) {
 		g_bLeftKeyDown = false;
 		g_bRightKeyDown = false;
 		g_bUpKeyDown = false;
@@ -1101,14 +1104,14 @@ int CockpitLookHook(int* params)
 		}
 
 		if (bExternalCamera) {
-			if (g_bNumPadAdd && PlayerDataTable[playerIndex].externalCameraDistance > 80) {
-				PlayerDataTable[playerIndex].externalCameraDistance -= 24;
+			if (g_bNumPad9 && PlayerDataTable[playerIndex].externalCameraDistance > 80) {
+				PlayerDataTable[playerIndex].externalCameraDistance -= 16;
 				if (PlayerDataTable[playerIndex].externalCameraDistance < 80)
 					PlayerDataTable[playerIndex].externalCameraDistance = 80;
 			}
 
-			if (g_bNumPadSub && PlayerDataTable[playerIndex].externalCameraDistance < 8192) {
-				PlayerDataTable[playerIndex].externalCameraDistance += 24;
+			if (g_bNumPad7 && PlayerDataTable[playerIndex].externalCameraDistance < 8192) {
+				PlayerDataTable[playerIndex].externalCameraDistance += 16;
 				if (PlayerDataTable[playerIndex].externalCameraDistance > 8192)
 					PlayerDataTable[playerIndex].externalCameraDistance = 8192;
 			}
@@ -1429,6 +1432,8 @@ void InitKeyboard()
 	GetAsyncKeyState(VK_X_KEY);
 	GetAsyncKeyState(VK_ADD);
 	GetAsyncKeyState(VK_SUBTRACT);
+	GetAsyncKeyState(VK_NUMPAD7);
+	GetAsyncKeyState(VK_NUMPAD9);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
