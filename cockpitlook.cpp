@@ -103,6 +103,11 @@ void UpdateHyperspaceState(int playerIndex) {
 		g_bHyperspaceLastFrame = (g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST);
 		g_iHyperspaceFrame = -1;
 		g_HyperspacePhaseFSM = HS_INIT_ST;
+		/*if (g_bHyperspaceLastFrame) {
+			log_debug("yaw,pitch at hyper exit: %0.3f, %0.3f",
+				PlayerDataTable[playerIndex].yaw / 65536.0f * 360.0f,
+				PlayerDataTable[playerIndex].pitch / 65536.0f * 360.0f);
+		}*/
 	}
 
 	switch (g_HyperspacePhaseFSM) {
@@ -117,13 +122,6 @@ void UpdateHyperspaceState(int playerIndex) {
 			g_bHyperspaceFirstFrame = true;
 			g_bInHyperspace = true;
 			g_iHyperspaceFrame = 0;
-			//if (PlayerDataTable[*playerIndex].cockpitCameraYaw != g_fLastCockpitCameraYaw ||
-			//	PlayerDataTable[*playerIndex].cockpitCameraPitch != g_fLastCockpitCameraPitch)
-			//	g_bHyperHeadSnapped = true;
-			//if (*numberOfPlayersInGame == 1) {
-			//	PlayerDataTable[*playerIndex].cockpitCameraYaw = g_fLastCockpitCameraYaw;
-			//	PlayerDataTable[*playerIndex].cockpitCameraPitch = g_fLastCockpitCameraPitch;
-			//}
 			g_HyperspacePhaseFSM = HS_HYPER_ENTER_ST;
 		}
 		break;
@@ -146,6 +144,10 @@ void UpdateHyperspaceState(int playerIndex) {
 			g_bHyperspaceTunnelLastFrame = true;
 			//g_bInHyperspace = true;
 			g_HyperspacePhaseFSM = HS_HYPER_EXIT_ST;
+			/*log_debug("yaw,pitch at hyper tunnel exit: %0.3f, %0.3f",
+				PlayerDataTable[playerIndex].yaw / 65536.0f * 360.0f,
+				PlayerDataTable[playerIndex].pitch / 65536.0f * 360.0f);
+			*/
 		}
 		break;
 	case HS_HYPER_EXIT_ST:
@@ -168,6 +170,7 @@ void UpdateHyperspaceState(int playerIndex) {
 			g_HyperspacePhaseFSM = HS_INIT_ST;
 		}
 		*/
+		
 		break;
 	}
 }
@@ -211,6 +214,8 @@ const int   VK_I_KEY = 0x49; // Ctrl+I is used to toggle cockpit inertia
 const int   VK_J_KEY = 0x4a; // Ctrl+J is used to reload the cockpitlook.cfg params
 //const int   VK_K_KEY = 0x4b;
 //const int   VK_L_KEY = 0x4c;
+const int VK_X_KEY = 0x58; // Ctrl+X is used to dump debug info
+bool g_bNumPadAdd = false, g_bNumPadSub = false;
 
 // General types and globals
 typedef enum {
@@ -396,15 +401,17 @@ void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerInd
 	time_t curT = time(NULL);
 	// Reset the first frame if the time between successive queries is too big: this
 	// implies the game was either paused or a new mission was loaded
-	bFirstFrame = curT - prevT > 2; // Reset if 2+s have elapsed
+	bFirstFrame = curT - prevT > 2; // Reset if +2s have elapsed
 	// Skip the very first frame: there's no inertia to compute yet
-	if (bFirstFrame || !g_bCockpitInertiaEnabled || g_bHyperspaceTunnelLastFrame)
+	if (bFirstFrame || !g_bCockpitInertiaEnabled || g_bHyperspaceTunnelLastFrame || g_bHyperspaceLastFrame)
 	{
 		bFirstFrame = false;
 		*XDisp = *YDisp = *ZDisp = 0.0f;
+		//log_debug("Resetting X/Y/ZDisp");
 		// Update the previous heading vectors
 		g_prevFs = Fs;
 		prevT = curT;
+		fLastSpeed = fCurSpeed;
 		return;
 	}
 
@@ -445,7 +452,8 @@ void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerInd
 	}
 
 	//if (g_HyperspacePhaseFSM == HS_HYPER_ENTER_ST || g_HyperspacePhaseFSM == HS_INIT_ST)
-	//	log_debug("[%d] X,Y: %0.3f, %0.3f", g_iHyperspaceFrames, *XDisp, *YDisp);
+	//if (g_bHyperspaceLastFrame || g_bHyperspaceTunnelLastFrame)
+	//	log_debug("[%d] X/YDisp: %0.3f, %0.3f",  g_iHyperspaceFrame, *XDisp, *YDisp);
 }
 
 typedef struct HeadPosStruct {
@@ -546,9 +554,13 @@ void animTickZ(Vector3 *headPos) {
 	headPos->z = -headPos->z; // The z-axis is inverted in XWA w.r.t. the original view-centric definition
 }
 
-void ProcessKeyboard(__int16 keycodePressed) {
-	static bool bLastIKeyState = false, bLastJKeyState = false;
-	static bool bCurIKeyState = false, bCurJKeyState = false;
+void DumpDebugInfo(int playerIndex) {
+	log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].externalCameraDistance);
+}
+
+void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
+	static bool bLastIKeyState = false, bLastJKeyState = false, bLastXKeyState = false;
+	static bool bCurIKeyState = false, bCurJKeyState = false, bCurXKeyState = false;
 
 	//bool bControl = *s_XwaIsControlKeyPressed;
 	//bool bShift = *s_XwaIsShiftKeyPressed;
@@ -558,11 +570,15 @@ void ProcessKeyboard(__int16 keycodePressed) {
 	bool bAlt		= GetAsyncKeyState(VK_MENU);
 	bool bRightAlt	= GetAsyncKeyState(VK_RMENU);
 	bool bLeftAlt	= GetAsyncKeyState(VK_LMENU);
+	g_bNumPadAdd	= GetAsyncKeyState(VK_ADD);
+	g_bNumPadSub	= GetAsyncKeyState(VK_SUBTRACT);
 	// I,J key states:
 	bLastIKeyState = bCurIKeyState;
 	bLastJKeyState = bCurJKeyState;
+	bLastXKeyState = bCurXKeyState;
 	bCurJKeyState = GetAsyncKeyState(VK_J_KEY);
 	bCurIKeyState = GetAsyncKeyState(VK_I_KEY);
+	bCurXKeyState = GetAsyncKeyState(VK_X_KEY);
 
 	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
 
@@ -572,6 +588,11 @@ void ProcessKeyboard(__int16 keycodePressed) {
 	{
 		log_debug("*********** RELOADING CockpitLookHook.cfg ***********");
 		LoadParams();
+	}
+
+	// Ctrl+X: Dump debug info
+	if (bCtrl && bLastXKeyState && !bCurXKeyState) {
+		DumpDebugInfo(playerIndex);
 	}
 
 	if (bCtrl && bLastIKeyState && !bCurIKeyState) {
@@ -613,7 +634,7 @@ void ProcessKeyboard(__int16 keycodePressed) {
 	g_bResetHeadCenter = (keycodePressed == KeyCode_PERIOD);
 	if (keycodePressed == KeyCode_CAPSLOCK)
 		g_bToggleKeyboardCaps = !g_bToggleKeyboardCaps;
-	
+
 	//log_debug("keycode: 0x%X, ACS: %d,%d,%d", keycodePressed, *s_XwaIsAltKeyPressed, *s_XwaIsControlKeyPressed, *s_XwaIsShiftKeyPressed);
 }
 
@@ -673,18 +694,18 @@ int CockpitLookHook(int* params)
 		//log_debug("------------------");
 		//log_debug("yaw,pitch: %d, %d", PlayerDataTable[playerIndex].cameraYaw, PlayerDataTable[playerIndex].cameraPitch);
 		// Detect changes to the camera performed between calls to this hook:
-		short yawDiff = PlayerDataTable[playerIndex].cameraYaw - prevCameraYaw;
+		short yawDiff   = PlayerDataTable[playerIndex].cameraYaw - prevCameraYaw;
 		short pitchDiff = PlayerDataTable[playerIndex].cameraPitch - prevCameraPitch;
-		int distDiff = PlayerDataTable[playerIndex].externalCameraDistance - prevCameraDist;
+		int   distDiff  = PlayerDataTable[playerIndex].externalCameraDistance - prevCameraDist;
 		//log_debug("diff: %d, %d", yawDiff, pitchDiff);
 		// Adjust the pre-inertia yaw/pitch if the camera moved between calls to this hook. This adjustment
 		// is only possible if prevCameraYaw/Pitch is valid (that is, if the previous frame was rendered in
 		// external camera view)
 		if (bLastExternalCamera) 
 		{
-			lastCameraYaw += yawDiff;
+			lastCameraYaw   += yawDiff;
 			lastCameraPitch += pitchDiff;
-			lastCameraDist += distDiff;
+			lastCameraDist  += distDiff;
 		}
 		//log_debug("lastCamera (1): %d, %d", lastCameraYaw, lastCameraPitch);
 
@@ -696,7 +717,7 @@ int CockpitLookHook(int* params)
 
 	//XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
 	__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;	
-	ProcessKeyboard(keycodePressed);
+	ProcessKeyboard(playerIndex, keycodePressed);
 
 	// Update the Hyperspace FSM
 	UpdateHyperspaceState(playerIndex);
@@ -766,8 +787,10 @@ int CockpitLookHook(int* params)
 						float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 						if (g_bInHyperspace)
 							ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
-						else
+						else {
+							//log_debug("Fs: %0.3f, %0.3f, %0.3f", Fs.x, Fs.y, Fs.z);
 							ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
+						}
 						// Apply the inertia:
 						g_headPos.x += XDisp;
 						g_headPos.y += YDisp;
@@ -800,8 +823,10 @@ int CockpitLookHook(int* params)
 							float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 							if (g_bInHyperspace)
 								ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
-							else
+							else {
+								//log_debug("Fs: %0.3f, %0.3f, %0.3f", Fs.x, Fs.y, Fs.z);
 								ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
+							}
 							// Apply the inertia:
 							g_headPos.x += XDisp;
 							g_headPos.y += YDisp;
@@ -1075,6 +1100,20 @@ int CockpitLookHook(int* params)
 			//cockpitRefZ = 0;
 		}
 
+		if (bExternalCamera) {
+			if (g_bNumPadAdd && PlayerDataTable[playerIndex].externalCameraDistance > 80) {
+				PlayerDataTable[playerIndex].externalCameraDistance -= 24;
+				if (PlayerDataTable[playerIndex].externalCameraDistance < 80)
+					PlayerDataTable[playerIndex].externalCameraDistance = 80;
+			}
+
+			if (g_bNumPadSub && PlayerDataTable[playerIndex].externalCameraDistance < 8192) {
+				PlayerDataTable[playerIndex].externalCameraDistance += 24;
+				if (PlayerDataTable[playerIndex].externalCameraDistance > 8192)
+					PlayerDataTable[playerIndex].externalCameraDistance = 8192;
+			}
+		}
+
 		// Mouse look code
 		if (*mouseLook && !*inMissionFilmState && !*viewingFilmState)
 		{
@@ -1147,7 +1186,7 @@ int CockpitLookHook(int* params)
 			// next time we enter this hook
 			lastCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
 			lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-			lastCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
+			lastCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
 			//log_debug("lastCamera (2): %d, %d", lastCameraYaw, lastCameraPitch);
 
 			// Apply inertia. First, compute the length of the inertia vector:
@@ -1178,9 +1217,9 @@ int CockpitLookHook(int* params)
 			// Add the tilt even if external inertia is off:
 			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
 			// Save the final values for yaw/pitch -- this will help us detect changes performed in other places
-			prevCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
+			prevCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
 			prevCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-			prevCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
+			prevCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
 			//log_debug("prevCamera: %d, %d", prevCameraYaw, prevCameraPitch);
 			//log_debug("=================");
 		}
@@ -1302,6 +1341,9 @@ void LoadParams() {
 			else if (_stricmp(param, "flip_yz_axes") == 0) {
 				g_bFlipYZAxes = (bool)fValue;
 			}
+			else if (_stricmp(param, "debug_mode") == 0) {
+				g_bGlobalDebug = (bool)fValue;
+			}
 			// Cockpit Lean/Look
 			else if (_stricmp(param, "keyboard_lean") == 0) {
 				g_bKeyboardLean = (bool)fValue;
@@ -1383,6 +1425,10 @@ void InitKeyboard()
 	GetAsyncKeyState(VK_RMENU);
 	GetAsyncKeyState(VK_LMENU);
 	GetAsyncKeyState(VK_J_KEY);
+	GetAsyncKeyState(VK_I_KEY);
+	GetAsyncKeyState(VK_X_KEY);
+	GetAsyncKeyState(VK_ADD);
+	GetAsyncKeyState(VK_SUBTRACT);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
