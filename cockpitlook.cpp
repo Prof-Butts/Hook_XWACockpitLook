@@ -235,7 +235,7 @@ int g_FreePIEOutputSlot = -1;
 /* Cockpit Inertia													 */
 /*********************************************************************/
 bool g_bCockpitInertiaEnabled = false, g_bExtInertiaEnabled = false;
-float g_fCockpitInertia = 0.35f, g_fCockpitSpeedInertia = 0.005f;
+float g_fCockpitInertia = 0.35f, g_fCockpitSpeedInertia = 0.005f, g_fExtDistInertia = 0.0f;
 float g_fCockpitMaxInertia = 0.2f, g_fExtInertia = -16384.0f, g_fExtMaxInertia = 0.025f;
 short g_externalTilt = -1820; // -10 degrees
 // tilt = degrees * 32768 / 180
@@ -655,8 +655,15 @@ int CockpitLookHook(int* params)
 	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
 	static bool bLastExternalCamera = bExternalCamera;
 	static short lastCameraYaw = 0, lastCameraPitch = 0; // These are the pre-inertia values from the last frame
+	static int lastCameraDist = 1024;
 	static short prevCameraYaw = 0, prevCameraPitch = 0; // These are the post-inertia values from the last frame
-	float yawInertia = 0.0f, pitchInertia = 0.0f;
+	static int prevCameraDist = 1024;
+	float yawInertia = 0.0f, pitchInertia = 0.0f, distInertia = 0.0f;
+	/*static bool bFirstFrame = true;
+	if (bFirstFrame) {
+		log_debug("External Dist: %d", PlayerDataTable[playerIndex].externalCameraDistance);
+		bFirstFrame = false;
+	}*/
 
 	// Restore the position of the external camera if external inertia is enabled.
 	if (g_bExtInertiaEnabled && bExternalCamera) 
@@ -666,6 +673,7 @@ int CockpitLookHook(int* params)
 		// Detect changes to the camera performed between calls to this hook:
 		short yawDiff = PlayerDataTable[playerIndex].cameraYaw - prevCameraYaw;
 		short pitchDiff = PlayerDataTable[playerIndex].cameraPitch - prevCameraPitch;
+		int distDiff = PlayerDataTable[playerIndex].externalCameraDistance - prevCameraDist;
 		//log_debug("diff: %d, %d", yawDiff, pitchDiff);
 		// Adjust the pre-inertia yaw/pitch if the camera moved between calls to this hook. This adjustment
 		// is only possible if prevCameraYaw/Pitch is valid (that is, if the previous frame was rendered in
@@ -674,12 +682,14 @@ int CockpitLookHook(int* params)
 		{
 			lastCameraYaw += yawDiff;
 			lastCameraPitch += pitchDiff;
+			lastCameraDist += distDiff;
 		}
 		//log_debug("lastCamera (1): %d, %d", lastCameraYaw, lastCameraPitch);
 
 		// Restore the position of the camera before adding external view inertia
 		PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
 		PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
+		PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
 	}
 
 	//XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
@@ -761,7 +771,7 @@ int CockpitLookHook(int* params)
 						g_headPos.y += YDisp;
 						g_headPos.z += ZDisp;
 
-						yawInertia = XDisp; pitchInertia = YDisp;
+						yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 					}
 
 					if (g_bInHyperspace)
@@ -795,7 +805,7 @@ int CockpitLookHook(int* params)
 							g_headPos.y += YDisp;
 							g_headPos.z += ZDisp;
 							
-							yawInertia = XDisp; pitchInertia = YDisp;
+							yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 						}
 
 						if (g_bInHyperspace)
@@ -1006,7 +1016,7 @@ int CockpitLookHook(int* params)
 					g_headPos.y += YDisp;
 					g_headPos.z += ZDisp;
 
-					yawInertia = XDisp; pitchInertia = YDisp;
+					yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 				}
 
 				if (g_bInHyperspace)
@@ -1130,6 +1140,7 @@ int CockpitLookHook(int* params)
 			// next time we enter this hook
 			lastCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
 			lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
+			lastCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
 			//log_debug("lastCamera (2): %d, %d", lastCameraYaw, lastCameraPitch);
 
 			// Apply inertia. First, compute the length of the inertia vector:
@@ -1152,6 +1163,7 @@ int CockpitLookHook(int* params)
 			// Apply the inertia
 			PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
 			PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
+			PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
 		}
 
 		// Add the tilt and save yaw/pitch if we're in external camera view
@@ -1161,6 +1173,7 @@ int CockpitLookHook(int* params)
 			// Save the final values for yaw/pitch -- this will help us detect changes performed in other places
 			prevCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
 			prevCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
+			prevCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
 			//log_debug("prevCamera: %d, %d", prevCameraYaw, prevCameraPitch);
 			//log_debug("=================");
 		}
@@ -1328,6 +1341,9 @@ void LoadParams() {
 			}
 			else if (_stricmp(param, "external_max_inertia") == 0) {
 				g_fExtMaxInertia = fValue;
+			}
+			else if (_stricmp(param, "external_dist_inertia") == 0) {
+				g_fExtDistInertia = fValue;
 			}
 			else if (_stricmp(param, "external_tilt") == 0) {
 				g_externalTilt = (short)(fValue * 32768.0f / 180.0f);
