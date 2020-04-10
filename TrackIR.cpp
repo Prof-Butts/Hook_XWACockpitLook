@@ -75,6 +75,7 @@ HMODULE hTrackIR = NULL;
 unsigned short g_TrackIRRequestData = 0x77;
 short g_FreePIEProfileID = 13302; // Borrowing FreePIE's ID since I don't think I'm ever going to get one
 TRACKIRDATA data;
+extern bool g_bGlobalDebug;
 
 bool InitTrackIR() {
 	LONG lRes = ERROR_SUCCESS;
@@ -84,6 +85,7 @@ bool InitTrackIR() {
 	int error;
 	bool success = true;
 
+	if (g_bGlobalDebug) log_debug("[TrackIR] InitTrackIR()");
 	lRes = RegGetValueA(HKEY_CURRENT_USER, "Software\\NaturalPoint\\NaturalPoint\\NPClient Location\\",
 		"Path", RRF_RT_ANY, NULL, regvalue, &size);
 	if (lRes != ERROR_SUCCESS) {
@@ -135,7 +137,7 @@ bool InitTrackIR() {
 		success = false;
 		goto out;
 	}
-	//log_debug("Signature:\n%s\n%s", signature.AppSignature, signature.DllSignature);
+	if (g_bGlobalDebug) log_debug("Signature:\n%s\n%s", signature.AppSignature, signature.DllSignature);
 
 	error = NP_QueryVersion(&version);
 	if (error != 0) {
@@ -143,7 +145,7 @@ bool InitTrackIR() {
 		success = false;
 		goto out;
 	}
-	//log_debug("NPClient version: 0x%x", version);
+	if (g_bGlobalDebug) log_debug("NPClient version: 0x%x", version);
 
 	error = NP_RegisterWindowHandle((unsigned int )g_hWnd);
 	if (error != 0) {
@@ -159,7 +161,7 @@ bool InitTrackIR() {
 		success = false;
 		goto out;
 	}
-	//log_debug("NP_RequestData(0x%x)", g_TrackIRRequestData);
+	if (g_bGlobalDebug) log_debug("NP_RequestData(0x%x)", g_TrackIRRequestData);
 
 	error = NP_RegisterProgramProfileID(g_FreePIEProfileID);
 	if (error != 0) {
@@ -175,7 +177,7 @@ bool InitTrackIR() {
 		success = false;
 		goto out;
 	}
-	//log_debug("NP_StopCursor()");
+	if (g_bGlobalDebug) log_debug("NP_StopCursor()");
 
 	error = NP_StartDataTransmission();
 	if (error != 0) {
@@ -183,11 +185,13 @@ bool InitTrackIR() {
 		success = false;
 		goto out;
 	}
-	//log_debug("NP_StartDataTransmission()");
+	if (g_bGlobalDebug) log_debug("NP_StartDataTransmission()");
 
 out:
 	if (!success)
 		ShutdownTrackIR();
+	else
+		if (g_bGlobalDebug) log_debug("TrackIR Initialized successfully");
 	return success;
 }
 
@@ -198,20 +202,20 @@ void ShutdownTrackIR()
 	if (error != NP_OK) {
 		log_debug("error %d when calling NP_StopDataTransmission()", error);
 	}
-	//log_debug("NP_StopDataTransmission()");
+	if (g_bGlobalDebug) log_debug("NP_StopDataTransmission()");
 
 	error = NP_StartCursor();
 	if (error != NP_OK) {
 		log_debug("error %d when calling NP_StartCursor()", error);
 	}
-	//log_debug("NP_StartCursor()");
+	if (g_bGlobalDebug) log_debug("NP_StartCursor()");
 
 
 	error = NP_UnregisterWindowHandle();
 	if (error != NP_OK) {
 		log_debug("error %d when calling NP_UnregisterWindowHandle()", error);
 	}
-	//log_debug("NP_UnregisterWindowHandle()");
+	if (g_bGlobalDebug) log_debug("NP_UnregisterWindowHandle()");
 	FreeLibrary(hTrackIR);
 }
 

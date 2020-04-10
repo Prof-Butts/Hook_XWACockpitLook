@@ -68,6 +68,8 @@ void log_debug(const char *format, ...)
 	va_end(args);
 }
 
+bool g_bGlobalDebug = false;
+
 /*
  * HYPERSPACE variables
  */
@@ -921,6 +923,7 @@ int CockpitLookHook(int* params)
 				const float scale_y =  0.0002f;
 				const float scale_z = -0.0002f;
 				
+				if (g_bGlobalDebug) log_debug("[TrackIR] Case start");
 				if (g_bKeyboardLean) {
 					ComputeCockpitLean(&g_headPosFromKeyboard);
 					g_headPosFromKeyboard = -g_headPosFromKeyboard;
@@ -937,7 +940,10 @@ int CockpitLookHook(int* params)
 				 * This will disable the POV hat; but you probably don't need it if you're using
 				 * your head to look around.
 				 */
+				if (g_bGlobalDebug) log_debug("[TrackIR] Reading TrackIR data");
 				if (ReadTrackIRData(&yaw, &pitch, &x, &y, &z)) {
+					if (g_bGlobalDebug) log_debug("[TrackIR] Data read, (%0.3f, %0.3f), (%0.3f, %0.3f, %0.3f)",
+						yaw, pitch, x, y, z);
 					x		 *=  scale_x;
 					y		 *=  scale_y;
 					z		 *=  scale_z;
@@ -960,6 +966,7 @@ int CockpitLookHook(int* params)
 					enableTrackedYawPitch = true;
 				}
 				else {
+					if (g_bGlobalDebug) log_debug("[TrackIR] Data read failed. g_headPos <- (0,0,0,0)");
 					g_headPos.set(0, 0, 0, 0);
 					enableTrackedYawPitch = false;
 				}
