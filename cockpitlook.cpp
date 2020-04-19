@@ -1104,6 +1104,7 @@ int CockpitLookHook(int* params)
 		}
 
 		if (bExternalCamera) {
+			// These limits (80, 8192) were observed empirically.
 			if (g_bNumPad9 && PlayerDataTable[playerIndex].externalCameraDistance > 80) {
 				PlayerDataTable[playerIndex].externalCameraDistance -= 16;
 				if (PlayerDataTable[playerIndex].externalCameraDistance < 80)
@@ -1226,6 +1227,22 @@ int CockpitLookHook(int* params)
 			//log_debug("prevCamera: %d, %d", prevCameraYaw, prevCameraPitch);
 			//log_debug("=================");
 		}
+	}
+	else { 
+		// The mouse look is disabled because the cockpit isn't displayed, the gunner turret is active, or
+		// we're in multiplayer, let's update the yaw/pitch and tilt to avoid spinning out of control when
+		// switching from no-cockpit to exterior view
+		lastCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
+		lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
+		lastCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
+
+		if (bExternalCamera && *numberOfPlayersInGame == 1) {
+			// Add the tilt even if external inertia is off:
+			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
+		}
+		prevCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
+		prevCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
+		prevCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
 	}
 	
 //out:
