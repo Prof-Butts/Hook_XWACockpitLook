@@ -730,7 +730,7 @@ int CockpitLookHook(int* params)
 
 	// This hook "works" for MP; but unfortunately, code in XWA keeps trying to sync all the mouse
 	// look parameters, so that makes MP unplayable. We won't be able to enable this hook in MP
-	// until the MP networking code has been translated/fixed to allow different mouse look params
+	// until the MP networking code has been translated/fixed to allow per-player mouse look params
 	if (//!PlayerDataTable[playerIndex].hyperspacePhase && // Enable mouse-look during hyperspace
 		PlayerDataTable[playerIndex].cockpitDisplayed
 		&& !PlayerDataTable[playerIndex].gunnerTurretActive
@@ -1246,6 +1246,47 @@ int CockpitLookHook(int* params)
 		lastCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
 
 		if (bExternalCamera && *numberOfPlayersInGame == 1) {
+			float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
+			if (g_bInHyperspace)
+				ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
+			else {
+				Vector4 Rs, Us, Fs;
+				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
+				ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
+			}
+			yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
+
+			// Apply inertia. First, compute the length of the inertia vector:
+			float x, L = sqrt(yawInertia * yawInertia + pitchInertia * pitchInertia);
+			// Normalize the [yawInertia, pitchInertia] vector, our vector is now unitary and lies
+			// in a circle around the origin
+			yawInertia /= L; pitchInertia /= L;
+			// Normalize the range of L between 0 and +1. We'll clamp it to 1 using smoothstep below
+			x = L / g_fExtMaxInertia;
+			// Here, I'm dividing the smoothstep graph and taking the middle point to the right
+			// so that we get a curve that starts linear and then tapers off towards 1. Formally,
+			// I should multiply x by 0.5 below, but using 0.45 makes a nicer curve. See the following
+			// link to visualize the curve we're using:
+			// https://www.iquilezles.org/apps/graphtoy/?f1(x)=2.0%20*%20clamp(smoothstep(0,%201,%20x%20*%200.45%20+%200.5)%20-%200.5,%200.0,%201.0)
+			L = g_fExtMaxInertia * 2.0f * clamp(smoothstep(0.0f, 1.0f, x * 0.45f + 0.5f) - 0.5f, 0.0, 1.0f);
+			// The length of the vector now goes from 0 to g_fExtMaxInertia smoothly and tapers off
+			// when approaching g_fExtMaxInertia. Our [yawInertia, pitchInertia] vector is still unitary
+			// so we multiply it by the smooth L to extend it back to the right range:
+			yawInertia *= L; pitchInertia *= L;
+			// Apply the inertia
+			if (g_bExtInertiaEnabled) {
+				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
+			}
+			else {
+				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
+				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
+				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
+			}
+
+
+
 			// Add the tilt even if external inertia is off:
 			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
 		}
