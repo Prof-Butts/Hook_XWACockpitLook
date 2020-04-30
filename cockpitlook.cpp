@@ -692,7 +692,7 @@ int CockpitLookHook(int* params)
 	}*/
 
 	// Restore the position of the external camera if external inertia is enabled.
-	if (g_bExtInertiaEnabled && bExternalCamera) 
+	if (bExternalCamera) 
 	{
 		//log_debug("------------------");
 		//log_debug("yaw,pitch: %d, %d", PlayerDataTable[playerIndex].cameraYaw, PlayerDataTable[playerIndex].cameraPitch);
@@ -713,9 +713,12 @@ int CockpitLookHook(int* params)
 		//log_debug("lastCamera (1): %d, %d", lastCameraYaw, lastCameraPitch);
 
 		// Restore the position of the camera before adding external view inertia
-		PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
-		PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
-		PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
+		//if (g_bExtInertiaEnabled) 
+		{
+			PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
+			PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
+			PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
+		}
 	}
 
 	//XwaDIKeyboardUpdateShiftControlAltKeysPressedState();
@@ -1184,7 +1187,8 @@ int CockpitLookHook(int* params)
 		}
 
 		// Cockpit inertia in external view
-		if (g_bExtInertiaEnabled && bExternalCamera) {
+		if (bExternalCamera) 
+		{
 			float x;
 			// Save the current yaw/pitch before adding external view inertia, we'll restore these values the
 			// next time we enter this hook
@@ -1202,7 +1206,7 @@ int CockpitLookHook(int* params)
 			x = L / g_fExtMaxInertia;
 			// Here, I'm dividing the smoothstep graph and taking the middle point to the right
 			// so that we get a curve that starts linear and then tapers off towards 1. Formally,
-			// I shoudl multiply x by 0.5 below, but using 0.45 makes a nicer curve. See the following
+			// I should multiply x by 0.5 below, but using 0.45 makes a nicer curve. See the following
 			// link to visualize the curve we're using:
 			// https://www.iquilezles.org/apps/graphtoy/?f1(x)=2.0%20*%20clamp(smoothstep(0,%201,%20x%20*%200.45%20+%200.5)%20-%200.5,%200.0,%201.0)
 			L = g_fExtMaxInertia * 2.0f * clamp(smoothstep(0.0f, 1.0f, x * 0.45f + 0.5f) - 0.5f, 0.0, 1.0f);
@@ -1211,13 +1215,17 @@ int CockpitLookHook(int* params)
 			// so we multiply it by the smooth L to extend it back to the right range:
 			yawInertia *= L; pitchInertia *= L;
 			// Apply the inertia
-			PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
-			PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
-			PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
-		}
+			if (g_bExtInertiaEnabled) {
+				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
+			}
+			else {
+				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
+				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
+				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
+			}
 
-		// Add the tilt and save yaw/pitch if we're in external camera view
-		if (bExternalCamera) {
 			// Add the tilt even if external inertia is off:
 			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
 			// Save the final values for yaw/pitch -- this will help us detect changes performed in other places
@@ -1228,9 +1236,10 @@ int CockpitLookHook(int* params)
 			//log_debug("=================");
 		}
 	}
-	else { 
+	else 
+	{ 
 		// The mouse look is disabled because the cockpit isn't displayed, the gunner turret is active, or
-		// we're in multiplayer, let's update the yaw/pitch and tilt to avoid spinning out of control when
+		// we're in multiplayer: let's update the yaw/pitch and tilt to avoid spinning out of control when
 		// switching from no-cockpit to exterior view
 		lastCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
 		lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
@@ -1240,9 +1249,9 @@ int CockpitLookHook(int* params)
 			// Add the tilt even if external inertia is off:
 			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
 		}
-		prevCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
+		prevCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
 		prevCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-		prevCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
+		prevCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
 	}
 	
 //out:
