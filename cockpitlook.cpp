@@ -400,11 +400,12 @@ void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerInd
 	static float fLastSpeed = 0.0f;
 	static time_t prevT = 0;
 	time_t curT = time(NULL);
+	bool InertiaEnabled = g_bCockpitInertiaEnabled || g_bExtInertiaEnabled;
 	// Reset the first frame if the time between successive queries is too big: this
 	// implies the game was either paused or a new mission was loaded
 	bFirstFrame = curT - prevT > 2; // Reset if +2s have elapsed
 	// Skip the very first frame: there's no inertia to compute yet
-	if (bFirstFrame || !g_bCockpitInertiaEnabled || g_bHyperspaceTunnelLastFrame || g_bHyperspaceLastFrame)
+	if (bFirstFrame || !InertiaEnabled || g_bHyperspaceTunnelLastFrame || g_bHyperspaceLastFrame)
 	{
 		bFirstFrame = false;
 		*XDisp = *YDisp = *ZDisp = 0.0f;
@@ -455,6 +456,37 @@ void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerInd
 	//if (g_HyperspacePhaseFSM == HS_HYPER_ENTER_ST || g_HyperspacePhaseFSM == HS_INIT_ST)
 	//if (g_bHyperspaceLastFrame || g_bHyperspaceTunnelLastFrame)
 	//	log_debug("[%d] X/YDisp: %0.3f, %0.3f",  g_iHyperspaceFrame, *XDisp, *YDisp);
+}
+
+/*
+ * Takes a [yaw,pitch] "linear" inertia vector and returns a smooth transition between 0 at
+ * the origin and 1 near the edges.
+ */
+void SmoothInertia(float *inout_yawInertia, float *inout_pitchInertia) 
+{
+	float yawInertia = *inout_yawInertia;
+	float pitchInertia = *inout_pitchInertia;
+
+	// First, compute the length of the inertia vector:
+	float x, L = sqrt(yawInertia * yawInertia + pitchInertia * pitchInertia);
+	// Normalize the [yawInertia, pitchInertia] vector, our vector is now unitary and lies
+	// in a circle around the origin
+	yawInertia /= L; pitchInertia /= L;
+	// Normalize the range of L between 0 and +1. We'll clamp it to 1 using smoothstep below
+	x = L / g_fExtMaxInertia;
+	// Here, I'm dividing the smoothstep graph and taking the middle point to the right
+	// so that we get a curve that starts linear and then tapers off towards 1. Formally,
+	// I should multiply x by 0.5 below, but using 0.45 makes a nicer curve. See the following
+	// link to visualize the curve we're using:
+	// https://www.iquilezles.org/apps/graphtoy/?f1(x)=2.0%20*%20clamp(smoothstep(0,%201,%20x%20*%200.45%20+%200.5)%20-%200.5,%200.0,%201.0)
+	L = g_fExtMaxInertia * 2.0f * clamp(smoothstep(0.0f, 1.0f, x * 0.45f + 0.5f) - 0.5f, 0.0, 1.0f);
+	// The length of the vector now goes from 0 to g_fExtMaxInertia smoothly and tapers off
+	// when approaching g_fExtMaxInertia. Our [yawInertia, pitchInertia] vector is still unitary
+	// so we multiply it by the smooth L to extend it back to the right range:
+	yawInertia *= L; pitchInertia *= L;
+
+	*inout_yawInertia = yawInertia;
+	*inout_pitchInertia = pitchInertia;
 }
 
 typedef struct HeadPosStruct {
@@ -600,6 +632,7 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 
 	if (g_bCtrl && bLastIKeyState && !bCurIKeyState) {
 		g_bCockpitInertiaEnabled = !g_bCockpitInertiaEnabled;
+		g_bExtInertiaEnabled = !g_bExtInertiaEnabled;
 	}
 
 	if (bAlt || g_bCtrl) {
@@ -789,7 +822,7 @@ int CockpitLookHook(int* params)
 				if (*mouseLook && !*inMissionFilmState && !*viewingFilmState) {
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
-					if (g_bCockpitInertiaEnabled) {
+					if (g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
 						float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 						if (g_bInHyperspace)
 							ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
@@ -798,9 +831,11 @@ int CockpitLookHook(int* params)
 							ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 						}
 						// Apply the inertia:
-						g_headPos.x += XDisp;
-						g_headPos.y += YDisp;
-						g_headPos.z += ZDisp;
+						if (g_bCockpitInertiaEnabled) {
+							g_headPos.x += XDisp;
+							g_headPos.y += YDisp;
+							g_headPos.z += ZDisp;
+						}
 
 						yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 					}
@@ -825,7 +860,7 @@ int CockpitLookHook(int* params)
 						// I'm sure this section and the above can be refactored...
 						Vector4 Rs, Us, Fs;
 						Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
-						if (g_bCockpitInertiaEnabled) {
+						if (g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
 							float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 							if (g_bInHyperspace)
 								ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
@@ -834,9 +869,11 @@ int CockpitLookHook(int* params)
 								ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 							}
 							// Apply the inertia:
-							g_headPos.x += XDisp;
-							g_headPos.y += YDisp;
-							g_headPos.z += ZDisp;
+							if (g_bCockpitInertiaEnabled) {
+								g_headPos.x += XDisp;
+								g_headPos.y += YDisp;
+								g_headPos.z += ZDisp;
+							}
 							
 							yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 						}
@@ -1043,16 +1080,18 @@ int CockpitLookHook(int* params)
 
 				Vector4 Rs, Us, Fs;
 				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
-				if (g_bCockpitInertiaEnabled) {
+				if (g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
 					float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 					if (g_bInHyperspace)
 						ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
 					else
 						ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 					// Apply the inertia:
-					g_headPos.x += XDisp;
-					g_headPos.y += YDisp;
-					g_headPos.z += ZDisp;
+					if (g_bCockpitInertiaEnabled) {
+						g_headPos.x += XDisp;
+						g_headPos.y += YDisp;
+						g_headPos.z += ZDisp;
+					}
 
 					yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 				}
@@ -1106,6 +1145,7 @@ int CockpitLookHook(int* params)
 			//cockpitRefZ = 0;
 		}
 
+		// Use NumPad9 and NumPad7 to zoom in/out the external camera
 		if (bExternalCamera) {
 			// These limits (80, 8192) were observed empirically.
 			if (g_bNumPad9 && PlayerDataTable[playerIndex].externalCameraDistance > 80) {
@@ -1186,10 +1226,9 @@ int CockpitLookHook(int* params)
 				*mouseLookWasNotEnabled = 0;
 		}
 
-		// Cockpit inertia in external view
+		// Apply External View Inertia
 		if (bExternalCamera) 
 		{
-			float x;
 			// Save the current yaw/pitch before adding external view inertia, we'll restore these values the
 			// next time we enter this hook
 			lastCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
@@ -1197,23 +1236,7 @@ int CockpitLookHook(int* params)
 			lastCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
 			//log_debug("lastCamera (2): %d, %d", lastCameraYaw, lastCameraPitch);
 
-			// Apply inertia. First, compute the length of the inertia vector:
-			float L = sqrt(yawInertia * yawInertia + pitchInertia * pitchInertia);
-			// Normalize the [yawInertia, pitchInertia] vector, our vector is now unitary and lies
-			// in a circle around the origin
-			yawInertia /= L; pitchInertia /= L;
-			// Normalize the range of L between 0 and +1. We'll clamp it to 1 using smoothstep below
-			x = L / g_fExtMaxInertia;
-			// Here, I'm dividing the smoothstep graph and taking the middle point to the right
-			// so that we get a curve that starts linear and then tapers off towards 1. Formally,
-			// I should multiply x by 0.5 below, but using 0.45 makes a nicer curve. See the following
-			// link to visualize the curve we're using:
-			// https://www.iquilezles.org/apps/graphtoy/?f1(x)=2.0%20*%20clamp(smoothstep(0,%201,%20x%20*%200.45%20+%200.5)%20-%200.5,%200.0,%201.0)
-			L = g_fExtMaxInertia * 2.0f * clamp(smoothstep(0.0f, 1.0f, x * 0.45f + 0.5f) - 0.5f, 0.0, 1.0f);
-			// The length of the vector now goes from 0 to g_fExtMaxInertia smoothly and tapers off
-			// when approaching g_fExtMaxInertia. Our [yawInertia, pitchInertia] vector is still unitary
-			// so we multiply it by the smooth L to extend it back to the right range:
-			yawInertia *= L; pitchInertia *= L;
+			SmoothInertia(&yawInertia, &pitchInertia);
 			// Apply the inertia
 			if (g_bExtInertiaEnabled) {
 				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
@@ -1241,11 +1264,13 @@ int CockpitLookHook(int* params)
 		// The mouse look is disabled because the cockpit isn't displayed, the gunner turret is active, or
 		// we're in multiplayer: let's update the yaw/pitch and tilt to avoid spinning out of control when
 		// switching from no-cockpit to exterior view
-		lastCameraYaw = PlayerDataTable[playerIndex].cameraYaw;
+		lastCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
 		lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-		lastCameraDist = PlayerDataTable[playerIndex].externalCameraDistance;
+		lastCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
 
-		if (bExternalCamera && *numberOfPlayersInGame == 1) {
+		// Apply External View Inertia when the cockpit is not displayed
+		if (bExternalCamera && *numberOfPlayersInGame == 1) 
+		{
 			float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
 			if (g_bInHyperspace)
 				ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
@@ -1256,23 +1281,7 @@ int CockpitLookHook(int* params)
 			}
 			yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 
-			// Apply inertia. First, compute the length of the inertia vector:
-			float x, L = sqrt(yawInertia * yawInertia + pitchInertia * pitchInertia);
-			// Normalize the [yawInertia, pitchInertia] vector, our vector is now unitary and lies
-			// in a circle around the origin
-			yawInertia /= L; pitchInertia /= L;
-			// Normalize the range of L between 0 and +1. We'll clamp it to 1 using smoothstep below
-			x = L / g_fExtMaxInertia;
-			// Here, I'm dividing the smoothstep graph and taking the middle point to the right
-			// so that we get a curve that starts linear and then tapers off towards 1. Formally,
-			// I should multiply x by 0.5 below, but using 0.45 makes a nicer curve. See the following
-			// link to visualize the curve we're using:
-			// https://www.iquilezles.org/apps/graphtoy/?f1(x)=2.0%20*%20clamp(smoothstep(0,%201,%20x%20*%200.45%20+%200.5)%20-%200.5,%200.0,%201.0)
-			L = g_fExtMaxInertia * 2.0f * clamp(smoothstep(0.0f, 1.0f, x * 0.45f + 0.5f) - 0.5f, 0.0, 1.0f);
-			// The length of the vector now goes from 0 to g_fExtMaxInertia smoothly and tapers off
-			// when approaching g_fExtMaxInertia. Our [yawInertia, pitchInertia] vector is still unitary
-			// so we multiply it by the smooth L to extend it back to the right range:
-			yawInertia *= L; pitchInertia *= L;
+			SmoothInertia(&yawInertia, &pitchInertia);
 			// Apply the inertia
 			if (g_bExtInertiaEnabled) {
 				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
@@ -1284,8 +1293,6 @@ int CockpitLookHook(int* params)
 				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
 				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
 			}
-
-
 
 			// Add the tilt even if external inertia is off:
 			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
