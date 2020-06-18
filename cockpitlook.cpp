@@ -608,12 +608,12 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	g_bNumPad7		= GetAsyncKeyState(VK_NUMPAD7);
 	g_bNumPad9		= GetAsyncKeyState(VK_NUMPAD9);
 	// I,J key states:
-	bLastIKeyState = bCurIKeyState;
-	bLastJKeyState = bCurJKeyState;
-	bLastXKeyState = bCurXKeyState;
-	bCurJKeyState = GetAsyncKeyState(VK_J_KEY);
-	bCurIKeyState = GetAsyncKeyState(VK_I_KEY);
-	bCurXKeyState = GetAsyncKeyState(VK_X_KEY);
+	bLastIKeyState	= bCurIKeyState;
+	bLastJKeyState	= bCurJKeyState;
+	bLastXKeyState	= bCurXKeyState;
+	bCurJKeyState	= GetAsyncKeyState(VK_J_KEY);
+	bCurIKeyState	= GetAsyncKeyState(VK_I_KEY);
+	bCurXKeyState	= GetAsyncKeyState(VK_X_KEY);
 
 	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
 
