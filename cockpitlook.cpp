@@ -68,6 +68,55 @@ void log_debug(const char *format, ...)
 	va_end(args);
 }
 
+HANDLE g_SerialHandle = INVALID_HANDLE_VALUE;
+
+// From: https://stackoverflow.com/questions/15794422/serial-port-rs-232-connection-in-c
+void InitSerialPort(DWORD baudrate, BYTE byteSize, BYTE stopBits, BYTE parity) 
+{
+	// Open the serial port
+	g_SerialHandle = CreateFile("\\\\.\\COM1", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+
+	// Do some basic settings
+	DCB serialParams = { 0 };
+	serialParams.DCBlength = sizeof(serialParams);
+
+	GetCommState(g_SerialHandle, &serialParams);
+	serialParams.BaudRate = baudrate;
+	serialParams.ByteSize = byteSize;
+	serialParams.StopBits = stopBits;
+	serialParams.Parity   = parity;
+	SetCommState(g_SerialHandle, &serialParams);
+
+	// Set timeouts
+	COMMTIMEOUTS timeout = { 0 };
+	timeout.ReadIntervalTimeout = 50;
+	timeout.ReadTotalTimeoutConstant = 50;
+	timeout.ReadTotalTimeoutMultiplier = 50;
+	timeout.WriteTotalTimeoutConstant = 50;
+	timeout.WriteTotalTimeoutMultiplier = 10;
+
+	SetCommTimeouts(g_SerialHandle, &timeout);
+}
+
+void CloseSerialPort()
+{
+	if (g_SerialHandle != INVALID_HANDLE_VALUE)
+		CloseHandle(g_SerialHandle);
+}
+
+void WriteToSerialPort(char *msg)
+{
+	if (g_SerialHandle != INVALID_HANDLE_VALUE)
+		WriteFile(g_SerialHandle, msg, strlen(msg), NULL, NULL);
+}
+
+void SendXWADataThroughSerialPort()
+{
+	char buf[256];
+	sprintf_s(buf, 256, "%d", PlayerDataTable[*localPlayerIndex].currentSpeed);
+	WriteToSerialPort(buf);
+}
+
 bool g_bGlobalDebug = false;
 
 /*
@@ -723,6 +772,9 @@ int CockpitLookHook(int* params)
 		log_debug("External Dist: %d", PlayerDataTable[playerIndex].externalCameraDistance);
 		bFirstFrame = false;
 	}*/
+
+	// Send some XWA data through the serial port:
+	SendXWADataThroughSerialPort();
 
 	// Restore the position of the external camera if external inertia is enabled.
 	if (bExternalCamera) 
@@ -1522,6 +1574,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		log_debug("Parameters loaded");
 		InitKeyboard();
 		InitHeadingMatrix();
+		InitSerialPort(9600, 8, 0, 1);
 		switch (g_TrackerType)
 		{
 		case TRACKER_FREEPIE:
@@ -1542,6 +1595,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		break;
 	case DLL_PROCESS_DETACH:
 		log_debug("Unloading Cockpitlook hook");
+		CloseSerialPort();
 		switch (g_TrackerType) {
 		case TRACKER_FREEPIE:
 			ShutdownFreePIE();
