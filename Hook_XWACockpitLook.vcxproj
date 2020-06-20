@@ -147,6 +147,7 @@
     <ClCompile Include="Matrices.cpp" />
     <ClCompile Include="SteamVR.cpp" />
     <ClCompile Include="TrackIR.cpp" />
+    <ClCompile Include="UDP.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FreePIE.h" />
@@ -159,6 +160,7 @@
     <ClInclude Include="SteamVR.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TrackIR.h" />
+    <ClInclude Include="UDP.h" />
     <ClInclude Include="Vectors.h" />
     <ClInclude Include="XWAEnums.h" />
     <ClInclude Include="XWAFramework.h" />

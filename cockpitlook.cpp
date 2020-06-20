@@ -23,6 +23,7 @@
 
 #include "Vectors.h"
 #include "Matrices.h"
+#include "UDP.h"
 
 // TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
@@ -705,6 +706,14 @@ Params[-10] = EDI
 Params[-11] = ESP
 Params[-15] = EBP
 */
+
+void SendXWADataOverUDP()
+{
+	char buf[512];
+	sprintf_s(buf, 512, "speed:%d", (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f));
+	SendUDPMessage(buf);
+}
+
 int CockpitLookHook(int* params)
 {
 	int playerIndex = params[-10]; // Using -10 instead of -6, prevents this hook from crashing in Multiplayer
@@ -723,6 +732,8 @@ int CockpitLookHook(int* params)
 		log_debug("External Dist: %d", PlayerDataTable[playerIndex].externalCameraDistance);
 		bFirstFrame = false;
 	}*/
+
+	if (g_bUDPEnabled) SendXWADataOverUDP();
 
 	// Restore the position of the external camera if external inertia is enabled.
 	if (bExternalCamera) 
@@ -1484,7 +1495,19 @@ void LoadParams() {
 				}
 			}
 			
-
+			// UDP settings
+			else if (_stricmp(param, "UDP_telemetry_enabled") == 0) {
+				g_bUDPEnabled = (bool)fValue;
+				log_debug("[UDP] Telemetry Enabled: %d", g_bUDPEnabled);
+			}
+			else if (_stricmp(param, "UDP_telemetry_port") == 0) {
+				g_iUDPPort = (int)fValue;
+				log_debug("[UDP] Telemetry Port: %d", g_iUDPPort);
+			}
+			else if (_stricmp(param, "UDP_telemetry_server") == 0) {
+				_snprintf_s(g_sUDPServer, 80, "%s", svalue);
+				log_debug("[UDP] Telemetry Server: %s", g_sUDPServer);
+			}
 		}
 	} // while ... read file
 	fclose(file);
@@ -1522,6 +1545,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		log_debug("Parameters loaded");
 		InitKeyboard();
 		InitHeadingMatrix();
+		// UDP Telemetry Initialization
+		if (g_bUDPEnabled) {
+			InitializeUDP();
+			InitializeUDPSocket();
+		}
+
 		switch (g_TrackerType)
 		{
 		case TRACKER_FREEPIE:
@@ -1542,6 +1571,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		break;
 	case DLL_PROCESS_DETACH:
 		log_debug("Unloading Cockpitlook hook");
+		if (g_bUDPEnabled) CloseUDP();
 		switch (g_TrackerType) {
 		case TRACKER_FREEPIE:
 			ShutdownFreePIE();
