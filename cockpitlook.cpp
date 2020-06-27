@@ -710,7 +710,53 @@ Params[-15] = EBP
 void SendXWADataOverUDP()
 {
 	char buf[512];
+	//int objectIndex = PlayerDataTable[*localPlayerIndex].objectIndex;
 	sprintf_s(buf, 512, "speed:%d", (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f));
+
+	//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
+	//log_debug("[UDP] Throttle: %s", CraftDefinitionTable[objectIndex].CockpitFileName);
+	//log_debug("[UDP] localPlayerIndex: %d, Index: %d", *localPlayerIndex, PlayerDataTable[*localPlayerIndex].objectIndex);
+	//Prints 0, 0
+	//log_debug("[UDP] CameraIdx: %d", PlayerDataTable[*localPlayerConnectedAs].cameraFG);
+	// Prints -1
+	
+	//log_debug("[UDP] g_currentFGIndex: %d, g_currentPlayerObjectIndex: %d", *g_currentFGIndex, *g_currentPlayerObjectIndex);
+	// [7852] [DBG] [Cockpitlook] [UDP] g_currentFGIndex: 16, g_currentPlayerObjectIndex: -1
+	//log_debug("[UDP] g_localPlayerObjectIndex2: %d", *g_localPlayerObjectIndex2);
+
+	/*
+	// None of this worked:
+	log_debug("[UDP] ShieldDir: %d, elsLasers: %d, elsShields: %d, elsBeam: %d",
+		PlayerDataTable[*localPlayerIndex].shieldDirection,
+		PlayerDataTable[*localPlayerIndex].elsLasers,
+		PlayerDataTable[*localPlayerIndex].elsShields,
+		PlayerDataTable[*localPlayerIndex].elsBeam);
+	*/
+
+	/*
+	// Not sure what objectIndex is:
+	log_debug("[UDP] objectIndex: %d, currentTargetIndex: %d",
+		PlayerDataTable[*localPlayerIndex].objectIndex,
+		PlayerDataTable[*localPlayerIndex].currentTargetIndex);
+	*/
+	
+	//log_debug("[UDP] Player IFF: %d, team: %d", PlayerDataTable[*localPlayerIndex].IFF, PlayerDataTable[*localPlayerIndex].team);
+	int currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
+	if (currentTargetIndex > -1) {
+		ObjectEntry *object = &((*objects)[currentTargetIndex]);
+		//log_debug("[UDP] %s", object->MobileObjectPtr->pChar); // Displays (null)
+		//log_debug("[UDP] Target IFF: %d, Team: %d, MarkingColor: %d", object->MobileObjectPtr->IFF, object->MobileObjectPtr->Team, object->MobileObjectPtr->markingColor);
+		//log_debug("[UDP] Cargo Idx: %d, Cargo: %s", object->MobileObjectPtr->craftInstancePtr->CargoIndex, 
+		//	object->MobileObjectPtr->craftInstancePtr->Cargo); // Displays the cargo even before it's scanned
+
+		// Hull Strength is given in... some units. CraftType seems to work fine too.
+		//log_debug("[DBG] CraftType: %d, HullStrength: %d", object->MobileObjectPtr->craftInstancePtr->CraftType, object->MobileObjectPtr->craftInstancePtr->HullStrength);
+
+		//log_debug("[UDP] 0x%X, 0x%X", object->MobileObjectPtr->craftInstancePtr->field_3D1[0], object->MobileObjectPtr->craftInstancePtr->field_3D1[1]);
+		//log_debug("[UDP] 0x%X, 0x%X, 0x%X", object->MobileObjectPtr->craftInstancePtr->field_3E9, object->MobileObjectPtr->craftInstancePtr->field_3ED,
+		//	object->MobileObjectPtr->craftInstancePtr->field_3F1);
+	}
+	
 	SendUDPMessage(buf);
 }
 

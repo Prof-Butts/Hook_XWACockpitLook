@@ -1,5 +1,19 @@
 /*
 	Simple UDP client. From: https://www.binarytides.com/udp-socket-programming-in-winsock/
+
+Format:
+
+type|key:value
+
+So:
+
+player|speed:100
+player|callsign:Rogue 1
+player|throttle:66
+etc.
+
+More examples: https://github.com/daneedk/TelemetryProxy/blob/master/information.md
+
 */
 
 #include <stdio.h>

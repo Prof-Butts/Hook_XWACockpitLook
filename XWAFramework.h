@@ -77,8 +77,9 @@ RECT* rectStandard3 = (RECT *)0x6031A8;
 const auto battleSelectScrollMovement = (int *)0x78317C;
 const auto loadScrnTotalMissionsListed = (int *)0x7830BC;
 const auto localPlayerIndex = (int *)0x8C1CC8;
-ObjectEntry* objects = *(ObjectEntry **)0x7B33C4;
+ObjectEntry** objects = (ObjectEntry **)0x7B33C4;
 PlayerDataEntry* PlayerDataTable = (PlayerDataEntry *)0x8B94E0;
+CraftDefinitionEntry *CraftDefinitionTable = (CraftDefinitionEntry *)0x005BB480; // 32 Entries
 const auto localPlayerConnectedAs = (int *)0xABD7B4;
 const auto flightGroupInfo = (int *)0x783194;
 const auto battleSelectMissionScrollIndex = (int *)0x783174;
@@ -147,4 +148,13 @@ const auto XwaDIKeyboardUpdateShiftControlAltKeysPressedState = (void(*)())0x004
 const auto dword_7833D4 = (int*)0x7833D4;
 const auto dword_B07C6C = (int*)0xB07C6C;
 
+const auto g_currentFGIndex = (WORD*)0x009E9708;
+const auto g_currentCraftPtr = (void*)0x00910DFC; // Craft *
+// Craft g_craftPtr = 009106A0
+const auto g_currentPlayerObjectIndex = (int*)0x008C1604;
 
+// 007CA1A0     CurrentObjectTable CurrentObject
+// 007B33C4     g_objectPtr     dd	Object *g_objectPtr
+
+const auto g_localPlayerObjectIndex = (int *)0x0634370;
+const auto g_localPlayerObjectIndex2 = (int *)0x0631B70;
