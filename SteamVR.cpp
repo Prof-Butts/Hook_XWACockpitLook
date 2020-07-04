@@ -3,6 +3,7 @@
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
 vr::IVRSystem *g_pHMD = NULL;
+vr::IVRCompositor *g_pVRCompositor = NULL;
 
 bool InitSteamVR()
 {
@@ -132,7 +133,15 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch)
 		vr::HmdQuaternionf_t q;
 		vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
 
-		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0, &trackedDevicePose, 1);
+		/* Get pose predicted 2.8 frames in the future, that's what we believe WaitGetPoses() is returning when called later in ddraw.dll
+		   TODO: calculate this dynamically according to HMD refresh rate and current frames per second.
+		*/
+		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
+
+		/* TODO: since this is called before BeginScene (verified with GPUView), it would be better to use WaitGetPoses() here
+		   and GetLastPoses() in BeginScene(), but does not seem to work.
+		vr::EVRCompositorError error = vr::VRCompositor()->WaitGetPoses(&trackedDevicePose,0, NULL, 0);
+		*/
 		poseMatrix = trackedDevicePose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
 		q = rotationToQuaternion(trackedDevicePose.mDeviceToAbsoluteTracking);
 		quatToEuler(q, yaw, pitch, &roll);
