@@ -730,6 +730,8 @@ void SendXWADataOverUDP()
 		float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
 		int shields_front = (int )(100.0 * (float)craftInstance->ShieldPointsFront / total_shield_points);
 		int shields_back = (int)(100.0 * (float)craftInstance->ShieldPointsBack / total_shield_points);
+		shields_front = max(0, shields_front);
+		shields_back = max(0, shields_back);
 
 		msg += "\t\t\"name\" : " + std::string(name) + "\n";
 		msg += "\t\t\"short name\" : " + std::string(short_name) + "\n";
@@ -792,6 +794,7 @@ void SendXWADataOverUDP()
 			hull = max(0, hull);
 			float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
 			int shields = (int )(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
+			shields = max(0, shields);
 
 			msg += "\t\t\"name\" : " + std::string(name) + "\n";
 			msg += "\t\t\"short name\" : " + std::string(short_name) + "\n";
