@@ -135,7 +135,8 @@ struct CraftInstance {
 	BYTE InspectedByTeam[10];
 	BYTE CargoIndex;
 	BYTE field_1A1;
-	DWORD FrontShieldHitpoints[2]; // Ofs 0x1A2 dd 2 dup(? )
+	DWORD ShieldPointsFront; // // Ofs 0x1A2 dd 2 dup(? )
+	DWORD ShieldPointsBack;
 	BYTE ElsShields;
 	BYTE ShieldDirection;
 	BYTE NumberOfLaserSets;

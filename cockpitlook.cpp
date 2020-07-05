@@ -709,55 +709,132 @@ Params[-15] = EBP
 
 void SendXWADataOverUDP()
 {
-	char buf[512];
-	//int objectIndex = PlayerDataTable[*localPlayerIndex].objectIndex;
-	sprintf_s(buf, 512, "speed:%d", (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f));
+	std::string msg = "";
+	//char buf[512];
+	//sprintf_s(buf, 512, "speed:%d", (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f));
+	msg += "{\n";
 
-	//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
-	//log_debug("[UDP] Throttle: %s", CraftDefinitionTable[objectIndex].CockpitFileName);
-	//log_debug("[UDP] localPlayerIndex: %d, Index: %d", *localPlayerIndex, PlayerDataTable[*localPlayerIndex].objectIndex);
-	//Prints 0, 0
-	//log_debug("[UDP] CameraIdx: %d", PlayerDataTable[*localPlayerConnectedAs].cameraFG);
-	// Prints -1
-	
-	//log_debug("[UDP] g_currentFGIndex: %d, g_currentPlayerObjectIndex: %d", *g_currentFGIndex, *g_currentPlayerObjectIndex);
-	// [7852] [DBG] [Cockpitlook] [UDP] g_currentFGIndex: 16, g_currentPlayerObjectIndex: -1
-	//log_debug("[UDP] g_localPlayerObjectIndex2: %d", *g_localPlayerObjectIndex2);
+	// PLAYER SECTION
+	msg += "\t\"player\":\n\t{\n";
+	{
+		int objectIndex = PlayerDataTable[*localPlayerIndex].objectIndex;
+		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
+		ObjectEntry *object = &((*objects)[objectIndex]);
+		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+		CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+		CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+		char *name = (char *)craftDefinition->pCraftName;
+		char *short_name = (char *)craftDefinition->pCraftShortName;
+		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
+		hull = max(0, hull);
+		float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
+		int shields_front = (int )(100.0 * (float)craftInstance->ShieldPointsFront / total_shield_points);
+		int shields_back = (int)(100.0 * (float)craftInstance->ShieldPointsBack / total_shield_points);
 
-	/*
-	// None of this worked:
-	log_debug("[UDP] ShieldDir: %d, elsLasers: %d, elsShields: %d, elsBeam: %d",
-		PlayerDataTable[*localPlayerIndex].shieldDirection,
-		PlayerDataTable[*localPlayerIndex].elsLasers,
-		PlayerDataTable[*localPlayerIndex].elsShields,
-		PlayerDataTable[*localPlayerIndex].elsBeam);
-	*/
+		msg += "\t\t\"name\" : " + std::string(name) + "\n";
+		msg += "\t\t\"short name\" : " + std::string(short_name) + "\n";
+		msg += "\t\t\"speed\" : " + std::to_string(speed) + "\n";
+		//msg += "\t\t\"current speed\" : " + std::to_string(mobileObject->currentSpeed) + "\n"; // Redundant
+		msg += "\t\t\"craft type\" : " + std::to_string(craftInstance->CraftType) + "\n";
+		msg += "\t\t\"ELS lasers\" : " + std::to_string(craftInstance->ElsLasers) + "\n";
+		msg += "\t\t\"ELS shields\" : " + std::to_string(craftInstance->ElsShields) + "\n";
+		msg += "\t\t\"ELS beam\" : " + std::to_string(craftInstance->ElsBeam) + "\n";
+		msg += "\t\t\"s-foils\" : " + std::to_string(craftInstance->SfoilsState) + "\n";
+		msg += "\t\t\"shield direction\" : " + std::to_string(craftInstance->ShieldDirection) + "\n";
+		msg += "\t\t\"front shields\" : " + std::to_string(shields_front) + "\n";
+		msg += "\t\t\"back shields\" : " + std::to_string(shields_back) + "\n";
+		msg += "\t\t\"hull\" : " + std::to_string(hull) + "\n";
+		msg += "\t\t\"system\" : " + std::to_string(craftInstance->SystemStrength) + "\n";
+		msg += "\t\t\"beam active\" : " + std::to_string(craftInstance->BeamActive) + "\n";
 
-	/*
-	// Not sure what objectIndex is:
-	log_debug("[UDP] objectIndex: %d, currentTargetIndex: %d",
-		PlayerDataTable[*localPlayerIndex].objectIndex,
-		PlayerDataTable[*localPlayerIndex].currentTargetIndex);
-	*/
-	
-	//log_debug("[UDP] Player IFF: %d, team: %d", PlayerDataTable[*localPlayerIndex].IFF, PlayerDataTable[*localPlayerIndex].team);
-	int currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
-	if (currentTargetIndex > -1) {
-		ObjectEntry *object = &((*objects)[currentTargetIndex]);
-		//log_debug("[UDP] %s", object->MobileObjectPtr->pChar); // Displays (null)
-		//log_debug("[UDP] Target IFF: %d, Team: %d, MarkingColor: %d", object->MobileObjectPtr->IFF, object->MobileObjectPtr->Team, object->MobileObjectPtr->markingColor);
-		//log_debug("[UDP] Cargo Idx: %d, Cargo: %s", object->MobileObjectPtr->craftInstancePtr->CargoIndex, 
-		//	object->MobileObjectPtr->craftInstancePtr->Cargo); // Displays the cargo even before it's scanned
+		//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
+		//log_debug("[UDP] Throttle: %s", CraftDefinitionTable[objectIndex].CockpitFileName);
+		//log_debug("[UDP] localPlayerIndex: %d, Index: %d", *localPlayerIndex, PlayerDataTable[*localPlayerIndex].objectIndex);
+		//Prints 0, 0
+		//log_debug("[UDP] CameraIdx: %d", PlayerDataTable[*localPlayerConnectedAs].cameraFG);
+		// Prints -1
 
-		// Hull Strength is given in... some units. CraftType seems to work fine too.
-		//log_debug("[DBG] CraftType: %d, HullStrength: %d", object->MobileObjectPtr->craftInstancePtr->CraftType, object->MobileObjectPtr->craftInstancePtr->HullStrength);
+		//log_debug("[UDP] g_currentFGIndex: %d, g_currentPlayerObjectIndex: %d", *g_currentFGIndex, *g_currentPlayerObjectIndex);
+		// [7852] [DBG] [Cockpitlook] [UDP] g_currentFGIndex: 16, g_currentPlayerObjectIndex: -1
+		//log_debug("[UDP] g_localPlayerObjectIndex2: %d", *g_localPlayerObjectIndex2);
 
-		//log_debug("[UDP] 0x%X, 0x%X", object->MobileObjectPtr->craftInstancePtr->field_3D1[0], object->MobileObjectPtr->craftInstancePtr->field_3D1[1]);
-		//log_debug("[UDP] 0x%X, 0x%X, 0x%X", object->MobileObjectPtr->craftInstancePtr->field_3E9, object->MobileObjectPtr->craftInstancePtr->field_3ED,
-		//	object->MobileObjectPtr->craftInstancePtr->field_3F1);
+		/*
+		// None of this worked:
+		log_debug("[UDP] ShieldDir: %d, elsLasers: %d, elsShields: %d, elsBeam: %d",
+			PlayerDataTable[*localPlayerIndex].shieldDirection,
+			PlayerDataTable[*localPlayerIndex].elsLasers,
+			PlayerDataTable[*localPlayerIndex].elsShields,
+			PlayerDataTable[*localPlayerIndex].elsBeam);
+		*/
+
+		/*
+		// Not sure what objectIndex is:
+		log_debug("[UDP] objectIndex: %d, currentTargetIndex: %d",
+			PlayerDataTable[*localPlayerIndex].objectIndex,
+			PlayerDataTable[*localPlayerIndex].currentTargetIndex);
+		*/
+	}
+
+	msg += "\t},\n";
+	msg += "\t\"target\":\n\t{\n";
+	{
+		//log_debug("[UDP] Player IFF: %d, team: %d", PlayerDataTable[*localPlayerIndex].IFF, PlayerDataTable[*localPlayerIndex].team);
+		int currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
+		if (currentTargetIndex > -1) {
+			ObjectEntry *object = &((*objects)[currentTargetIndex]);
+			MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+			CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+			CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+			char *name = (char *)craftDefinition->pCraftName;
+			char *short_name = (char *)craftDefinition->pCraftShortName;
+			int IFF = object->MobileObjectPtr->IFF;
+			int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
+			hull = max(0, hull);
+			float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
+			int shields = (int )(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
+
+			msg += "\t\t\"name\" : " + std::string(name) + "\n";
+			msg += "\t\t\"short name\" : " + std::string(short_name) + "\n";
+			msg += "\t\t\"IFF\" : " + std::to_string(IFF) + "\n";
+			msg += "\t\t\"cargo\" : \"" + std::string(craftInstance->Cargo) + "\"\n";
+			msg += "\t\t\"craft type\" : " + std::to_string(craftInstance->CraftType) + "\n";
+			//msg += "\t\t\"shield direction\" : " + std::to_string(craftInstance->ShieldDirection) + "\n";
+			msg += "\t\t\"shields\" : " + std::to_string(shields) + "\n";
+			msg += "\t\t\"hull\" : " + std::to_string(hull) + "\n";
+			// state is 0 when the craft is static
+			// state is 3 when the craft is destroyed
+			msg += "\t\t\"state\" : " + std::to_string(craftInstance->CraftState) + "\n";
+			//msg += "\t\t\"system\" : " + std::to_string(craftInstance->SystemStrength) + "\n";
+
+			//log_debug("[UDP] %s", object->MobileObjectPtr->pChar); // Displays (null)
+			//log_debug("[UDP] Target IFF: %d, Team: %d, MarkingColor: %d", object->MobileObjectPtr->IFF, object->MobileObjectPtr->Team, object->MobileObjectPtr->markingColor);
+			//log_debug("[UDP] Cargo Idx: %d, Cargo: %s", object->MobileObjectPtr->craftInstancePtr->CargoIndex, 
+			//	object->MobileObjectPtr->craftInstancePtr->Cargo); // Displays the cargo even before it's scanned
+
+			// Hull Strength is given in... some units. CraftType seems to work fine too.
+			//log_debug("[DBG] CraftType: %d, HullStrength: %d", object->MobileObjectPtr->craftInstancePtr->CraftType, object->MobileObjectPtr->craftInstancePtr->HullStrength);
+
+			//log_debug("[UDP] 0x%X, 0x%X", object->MobileObjectPtr->craftInstancePtr->field_3D1[0], object->MobileObjectPtr->craftInstancePtr->field_3D1[1]);
+			//log_debug("[UDP] 0x%X, 0x%X, 0x%X", object->MobileObjectPtr->craftInstancePtr->field_3E9, object->MobileObjectPtr->craftInstancePtr->field_3ED,
+			//	object->MobileObjectPtr->craftInstancePtr->field_3F1);
+		}
 	}
 	
-	SendUDPMessage(buf);
+	msg += "\t},\n";
+	msg += "\t{\n";
+	msg += "\t\"status\":\n\t{\n";
+	{
+		msg += "\t\t\"location\" : ";
+		if ((*g_playerInHangar))
+			msg += "\"hangar\"\n";
+		else
+			msg += "\"space\"\n";
+	}
+	msg += "\t}\n";
+	// Final bracket
+	msg += "}";
+	
+	SendUDPMessage((char *)msg.c_str());
 }
 
 int CockpitLookHook(int* params)

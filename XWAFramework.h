@@ -158,3 +158,5 @@ const auto g_currentPlayerObjectIndex = (int*)0x008C1604;
 
 const auto g_localPlayerObjectIndex = (int *)0x0634370;
 const auto g_localPlayerObjectIndex2 = (int *)0x0631B70;
+
+const auto *g_playerInHangar = (unsigned int *)0x09C6E40;
