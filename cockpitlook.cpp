@@ -1,6 +1,6 @@
 /*
  * Copyright 2019, Justagai.
- * Extended for VR by Leo Reyes, 2019.
+ * Extended for VR by Leo Reyes, 2019, 2020.
  * Justagai coded the whole mouse hook, I (blue_max) just added support for FreePIE and SteamVR tracking.
  * December 2019: Added support for positional tracking by hijacking the cockpit shake variables.
 
