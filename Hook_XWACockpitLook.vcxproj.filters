@@ -36,6 +36,9 @@
     <ClCompile Include="UDP.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Telemetry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Hex.h">
@@ -84,6 +87,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UDP.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Telemetry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
