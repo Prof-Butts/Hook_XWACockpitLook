@@ -264,7 +264,11 @@ void SendXWADataOverUDP()
 		g_LocationTelemetry.playerInHangar = (bool)(*g_playerInHangar);
 	}
 
-	if (msg.length() > 0)
-		SendUDPMessage((char *)msg.c_str());
+	int len = msg.length();
+	if (len > 0) {
+		msg.erase(msg.find_last_not_of(" \t\n") + 1);
+		if (msg.length() > 0)
+			SendUDPMessage((char *)msg.c_str());
+	}
 }
 #endif
