@@ -31,9 +31,13 @@ void SendXWADataOverUDP()
 		int objectIndex = PlayerDataTable[*localPlayerIndex].objectIndex;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
 		ObjectEntry *object = &((*objects)[objectIndex]);
+		if (object == NULL) goto target_section;
 		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+		if (mobileObject == NULL) goto target_section;
 		CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+		if (craftInstance == NULL) goto target_section;
 		CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+		if (craftDefinition == NULL) goto target_section;
 		char *name = (char *)craftDefinition->pCraftName;
 		char *short_name = (char *)craftDefinition->pCraftShortName;
 		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
@@ -70,6 +74,7 @@ void SendXWADataOverUDP()
 
 	}
 
+target_section:
 	msg += "\t},\n";
 	msg += "\t\"target\":\n\t{\n";
 	{
@@ -77,9 +82,13 @@ void SendXWADataOverUDP()
 		int currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
 		if (currentTargetIndex > -1) {
 			ObjectEntry *object = &((*objects)[currentTargetIndex]);
+			if (object == NULL) goto status_section;
 			MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+			if (mobileObject == NULL) goto status_section;
 			CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+			if (craftInstance == NULL) goto status_section;
 			CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+			if (craftDefinition == NULL) goto status_section;
 			char *name = (char *)craftDefinition->pCraftName;
 			char *short_name = (char *)craftDefinition->pCraftShortName;
 			int IFF = object->MobileObjectPtr->IFF;
@@ -110,6 +119,7 @@ void SendXWADataOverUDP()
 		}
 	}
 
+status_section:
 	msg += "\t},\n";
 	msg += "\t{\n";
 	msg += "\t\"status\":\n\t{\n";
@@ -138,9 +148,13 @@ void SendXWADataOverUDP()
 		int objectIndex = PlayerDataTable[*localPlayerIndex].objectIndex;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
 		ObjectEntry *object = &((*objects)[objectIndex]);
+		if (object == NULL) goto target_section;
 		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+		if (mobileObject == NULL) goto target_section;
 		CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+		if (craftInstance == NULL) goto target_section;
 		CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+		if (craftDefinition == NULL) goto target_section;
 		char *name = (char *)craftDefinition->pCraftName;
 		char *short_name = (char *)craftDefinition->pCraftShortName;
 		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
@@ -202,13 +216,18 @@ void SendXWADataOverUDP()
 	}
 
 	// TARGET SECTION
+target_section:
 	{
 		int currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
 		if (currentTargetIndex > -1) {
 			ObjectEntry *object = &((*objects)[currentTargetIndex]);
+			if (object == NULL) goto status_section;
 			MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+			if (mobileObject == NULL) goto status_section;
 			CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+			if (craftInstance == NULL) goto status_section;
 			CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+			if (craftDefinition == NULL) goto status_section;
 			char *name = (char *)craftDefinition->pCraftName;
 			char *short_name = (char *)craftDefinition->pCraftShortName;
 			int IFF = object->MobileObjectPtr->IFF;
@@ -251,6 +270,7 @@ void SendXWADataOverUDP()
 	}
 
 	// STATUS SECTION
+status_section:
 	{
 		if ((bool)(*g_playerInHangar) != g_LocationTelemetry.playerInHangar) {
 			msg += "status|location:";
