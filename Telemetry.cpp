@@ -17,6 +17,8 @@ PlayerTelemetry g_PrevPlayerTelemetry;
 TargetTelemetry g_TargetTelemetry;
 LocationTelemetry g_LocationTelemetry;
 
+void log_debug(const char *format, ...);
+
 #ifdef TELEMETRY_JSON
 void SendXWADataOverUDP()
 {
@@ -28,7 +30,8 @@ void SendXWADataOverUDP()
 	// PLAYER SECTION
 	msg += "\t\"player\":\n\t{\n";
 	{
-		int objectIndex = PlayerDataTable[*localPlayerIndex].objectIndex;
+		int16_t objectIndex = (int16_t)PlayerDataTable[*localPlayerIndex].objectIndex;
+		if (objectIndex < 0) goto target_section;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
 		ObjectEntry *object = &((*objects)[objectIndex]);
 		if (object == NULL) goto target_section;
@@ -79,44 +82,43 @@ target_section:
 	msg += "\t\"target\":\n\t{\n";
 	{
 		//log_debug("[UDP] Player IFF: %d, team: %d", PlayerDataTable[*localPlayerIndex].IFF, PlayerDataTable[*localPlayerIndex].team);
-		int currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
-		if (currentTargetIndex > -1) {
-			ObjectEntry *object = &((*objects)[currentTargetIndex]);
-			if (object == NULL) goto status_section;
-			MobileObjectEntry *mobileObject = object->MobileObjectPtr;
-			if (mobileObject == NULL) goto status_section;
-			CraftInstance *craftInstance = mobileObject->craftInstancePtr;
-			if (craftInstance == NULL) goto status_section;
-			CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
-			if (craftDefinition == NULL) goto status_section;
-			char *name = (char *)craftDefinition->pCraftName;
-			char *short_name = (char *)craftDefinition->pCraftShortName;
-			int IFF = object->MobileObjectPtr->IFF;
-			int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
-			hull = max(0, hull);
-			float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
-			int shields = (int)(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
-			shields = max(0, shields);
+		short currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
+		if (currentTargetIndex < 0) goto status_section;
+		ObjectEntry *object = &((*objects)[currentTargetIndex]);
+		if (object == NULL) goto status_section;
+		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+		if (mobileObject == NULL) goto status_section;
+		CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+		if (craftInstance == NULL) goto status_section;
+		CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+		if (craftDefinition == NULL) goto status_section;
+		char *name = (char *)craftDefinition->pCraftName;
+		char *short_name = (char *)craftDefinition->pCraftShortName;
+		int IFF = object->MobileObjectPtr->IFF;
+		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
+		hull = max(0, hull);
+		float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
+		int shields = (int)(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
+		shields = max(0, shields);
 
-			msg += "\t\t\"name\" : \"" + std::string(name) + "\",\n";
-			msg += "\t\t\"short name\" : \"" + std::string(short_name) + "\",\n";
-			msg += "\t\t\"IFF\" : " + std::to_string(IFF) + ",\n";
-			msg += "\t\t\"cargo\" : \"" + std::string(craftInstance->Cargo) + "\",\n";
-			msg += "\t\t\"craft type\" : " + std::to_string(craftInstance->CraftType) + ",\n";
-			//msg += "\t\t\"shield direction\" : " + std::to_string(craftInstance->ShieldDirection) + "\n";
-			msg += "\t\t\"shields\" : " + std::to_string(shields) + ",\n";
-			msg += "\t\t\"hull\" : " + std::to_string(hull) + ",\n";
-			// state is 0 when the craft is static
-			// state is 3 when the craft is destroyed
-			msg += "\t\t\"state\" : " + std::to_string(craftInstance->CraftState) + ",\n";
-			//msg += "\t\t\"system\" : " + std::to_string(craftInstance->SystemStrength) + "\n";
-			// CycleTime is always 236, CycleTimer counts down from CycleTime to -1 and starts over
-			//msg += "\t\t\"cycle time\" : " + std::to_string(craftInstance->CycleTime) + "\n";
-			//msg += "\t\t\"cycle timer\" : " + std::to_string(craftInstance->CycleTimer) + "\n";
+		msg += "\t\t\"name\" : \"" + std::string(name) + "\",\n";
+		msg += "\t\t\"short name\" : \"" + std::string(short_name) + "\",\n";
+		msg += "\t\t\"IFF\" : " + std::to_string(IFF) + ",\n";
+		msg += "\t\t\"cargo\" : \"" + std::string(craftInstance->Cargo) + "\",\n";
+		msg += "\t\t\"craft type\" : " + std::to_string(craftInstance->CraftType) + ",\n";
+		//msg += "\t\t\"shield direction\" : " + std::to_string(craftInstance->ShieldDirection) + "\n";
+		msg += "\t\t\"shields\" : " + std::to_string(shields) + ",\n";
+		msg += "\t\t\"hull\" : " + std::to_string(hull) + ",\n";
+		// state is 0 when the craft is static
+		// state is 3 when the craft is destroyed
+		msg += "\t\t\"state\" : " + std::to_string(craftInstance->CraftState) + ",\n";
+		//msg += "\t\t\"system\" : " + std::to_string(craftInstance->SystemStrength) + "\n";
+		// CycleTime is always 236, CycleTimer counts down from CycleTime to -1 and starts over
+		//msg += "\t\t\"cycle time\" : " + std::to_string(craftInstance->CycleTime) + "\n";
+		//msg += "\t\t\"cycle timer\" : " + std::to_string(craftInstance->CycleTimer) + "\n";
 
-			//log_debug("[UDP] %s", object->MobileObjectPtr->pChar); // Displays (null)
-			//log_debug("[UDP] Target IFF: %d, Team: %d, MarkingColor: %d", object->MobileObjectPtr->IFF, object->MobileObjectPtr->Team, object->MobileObjectPtr->markingColor);
-		}
+		//log_debug("[UDP] %s", object->MobileObjectPtr->pChar); // Displays (null)
+		//log_debug("[UDP] Target IFF: %d, Team: %d, MarkingColor: %d", object->MobileObjectPtr->IFF, object->MobileObjectPtr->Team, object->MobileObjectPtr->markingColor);
 	}
 
 status_section:
@@ -145,8 +147,10 @@ void SendXWADataOverUDP()
 
 	// PLAYER SECTION
 	{
-		int objectIndex = PlayerDataTable[*localPlayerIndex].objectIndex;
+		int16_t objectIndex = (int16_t)PlayerDataTable[*localPlayerIndex].objectIndex;
+		if (objectIndex < 0) goto target_section;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
+		//log_debug("[DBG] objectIndex: %d, *localPlayerIndex: %d, localPlayerIndex: 0x%x", objectIndex, *localPlayerIndex, localPlayerIndex);
 		ObjectEntry *object = &((*objects)[objectIndex]);
 		if (object == NULL) goto target_section;
 		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
@@ -218,57 +222,56 @@ void SendXWADataOverUDP()
 	// TARGET SECTION
 target_section:
 	{
-		int currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
-		if (currentTargetIndex > -1) {
-			ObjectEntry *object = &((*objects)[currentTargetIndex]);
-			if (object == NULL) goto status_section;
-			MobileObjectEntry *mobileObject = object->MobileObjectPtr;
-			if (mobileObject == NULL) goto status_section;
-			CraftInstance *craftInstance = mobileObject->craftInstancePtr;
-			if (craftInstance == NULL) goto status_section;
-			CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
-			if (craftDefinition == NULL) goto status_section;
-			char *name = (char *)craftDefinition->pCraftName;
-			char *short_name = (char *)craftDefinition->pCraftShortName;
-			int IFF = object->MobileObjectPtr->IFF;
-			int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
-			hull = max(0, hull);
-			float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
-			int shields = (int)(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
-			shields = max(0, shields);
+		short currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
+		if (currentTargetIndex < 0) goto status_section;
+		ObjectEntry *object = &((*objects)[currentTargetIndex]);
+		if (object == NULL) goto status_section;
+		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+		if (mobileObject == NULL) goto status_section;
+		CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+		if (craftInstance == NULL) goto status_section;
+		CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+		if (craftDefinition == NULL) goto status_section;
+		char *name = (char *)craftDefinition->pCraftName;
+		char *short_name = (char *)craftDefinition->pCraftShortName;
+		int IFF = object->MobileObjectPtr->IFF;
+		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
+		hull = max(0, hull);
+		float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
+		int shields = (int)(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
+		shields = max(0, shields);
 
-			if (name != g_TargetTelemetry.name)
-				msg += "target|crafttypename:" + std::string(name) + "\n";
-			if (short_name != g_TargetTelemetry.short_name)
-				msg += "target|shortcrafttypename:" + std::string(short_name) + "\n";
-			if (IFF != g_TargetTelemetry.IFF)
-				msg += "target|IFF:" + std::to_string(IFF) + "\n";
-			if (strcmp(craftInstance->Cargo, g_TargetTelemetry.Cargo) != 0)
-				msg += "target|cargo:" + std::string(craftInstance->Cargo) + "\n";
-			if (shields != g_TargetTelemetry.shields)
-				msg += "target|shields:" + std::to_string(shields) + "\n";
-			if (hull != g_TargetTelemetry.hull)
-				msg += "target|hull:" + std::to_string(hull) + "\n";
-			// state is 0 when the craft is static
-			// state is 3 when the craft is destroyed
-			if (craftInstance->CraftState != g_TargetTelemetry.CraftState)
-				msg += "target|state:" + std::to_string(craftInstance->CraftState) + "\n";
+		if (name != g_TargetTelemetry.name)
+			msg += "target|crafttypename:" + std::string(name) + "\n";
+		if (short_name != g_TargetTelemetry.short_name)
+			msg += "target|shortcrafttypename:" + std::string(short_name) + "\n";
+		if (IFF != g_TargetTelemetry.IFF)
+			msg += "target|IFF:" + std::to_string(IFF) + "\n";
+		if (strcmp(craftInstance->Cargo, g_TargetTelemetry.Cargo) != 0)
+			msg += "target|cargo:" + std::string(craftInstance->Cargo) + "\n";
+		if (shields != g_TargetTelemetry.shields)
+			msg += "target|shields:" + std::to_string(shields) + "\n";
+		if (hull != g_TargetTelemetry.hull)
+			msg += "target|hull:" + std::to_string(hull) + "\n";
+		// state is 0 when the craft is static
+		// state is 3 when the craft is destroyed
+		if (craftInstance->CraftState != g_TargetTelemetry.CraftState)
+			msg += "target|state:" + std::to_string(craftInstance->CraftState) + "\n";
 
-			// CycleTime is always 236, CycleTimer counts down from CycleTime to -1 and starts over
-			//msg += "\t\t\"cycle time\" : " + std::to_string(craftInstance->CycleTime) + "\n";
-			//msg += "\t\t\"cycle timer\" : " + std::to_string(craftInstance->CycleTimer) + "\n";
+		// CycleTime is always 236, CycleTimer counts down from CycleTime to -1 and starts over
+		//msg += "\t\t\"cycle time\" : " + std::to_string(craftInstance->CycleTime) + "\n";
+		//msg += "\t\t\"cycle timer\" : " + std::to_string(craftInstance->CycleTimer) + "\n";
 
-			// Store the data for the next frame
-			g_TargetTelemetry.name = name;
-			g_TargetTelemetry.short_name = short_name;
-			g_TargetTelemetry.IFF = IFF;
-			memcpy(g_TargetTelemetry.Cargo, craftInstance->Cargo, 16);
-			g_TargetTelemetry.shields = shields;
-			g_TargetTelemetry.hull = hull;
-			g_TargetTelemetry.CraftState = craftInstance->CraftState;
-		}
+		// Store the data for the next frame
+		g_TargetTelemetry.name = name;
+		g_TargetTelemetry.short_name = short_name;
+		g_TargetTelemetry.IFF = IFF;
+		memcpy(g_TargetTelemetry.Cargo, craftInstance->Cargo, 16);
+		g_TargetTelemetry.shields = shields;
+		g_TargetTelemetry.hull = hull;
+		g_TargetTelemetry.CraftState = craftInstance->CraftState;
 	}
-
+	
 	// STATUS SECTION
 status_section:
 	{
