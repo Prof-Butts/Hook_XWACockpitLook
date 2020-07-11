@@ -141,6 +141,7 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		   Also, it removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
 		*/
 		vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
+		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
 		if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
 			poseMatrix = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
