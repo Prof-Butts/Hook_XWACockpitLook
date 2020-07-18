@@ -3,7 +3,6 @@
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
 vr::IVRSystem *g_pHMD = NULL;
-vr::IVRCompositor *g_pVRCompositor = NULL;
 
 bool InitSteamVR()
 {
@@ -19,6 +18,7 @@ bool InitSteamVR()
 		return false;
 	}
 	log_debug("VR runtime loaded");
+
 	g_bSteamVRInitialized = true;
 	return true;
 }
@@ -128,27 +128,35 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 	vr::VRControllerState_t state;
 	if (g_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
 	{
-		vr::TrackedDevicePose_t trackedDevicePose;
+		//vr::TrackedDevicePose_t trackedDevicePose;
+		vr::TrackedDevicePose_t trackedDevicePoseArray[vr::k_unMaxTrackedDeviceCount];
 		vr::HmdMatrix34_t poseMatrix;
 		vr::HmdQuaternionf_t q;
-		vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
+		//vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
 
-		/* Get pose predicted 2.8 frames in the future, that's what we believe WaitGetPoses() is returning when called later in ddraw.dll
-		   TODO: calculate this dynamically according to HMD refresh rate and current frames per second.
-		*/
-		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
+		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
 
-		/* TODO: since this is called before BeginScene (verified with GPUView), it would be better to use WaitGetPoses() here
-		   and GetLastPoses() in BeginScene(), but does not seem to work.
-		vr::EVRCompositorError error = vr::VRCompositor()->WaitGetPoses(&trackedDevicePose,0, NULL, 0);
+		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
+		   This should remove jitter although it may introduce some error due to the prediction when doing quick changes of velocity/direction.
+		   Also, it removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
 		*/
-		poseMatrix = trackedDevicePose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
-		q = rotationToQuaternion(trackedDevicePose.mDeviceToAbsoluteTracking);
-		quatToEuler(q, yaw, pitch, &roll);
-		*x = poseMatrix.m[0][3];
-		*y = poseMatrix.m[1][3];
-		*z = poseMatrix.m[2][3];
-		return true;
+		vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
+		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+
+		if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
+			poseMatrix = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
+			q = rotationToQuaternion(poseMatrix);
+			quatToEuler(q, yaw, pitch, &roll);
+			*x = poseMatrix.m[0][3];
+			*y = poseMatrix.m[1][3];
+			*z = poseMatrix.m[2][3];
+			return true;
+		}
+		else
+		{
+			log_debug("[DBG] HMD pose not valid");
+			return false;
+		}
 	}
 	return false;
 }
