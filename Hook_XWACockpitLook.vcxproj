@@ -146,6 +146,7 @@
     <ClCompile Include="cockpitlook.cpp" />
     <ClCompile Include="Matrices.cpp" />
     <ClCompile Include="SteamVR.cpp" />
+    <ClCompile Include="Telemetry.cpp" />
     <ClCompile Include="TrackIR.cpp" />
     <ClCompile Include="UDP.cpp" />
   </ItemGroup>
@@ -159,6 +160,7 @@
     <ClInclude Include="cockpitlook.h" />
     <ClInclude Include="SteamVR.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Telemetry.h" />
     <ClInclude Include="TrackIR.h" />
     <ClInclude Include="UDP.h" />
     <ClInclude Include="Vectors.h" />
