@@ -503,7 +503,7 @@ float centeredSigmoid(float x) {
 // TODO: Remove all these variables from ddraw once the migration is complete.
 //float g_fXWAUnitsToMetersScale = 655.36f; // This is technically correct; but it seems too much for me
 float g_fXWAUnitsToMetersScale = 400.0f; // This value feels better
-float g_fPosXMultiplier = -1.0f, g_fPosYMultiplier = -1.0f, g_fPosZMultiplier = -1.0f;
+float g_fPosXMultiplier = 1.666f, g_fPosYMultiplier = 1.666f, g_fPosZMultiplier = 1.666f;
 float g_fMinPositionX = -2.50f, g_fMaxPositionX = 2.50f;
 float g_fMinPositionY = -2.50f, g_fMaxPositionY = 2.50f;
 float g_fMinPositionZ = -2.50f, g_fMaxPositionZ = 2.50f;
