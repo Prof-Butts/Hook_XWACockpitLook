@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by Hook_XWAMouseLook.rc
+// Used by Hook_XWACockpitLook.rc
 //
 
 // Next default values for new objects
