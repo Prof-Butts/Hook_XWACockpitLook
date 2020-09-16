@@ -236,10 +236,13 @@ float g_fPitchOffset	 = DEFAULT_PITCH_OFFSET;
 int   g_iFreePIESlot	 = DEFAULT_FREEPIE_SLOT;
 bool  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
+bool  g_bTestJoystick = true;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
 Vector4 g_prevFs(0, 0, 1, 0);
 int g_FreePIEOutputSlot = -1;
+
+const auto XwaGetConnectedJoysticksCount = (int(*)())0x00541030;
 
 /*********************************************************************/
 /* Cockpit Inertia													 */
@@ -1114,25 +1117,40 @@ int CockpitLookHook(int* params)
 			}*/
 		}
 
+		int moveDelta = *(int *)0x005AA000 >> 1;
+		if (g_bTestJoystick && XwaGetConnectedJoysticksCount() == 0)
+		{
+			switch (keycodePressed)
+			{
+			case KeyCode_NUMPAD4:
+			case KeyCode_NUMPAD6:
+			case KeyCode_NUMPAD8:
+			case KeyCode_NUMPAD2:
+			case KeyCode_NUMPAD5:
+				keycodePressed = 0;
+				break;
+			}
+		}
+
 		// TODO: I changed the arrow keys for numpad keys because the keys would move the
 		//       view and I want to use them for something else. I need to validate that this
 		//		 change didn't actually break the code.
 		//if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
 		// NUMPAD1,NUMPAD3 rolls the craft; but it doesn't affect the yaw/pitch
 		if (*win32NumPad4Pressed || keycodePressed == KeyCode_NUMPAD4)
-			PlayerDataTable[playerIndex].cockpitCameraYaw -= 1200;
+			PlayerDataTable[playerIndex].cockpitCameraYaw -= moveDelta; // This was 1200 previously
 
 		//if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
 		if (*win32NumPad6Pressed || keycodePressed == KeyCode_NUMPAD6)
-			PlayerDataTable[playerIndex].cockpitCameraYaw += 1200;
+			PlayerDataTable[playerIndex].cockpitCameraYaw += moveDelta;
 
 		//if (*win32NumPad8Pressed || keycodePressed == KeyCode_ARROWDOWN)
 		if (*win32NumPad8Pressed || keycodePressed == KeyCode_NUMPAD8)
-			PlayerDataTable[playerIndex].cockpitCameraPitch += 1200;
+			PlayerDataTable[playerIndex].cockpitCameraPitch += moveDelta;
 
 		//if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
 		if (*win32NumPad2Pressed || keycodePressed == KeyCode_NUMPAD2)
-			PlayerDataTable[playerIndex].cockpitCameraPitch -= 1200;
+			PlayerDataTable[playerIndex].cockpitCameraPitch -= moveDelta;
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5 || keycodePressed == KeyCode_PERIOD)
 		{
@@ -1487,6 +1505,10 @@ void LoadParams() {
 					log_debug("Writing 5dof to slot %d", g_FreePIEOutputSlot);
 					InitFreePIE();
 				}
+			}
+
+			else if (_stricmp(param, "test_joystick") == 0) {
+				g_bTestJoystick = (bool)fValue;
 			}
 			
 			// UDP settings
