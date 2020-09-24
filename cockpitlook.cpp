@@ -593,7 +593,128 @@ void animTickZ(Vector3 *headPos) {
 }
 
 void DumpDebugInfo(int playerIndex) {
-	log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].externalCameraDistance);
+	static int counter = 0;
+	FILE *filePD = NULL, *fileCI = NULL;
+	int error = 0, size;
+	char sFileNamePD[128], sFileNameCI[128];
+	sprintf_s(sFileNamePD, 128, "./PlayerDataTable%d", counter);
+	sprintf_s(sFileNameCI, 128, "./CraftInstance%d", counter);
+	counter++;
+
+	int16_t objectIndex = (int16_t)PlayerDataTable[*localPlayerIndex].objectIndex;
+	ObjectEntry *object = &((*objects)[objectIndex]);
+	MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+	CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+
+	log_debug("primarySecondaryArmed: %d, warheadArmed: %d", 
+		PlayerDataTable[*localPlayerIndex].primarySecondaryArmed,
+		PlayerDataTable[*localPlayerIndex].warheadArmed);
+
+	//log_debug("activeWeapon: %d", PlayerDataTable[*localPlayerIndex].activeWeapon); // This was useless (it's always 1)
+	log_debug("WarheadArmed: %d, NumberOfLaserSets: %d, NumberOfLasers: %d, NumWarheadLauncherGroups: %d, Countermeasures: %d", 
+		PlayerDataTable[*localPlayerIndex].warheadArmed,
+		craftInstance->NumberOfLaserSets,
+		craftInstance->NumberOfLasers,
+		craftInstance->NumWarheadLauncherGroups,
+		craftInstance->CountermeasureAmount);
+
+	for (int i = 0; i < 2; i++) {
+		// For the first warhead group: 
+		// WarheadNextHardpoint[0] is 1 when the left tube is ready and 129 (-1 for signed byte?) when the right tube is ready.
+		// For the second warhead group:
+		// WarheadNextHardpoint[1] is 1 when the left tube is ready, 129 when the right tube is ready.
+		log_debug("WarheadNextHardpoint[%d]: %d", i, craftInstance->WarheadNextHardpoint[i]);
+	}
+
+	/*
+	MIS:
+	[14848] [DBG] [Cockpitlook] NumberOfLaserSets: 1, NumberOfLasers: 1, NumWarheadLauncherGroups: 2
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[0]: 1
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[1]: 1
+	[14848] [DBG] [Cockpitlook] [0] Type: 1, Count: 0  <-- Only 1 laser
+	[14848] [DBG] [Cockpitlook] [1] Type: 3, Count: 20 <-- First warhead group
+	[14848] [DBG] [Cockpitlook] [2] Type: 3, Count: 20
+	[14848] [DBG] [Cockpitlook] [3] Type: 3, Count: 20 <-- Second warhead group
+	[14848] [DBG] [Cockpitlook] [4] Type: 3, Count: 20
+
+	GUN:
+	2 laser sets (lasers, ion), 4 lasers in total (2 lasers 2 ion)
+	WeaponType 1 is laser, 2 is ion, 3 is missiles
+	[14848] [DBG] [Cockpitlook] NumberOfLaserSets: 2, NumberOfLasers: 4, NumWarheadLauncherGroups: 1
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[0]: 1
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[1]: 1
+	[14848] [DBG] [Cockpitlook] [0] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [1] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [2] Type: 2, Count: 0 <-- Ion
+	[14848] [DBG] [Cockpitlook] [3] Type: 2, Count: 0 <-- Ion
+	[14848] [DBG] [Cockpitlook] [4] Type: 3, Count: 8
+	[14848] [DBG] [Cockpitlook] [5] Type: 3, Count: 8
+
+	T/D:
+	2 laser sets (lasers, ion), 6 lasers in total (4 lasers, 2 ion)
+	[14848] [DBG] [Cockpitlook] NumberOfLaserSets: 2, NumberOfLasers: 6, NumWarheadLauncherGroups: 1
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[0]: 1
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[1]: 1
+	[14848] [DBG] [Cockpitlook] [0] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [1] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [2] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [3] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [4] Type: 2, Count: 0 <-- Ion
+	[14848] [DBG] [Cockpitlook] [5] Type: 2, Count: 0 <-- Ion
+	[14848] [DBG] [Cockpitlook] [6] Type: 3, Count: 1
+	[14848] [DBG] [Cockpitlook] [7] Type: 3, Count: 1
+
+	B/W:
+	[14848] [DBG] [Cockpitlook] NumberOfLaserSets: 2, NumberOfLasers: 6, NumWarheadLauncherGroups: 1
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[0]: 1
+	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[1]: 1
+	[14848] [DBG] [Cockpitlook] [0] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [1] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [2] Type: 1, Count: 0 <-- Laser
+	[14848] [DBG] [Cockpitlook] [3] Type: 2, Count: 0 <-- Ion
+	[14848] [DBG] [Cockpitlook] [4] Type: 2, Count: 0 <-- Ion
+	[14848] [DBG] [Cockpitlook] [5] Type: 2, Count: 0 <-- Ion
+	[14848] [DBG] [Cockpitlook] [6] Type: 3, Count: 6
+	[14848] [DBG] [Cockpitlook] [7] Type: 3, Count: 6
+	*/
+
+	for (int i = 0; i < 16; i++) {
+		// WeaponType: 0 == None, 1 == Lasers? 3 == Concussion Missiles?
+		if (craftInstance->Hardpoints[i].WeaponType == 0)
+			break;
+		log_debug("[%d] Type: %d, Count: %d", i,
+			craftInstance->Hardpoints[i].WeaponType,
+			craftInstance->Hardpoints[i].Count);
+	}
+
+	//log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].externalCameraDistance);
+	//log_debug("Dumping Debug info...");
+
+	try {
+		error = fopen_s(&filePD, sFileNamePD, "wb");
+	}
+	catch (...) {
+		log_debug("Could not create %s", sFileNamePD);
+	}
+	if (error != 0)
+		return;
+	
+	size = fwrite(&(PlayerDataTable[*localPlayerIndex]), sizeof(PlayerDataEntry), 1, filePD);
+	fclose(filePD);
+	log_debug("Dumped %s", sFileNamePD);
+
+	try {
+		error = fopen_s(&fileCI, sFileNameCI, "wb");
+	}
+	catch (...) {
+		log_debug("Could not create %s", sFileNameCI);
+	}
+	if (error != 0)
+		return;
+
+	size = fwrite(craftInstance, sizeof(CraftInstance), 1, fileCI);
+	fclose(fileCI);
+	log_debug("Dumped %s", sFileNameCI);
 }
 
 void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {

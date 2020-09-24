@@ -9,6 +9,20 @@ struct MobileObjectEntry;
 struct ProjectileInstance;
 struct RotationMatrix3D;
 
+struct CraftInstanceHardpoint {
+	WORD ProjectileType;
+	BYTE WeaponType; // 0 no weapon, 1 lasers, 2 ion, 3 warheads
+	BYTE LaserIndex;
+	BYTE Energy;
+	BYTE Count;
+	WORD TurretCooldown;
+	BYTE MeshID;
+	BYTE HardpointID;
+	WORD TurretTargetIndex;
+	WORD TurretTargetSearchCooldown;
+};
+static_assert(sizeof(CraftInstanceHardpoint) == 0xE, "size of CraftInstance must be 0xE");
+
 struct CraftInstance {
 	//Craft           struc ; (sizeof=0x3F9, mappedto_209)
 	DWORD NumberInFG;
@@ -104,7 +118,7 @@ struct CraftInstance {
 	DWORD DriftXPos;
 	DWORD DriftYPos;
 	DWORD DriftZPos;
-	WORD EngineThrottleInput; // Ofs 0xF0
+	WORD EngineThrottleInput; // Ofs 0xF0 <-- This is the throttle, 0xFFFF --> 100% throttle, divide by 65535.0f
 	WORD PercentOfActiveEngines;
 	WORD MissionSetSpeed;
 	WORD EngineSLAMInput;
@@ -185,7 +199,8 @@ struct CraftInstance {
 	BYTE field_2CC; // enum PloEnum
 	WORD field_2CD;
 	BYTE EngineThrottles[16]; // Ofs 0x2CF db 16 dup(? )
-	BYTE Hardpoints[224]; // Ofs 0x2DF CraftInstanceHardpoints 16 dup(? )
+	//BYTE Hardpoints[224]; // Ofs 0x2DF CraftInstanceHardpoints 16 dup(? )
+	CraftInstanceHardpoint Hardpoints[16];
 	WORD ObjectTagID; // Ofs 0x3BF     dw ?
 	WORD RotGunAngles[2];
 	WORD RotBeamAngles[2];
@@ -198,24 +213,7 @@ struct CraftInstance {
 	DWORD pObject; // offset
 };
 
-static_assert(sizeof(CraftInstance) == 0x3F9, "size of ObjectEntry must be 39");
-
-/*
-00000000 CraftInstanceHardpoints struc ; (sizeof=0xE, mappedto_294)
-00000000                                         ; XREF: FF005D0F/o
-00000000                                         ; Craft/r ...
-00000000 ProjectileType  dw ?
-00000002 WeaponType      db ?
-00000003 LaserIndex      db ?
-00000004 Energy          db ?
-00000005 Count           db ?
-00000006 TurretCooldown  dw ?
-00000008 MeshID          db ?
-00000009 HardpointID     db ?
-0000000A TurretTargetIndex dw ?
-0000000C TurretTargetSearchCooldown dw ?
-0000000E CraftInstanceHardpoints ends
-*/
+static_assert(sizeof(CraftInstance) == 0x3F9, "size of ObjectEntry must be 0x3F9");
 
 struct RotationMatrix3D
 {
@@ -354,8 +352,8 @@ struct PlayerDataEntry
 	__int16 craftMemory2;
 	__int16 craftMemory3;
 	__int16 craftMemory4;
-	char primarySecondaryArmed;
-	char warheadArmed;
+	char primarySecondaryArmed; // Bit attr: 0 primary weapon armed, 1: secondary weapon armed.
+	char warheadArmed; // Bit: 0 lasers, 1 warheads. If primarySecArmed is 1 and this is 1, then the secondary warhead is armed.
 	__int16 componentTargetIndex;
 	__int16 field_37;
 	__int16 engineWashCraftIndex;

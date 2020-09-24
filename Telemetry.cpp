@@ -31,7 +31,7 @@ void SendXWADataOverUDP()
 	msg += "\t\"player\":\n\t{\n";
 	{
 		int16_t objectIndex = (int16_t)PlayerDataTable[*localPlayerIndex].objectIndex;
-		if (objectIndex < 0) goto target_section;
+		if (objectIndex <= 0) goto target_section;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
 		ObjectEntry *object = &((*objects)[objectIndex]);
 		if (object == NULL) goto target_section;
@@ -83,7 +83,7 @@ target_section:
 	{
 		//log_debug("[UDP] Player IFF: %d, team: %d", PlayerDataTable[*localPlayerIndex].IFF, PlayerDataTable[*localPlayerIndex].team);
 		short currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
-		if (currentTargetIndex < 0) goto status_section;
+		if (currentTargetIndex <= 0) goto status_section;
 		ObjectEntry *object = &((*objects)[currentTargetIndex]);
 		if (object == NULL) goto status_section;
 		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
@@ -148,7 +148,7 @@ void SendXWADataOverUDP()
 	// PLAYER SECTION
 	{
 		int16_t objectIndex = (int16_t)PlayerDataTable[*localPlayerIndex].objectIndex;
-		if (objectIndex < 0) goto target_section;
+		if (objectIndex <= 0) goto target_section;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
 		//log_debug("[DBG] objectIndex: %d, *localPlayerIndex: %d, localPlayerIndex: 0x%x", objectIndex, *localPlayerIndex, localPlayerIndex);
 		ObjectEntry *object = &((*objects)[objectIndex]);
@@ -223,7 +223,7 @@ void SendXWADataOverUDP()
 target_section:
 	{
 		short currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
-		if (currentTargetIndex < 0) goto status_section;
+		if (currentTargetIndex <= 0) goto status_section;
 		ObjectEntry *object = &((*objects)[currentTargetIndex]);
 		if (object == NULL) goto status_section;
 		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
