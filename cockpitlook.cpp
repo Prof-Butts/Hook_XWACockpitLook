@@ -212,8 +212,12 @@ const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
 const int   DEFAULT_FREEPIE_SLOT = 0;
+// See https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+// for a full list of virtual key codes
 const int   VK_I_KEY = 0x49; // Ctrl+I is used to toggle cockpit inertia
 const int   VK_J_KEY = 0x4a; // Ctrl+J is used to reload the cockpitlook.cfg params
+const int	VK_T_KEY = 0x54;
+const int	VK_U_KEY = 0x55;
 //const int   VK_K_KEY = 0x4b;
 //const int   VK_L_KEY = 0x4c;
 const int VK_X_KEY = 0x58; // Ctrl+X is used to dump debug info
@@ -241,6 +245,7 @@ Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0
 Vector3 g_headPosFromKeyboard(0, 0, 0);
 Vector4 g_prevFs(0, 0, 1, 0);
 int g_FreePIEOutputSlot = -1;
+bool g_bTrackIRLoaded = false;
 
 const auto XwaGetConnectedJoysticksCount = (int(*)())0x00541030;
 
@@ -718,8 +723,8 @@ void DumpDebugInfo(int playerIndex) {
 }
 
 void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
-	static bool bLastIKeyState = false, bLastJKeyState = false, bLastXKeyState = false;
-	static bool bCurIKeyState = false, bCurJKeyState = false, bCurXKeyState = false;
+	static bool bLastIKeyState = false, bLastJKeyState = false, bLastXKeyState = false, bLastTKeyState = false, bLastUKeyState = false;
+	static bool bCurIKeyState = false, bCurJKeyState = false, bCurXKeyState = false, bCurTKeyState = false, bCurUKeyState = false;
 
 	//bool bControl = *s_XwaIsControlKeyPressed;
 	//bool bShift = *s_XwaIsShiftKeyPressed;
@@ -733,13 +738,17 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	g_bNumPadSub	= GetAsyncKeyState(VK_SUBTRACT);
 	g_bNumPad7		= GetAsyncKeyState(VK_NUMPAD7);
 	g_bNumPad9		= GetAsyncKeyState(VK_NUMPAD9);
-	// I,J key states:
+	// I,J,X,T key states:
 	bLastIKeyState	= bCurIKeyState;
 	bLastJKeyState	= bCurJKeyState;
 	bLastXKeyState	= bCurXKeyState;
+	bLastTKeyState	= bCurTKeyState;
+	bLastUKeyState	= bCurUKeyState;
 	bCurJKeyState	= GetAsyncKeyState(VK_J_KEY);
 	bCurIKeyState	= GetAsyncKeyState(VK_I_KEY);
 	bCurXKeyState	= GetAsyncKeyState(VK_X_KEY);
+	bCurTKeyState	= GetAsyncKeyState(VK_T_KEY);
+	bCurUKeyState	= GetAsyncKeyState(VK_U_KEY);
 
 	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
 
@@ -754,6 +763,19 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	// Ctrl+X: Dump debug info
 	if (g_bCtrl && bLastXKeyState && !bCurXKeyState) {
 		DumpDebugInfo(playerIndex);
+	}
+
+	// Ctrl+T: Reload TrackIR
+	if (g_TrackerType == TRACKER_TRACKIR && g_bCtrl && bLastTKeyState && !bCurTKeyState) {
+		if (g_bTrackIRLoaded) {
+			log_debug("Unloading TrackIR");
+			ShutdownTrackIR();
+		} 
+		else {
+			log_debug("Reloading TrackIR");
+			InitTrackIR();
+		}
+		g_bTrackIRLoaded = !g_bTrackIRLoaded;
 	}
 
 	if (g_bCtrl && bLastIKeyState && !bCurIKeyState) {
@@ -1664,6 +1686,8 @@ void InitKeyboard()
 	GetAsyncKeyState(VK_J_KEY);
 	GetAsyncKeyState(VK_I_KEY);
 	GetAsyncKeyState(VK_X_KEY);
+	GetAsyncKeyState(VK_T_KEY);
+	GetAsyncKeyState(VK_U_KEY);
 	GetAsyncKeyState(VK_ADD);
 	GetAsyncKeyState(VK_SUBTRACT);
 	GetAsyncKeyState(VK_NUMPAD7);
@@ -1699,7 +1723,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 				InitFreePIE();
 			break;
 		case TRACKER_TRACKIR:
-			InitTrackIR();
+			g_bTrackIRLoaded = InitTrackIR();
 			break;
 		}
 		break;
