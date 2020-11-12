@@ -765,17 +765,20 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 		DumpDebugInfo(playerIndex);
 	}
 
-	// Ctrl+T: Reload TrackIR
-	if (g_TrackerType == TRACKER_TRACKIR && g_bCtrl && bLastTKeyState && !bCurTKeyState) {
-		if (g_bTrackIRLoaded) {
-			log_debug("Unloading TrackIR");
-			ShutdownTrackIR();
-		} 
-		else {
-			log_debug("Reloading TrackIR");
-			InitTrackIR();
+	// Alt+T: Reload TrackIR
+	if (g_TrackerType == TRACKER_TRACKIR)
+	{
+		if (bAlt && bLastTKeyState && !bCurTKeyState) {
+			if (g_bTrackIRLoaded) {
+				log_debug("Unloading TrackIR");
+				ShutdownTrackIR();
+			}
+			else {
+				log_debug("Reloading TrackIR");
+				InitTrackIR();
+			}
+			g_bTrackIRLoaded = !g_bTrackIRLoaded;
 		}
-		g_bTrackIRLoaded = !g_bTrackIRLoaded;
 	}
 
 	if (g_bCtrl && bLastIKeyState && !bCurIKeyState) {
@@ -872,6 +875,17 @@ int CockpitLookHook(int* params)
 		log_debug("External Dist: %d", PlayerDataTable[playerIndex].externalCameraDistance);
 		bFirstFrame = false;
 	}*/
+
+	// For some reason, TrackIR won't load if the game is run from the launcher. So, let's
+	// try to reload TrackIR here.
+	if (g_TrackerType == TRACKER_TRACKIR) {
+		static int TrackIRRetries = 3;
+		if (TrackIRRetries > 0 && !g_bTrackIRLoaded) {
+			log_debug("TrackIR wasn't loaded, retrying...");
+			g_bTrackIRLoaded = InitTrackIR();
+			TrackIRRetries--;
+		}
+	}
 
 	if (g_bUDPEnabled) SendXWADataOverUDP();
 
