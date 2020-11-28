@@ -65,7 +65,7 @@ const auto rightPanelState2 = (int *)0x9F4B48;
 const auto leftPanelState = (int *)0x9F4B4C;
 const auto configConcourseSFXVolume = (__int8 *)0xB0C887;
 const auto configDifficulty = (__int8 *)0xB0C8BB;
-const auto missionDescriptionPtr = *(char **)0x9F4BD0;
+const char **missionDescriptionPtr = (const char **)0x9F4BD0;
 const auto missionLstPtr = (int *)0x9F4B98;
 const auto missionIndexLoaded = (int *)0x9F5E74;
 const auto missionSelectedOnLoadScrn = (int *)0x7830C0;
@@ -76,9 +76,10 @@ const auto missionDescriptionScrollPosition = (int *)0x7831B0;
 RECT* rectStandard3 = (RECT *)0x6031A8;
 const auto battleSelectScrollMovement = (int *)0x78317C;
 const auto loadScrnTotalMissionsListed = (int *)0x7830BC;
-const auto localPlayerIndex = (int *)0x8C1CC8;
-ObjectEntry* objects = *(ObjectEntry **)0x7B33C4;
+const int *localPlayerIndex = (int *)0x8C1CC8;
+ObjectEntry** objects = (ObjectEntry **)0x7B33C4;
 PlayerDataEntry* PlayerDataTable = (PlayerDataEntry *)0x8B94E0;
+CraftDefinitionEntry *CraftDefinitionTable = (CraftDefinitionEntry *)0x005BB480; // 32 Entries
 const auto localPlayerConnectedAs = (int *)0xABD7B4;
 const auto flightGroupInfo = (int *)0x783194;
 const auto battleSelectMissionScrollIndex = (int *)0x783174;
@@ -135,9 +136,27 @@ const auto mouseLook_X = (int*)0x9E9620;
 const auto mouseLookInverted = (__int8*)0x771298;
 const auto mouseLookResetPosition = (int*)0x9E962C;
 
-
+// Alt, Control and Shift key states:
+const auto s_XwaIsControlKeyPressed = (int *)0x006343DC;
+const auto s_XwaIsShiftKeyPressed = (int *)0x006343E0;
+const auto s_XwaIsAltKeyPressed = (int *)0x006343E4;
+// Call the following function to refresh the variables above:
+const auto XwaDIKeyboardUpdateShiftControlAltKeysPressedState = (void(*)())0x0042B880;
 
 // Unknowns
 
 const auto dword_7833D4 = (int*)0x7833D4;
 const auto dword_B07C6C = (int*)0xB07C6C;
+
+const auto g_currentFGIndex = (WORD*)0x009E9708;
+const auto g_currentCraftPtr = (void*)0x00910DFC; // Craft *
+// Craft g_craftPtr = 009106A0
+const auto g_currentPlayerObjectIndex = (int*)0x008C1604;
+
+// 007CA1A0     CurrentObjectTable CurrentObject
+// 007B33C4     g_objectPtr     dd	Object *g_objectPtr
+
+const auto g_localPlayerObjectIndex = (int *)0x0634370;
+const auto g_localPlayerObjectIndex2 = (int *)0x0631B70;
+
+const auto *g_playerInHangar = (unsigned int *)0x09C6E40;

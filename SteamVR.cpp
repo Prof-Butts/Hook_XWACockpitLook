@@ -18,6 +18,7 @@ bool InitSteamVR()
 		return false;
 	}
 	log_debug("VR runtime loaded");
+
 	g_bSteamVRInitialized = true;
 	return true;
 }
@@ -104,7 +105,7 @@ void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch) 
 	*roll = atan2(2.0f * q.x*q.w - 2.0f * q.y*q.z, 1.0f - 2.0f * sqx - 2.0f * sqz);
 }
 
-bool GetSteamVRPositionalData(float *yaw, float *pitch)
+bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, float *z)
 {
 	if (g_pHMD == NULL) {
 		log_debug("GetSteamVRPositional Data with g_pHMD = NULL");
@@ -127,16 +128,35 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch)
 	vr::VRControllerState_t state;
 	if (g_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
 	{
-		vr::TrackedDevicePose_t trackedDevicePose;
+		//vr::TrackedDevicePose_t trackedDevicePose;
+		vr::TrackedDevicePose_t trackedDevicePoseArray[vr::k_unMaxTrackedDeviceCount];
 		vr::HmdMatrix34_t poseMatrix;
 		vr::HmdQuaternionf_t q;
-		vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
+		//vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
 
-		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0, &trackedDevicePose, 1);
-		poseMatrix = trackedDevicePose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
-		q = rotationToQuaternion(trackedDevicePose.mDeviceToAbsoluteTracking);
-		quatToEuler(q, yaw, pitch, &roll);
-		return true;
+		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
+
+		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
+		   This should remove jitter although it may introduce some error due to the prediction when doing quick changes of velocity/direction.
+		   Also, it removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
+		*/
+		vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
+		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+
+		if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
+			poseMatrix = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
+			q = rotationToQuaternion(poseMatrix);
+			quatToEuler(q, yaw, pitch, &roll);
+			*x = poseMatrix.m[0][3];
+			*y = poseMatrix.m[1][3];
+			*z = poseMatrix.m[2][3];
+			return true;
+		}
+		else
+		{
+			log_debug("[DBG] HMD pose not valid");
+			return false;
+		}
 	}
 	return false;
 }
