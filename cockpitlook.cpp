@@ -25,11 +25,17 @@
 #include "Matrices.h"
 #include "UDP.h"
 #include "Telemetry.h"
+#include "SharedMem.h"
 
 // TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
+
+// The hooks are loaded before ddraw, so we can create the shared memory handle here
+SharedMem g_SharedMem(true);
+char shared_msg[80] = "message from the CokpitLookHook";
+
 
 #define DEBUG_TO_FILE 1
 //#undef DEBUG_TO_FILE
@@ -876,6 +882,13 @@ int CockpitLookHook(int* params)
 		bFirstFrame = false;
 	}*/
 
+	/*
+	// DEBUG: This wlll update the message on every frame
+	static int index = 0;
+	shared_msg[0] = 'A' + index;
+	index = (index + 1) % 10;
+	*/
+
 	// For some reason, TrackIR won't load if the game is run from the launcher. So, let's
 	// try to reload TrackIR here.
 	if (g_TrackerType == TRACKER_TRACKIR) {
@@ -1708,6 +1721,17 @@ void InitKeyboard()
 	GetAsyncKeyState(VK_NUMPAD9);
 }
 
+void InitSharedMem() {
+	SharedData *pSharedData = (SharedData *)g_SharedMem.GetMemoryPtr();
+	if (pSharedData == nullptr) {
+		log_debug("Could not load shared data ptr");
+		return;
+	}
+
+	pSharedData->pDataPtr = &(shared_msg[0]);
+	pSharedData->bDataReady = true;
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 {
 	switch (uReason)
@@ -1725,6 +1749,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 			InitializeUDP();
 			InitializeUDPSocket();
 		}
+		InitSharedMem();
 
 		switch (g_TrackerType)
 		{
