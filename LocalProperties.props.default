@@ -2,18 +2,20 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup>
+    <IncludePath>C:\Zip\XWA-DX11\FreePIE-master\Lib\IO\Code\include;C:\Zip\XWA-DX11\openvr-master;$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Zip\XWA-DX11\FreePIE-master\Lib\IO\Code\include;C:\Zip\XWA-DX11\openvr-master;%(AdditionalIncludeDirectories)
-	</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>
+        C:\Zip\XWA-DX11\FreePIE-master\Lib\IO\Code\include;C:\Zip\XWA-DX11\openvr-master;%(AdditionalIncludeDirectories)
+      </AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\Zip\XWA-DX11\openvr-master\lib\win32;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y $(TargetPath) "c:\Program Files (x86)\GOG Galaxy\Games\Star Wars - X-Wing Alliance" copy /Y $(TargetPath) "C:\Program Files (x86)\Steam\steamapps\common\Star Wars X-Wing Alliance"
-	  </Command>
+      <Command>copy /Y $(TargetPath) "c:\Program Files (x86)\GOG Galaxy\Games\Star Wars - X-Wing Alliance"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup />
