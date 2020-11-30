@@ -83,7 +83,8 @@ target_section:
 	{
 		//log_debug("[UDP] Player IFF: %d, team: %d", PlayerDataTable[*localPlayerIndex].IFF, PlayerDataTable[*localPlayerIndex].team);
 		short currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
-		if (currentTargetIndex <= 0) goto status_section;
+		// currentTargetIndex can apparently be 0. I remember the game crashing, but it doesn't anymore!
+		if (currentTargetIndex < 0) goto status_section;
 		ObjectEntry *object = &((*objects)[currentTargetIndex]);
 		if (object == NULL) goto status_section;
 		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
@@ -223,7 +224,8 @@ void SendXWADataOverUDP()
 target_section:
 	{
 		short currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
-		if (currentTargetIndex <= 0) goto status_section;
+		// currentTargetIndex can apparently be 0. I remember the game crashing, but it doesn't anymore!
+		if (currentTargetIndex < 0) goto status_section;
 		ObjectEntry *object = &((*objects)[currentTargetIndex]);
 		if (object == NULL) goto status_section;
 		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
