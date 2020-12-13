@@ -1,8 +1,10 @@
 #include "SteamVR.h"
+#include "SharedMem.h"
 
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
 vr::IVRSystem *g_pHMD = NULL;
+extern SharedMem g_SharedMem;
 
 bool InitSteamVR()
 {
@@ -128,23 +130,32 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 	vr::VRControllerState_t state;
 	if (g_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
 	{
-		//vr::TrackedDevicePose_t trackedDevicePose;
-		vr::TrackedDevicePose_t trackedDevicePoseArray[vr::k_unMaxTrackedDeviceCount];
+		vr::TrackedDevicePose_t trackedDevicePose;
+		//vr::TrackedDevicePose_t trackedDevicePoseArray[vr::k_unMaxTrackedDeviceCount];
 		vr::HmdMatrix34_t poseMatrix;
 		vr::HmdQuaternionf_t q;
 		//vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
 
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
+		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.042f, &trackedDevicePose, 1);
 
 		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
 		   This should remove jitter although it may introduce some error due to the prediction when doing quick changes of velocity/direction.
 		   Also, it removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
 		*/
-		vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
-		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		//vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
+		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);			//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		//vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
-		if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
-			poseMatrix = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
+		//if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
+		if (trackedDevicePose.bPoseIsValid) {
+			//poseMatrix = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
+			poseMatrix = trackedDevicePose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
+			// Store in shared memory for ddraw to access
+			SharedData* pSharedData = (SharedData*)g_SharedMem.GetMemoryPtr();
+			pSharedData->pDataPtr = &(trackedDevicePose);
+			pSharedData->bDataReady = true;			
+
 			q = rotationToQuaternion(poseMatrix);
 			quatToEuler(q, yaw, pitch, &roll);
 			*x = poseMatrix.m[0][3];

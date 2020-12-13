@@ -1728,8 +1728,8 @@ void InitSharedMem() {
 		return;
 	}
 
-	pSharedData->pDataPtr = &(shared_msg[0]);
-	pSharedData->bDataReady = true;
+	//pSharedData->pDataPtr = &(shared_msg[0]);
+	//pSharedData->bDataReady = true;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
