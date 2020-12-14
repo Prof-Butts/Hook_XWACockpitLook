@@ -35,6 +35,7 @@ extern bool g_bSteamVRInitialized;
 // The hooks are loaded before ddraw, so we can create the shared memory handle here
 SharedMem g_SharedMem(true);
 char shared_msg[80] = "message from the CokpitLookHook";
+vr::TrackedDevicePose_t g_hmdPose;
 
 
 #define DEBUG_TO_FILE 1
