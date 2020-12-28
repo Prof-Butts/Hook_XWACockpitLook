@@ -1726,11 +1726,7 @@ void InitSharedMem() {
 	SharedData *pSharedData = (SharedData *)g_SharedMem.GetMemoryPtr();
 	if (pSharedData == nullptr) {
 		log_debug("Could not load shared data ptr");
-		return;
 	}
-
-	//pSharedData->pDataPtr = &(shared_msg[0]);
-	//pSharedData->bDataReady = true;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)

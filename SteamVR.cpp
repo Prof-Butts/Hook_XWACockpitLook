@@ -23,6 +23,15 @@ bool InitSteamVR()
 	log_debug("VR runtime loaded");
 
 	g_bSteamVRInitialized = true;
+
+	// Put the address of g_hmdPose in shared memory. We only need to do this once.
+	// Setting bDataReady to true means that pDataPtr has been initialized to a valid
+	// address.
+	SharedData* pSharedData = (SharedData *)g_SharedMem.GetMemoryPtr();
+	if (pSharedData != nullptr) {
+		pSharedData->pDataPtr = &(g_hmdPose);
+		pSharedData->bDataReady = true;
+	}
 	return true;
 }
 
@@ -145,18 +154,13 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		   Also, it removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
 		*/
 		//vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
-		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);			//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 		//vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
 		//if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
 		if (g_hmdPose.bPoseIsValid) {
 			//poseMatrix = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
 			poseMatrix = g_hmdPose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
-			// Store in shared memory for ddraw to access
-			SharedData* pSharedData = (SharedData*)g_SharedMem.GetMemoryPtr();
-			pSharedData->pDataPtr = &(g_hmdPose);
-			pSharedData->bDataReady = true;			
-
 			q = rotationToQuaternion(poseMatrix);
 			quatToEuler(q, yaw, pitch, &roll);
 			*x = poseMatrix.m[0][3];
