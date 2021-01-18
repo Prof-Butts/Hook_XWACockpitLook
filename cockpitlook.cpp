@@ -630,13 +630,13 @@ void DumpDebugInfo(int playerIndex) {
 		craftInstance->NumWarheadLauncherGroups,
 		craftInstance->CountermeasureAmount);
 
-	for (int i = 0; i < 2; i++) {
+	//for (int i = 0; i < 2; i++) {
 		// For the first warhead group: 
 		// WarheadNextHardpoint[0] is 1 when the left tube is ready and 129 (-1 for signed byte?) when the right tube is ready.
 		// For the second warhead group:
 		// WarheadNextHardpoint[1] is 1 when the left tube is ready, 129 when the right tube is ready.
-		log_debug("WarheadNextHardpoint[%d]: %d", i, craftInstance->WarheadNextHardpoint[i]);
-	}
+		//log_debug("WarheadNextHardpoint[%d]: %d", i, craftInstance->WarheadNextHardpoint[i]);
+	//}
 
 	/*
 	MIS:
@@ -694,9 +694,11 @@ void DumpDebugInfo(int playerIndex) {
 		// WeaponType: 0 == None, 1 == Lasers? 3 == Concussion Missiles?
 		if (craftInstance->Hardpoints[i].WeaponType == 0)
 			break;
-		log_debug("[%d] Type: %d, Count: %d", i,
+		log_debug("[%d] Type: %d, Count: %d, Energy: %d", i,
 			craftInstance->Hardpoints[i].WeaponType,
-			craftInstance->Hardpoints[i].Count);
+			craftInstance->Hardpoints[i].Count, // This only seems to apply to warheads, for ions and lasers this is 0
+			craftInstance->Hardpoints[i].Energy // Only applies for lasers, max is 127, min is 0. For warheads, this is always 127
+		);
 	}
 
 	//log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].externalCameraDistance);
