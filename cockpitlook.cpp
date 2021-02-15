@@ -691,7 +691,8 @@ void DumpDebugInfo(int playerIndex) {
 	*/
 
 	for (int i = 0; i < 16; i++) {
-		// WeaponType: 0 == None, 1 == Lasers? 3 == Concussion Missiles?
+		// WeaponType: 0 == None, 1 == Lasers? 3 == Concussion Missiles? 4 == Gunner hardpoint!
+		// NOTE: Gunner hardpoint's energy level never depletes.
 		if (craftInstance->Hardpoints[i].WeaponType == 0)
 			break;
 		log_debug("[%d] Type: %d, Count: %d, Energy: %d", i,
@@ -700,6 +701,34 @@ void DumpDebugInfo(int playerIndex) {
 			craftInstance->Hardpoints[i].Energy // Only applies for lasers, max is 127, min is 0. For warheads, this is always 127
 		);
 	}
+
+	log_debug("Throttle: %0.3f", (float)craftInstance->EngineThrottleInput / 65535.0f);
+
+	// 0x0001 is the CMD/Targeting computer.
+	// 0x000E is the laser/ion display. Looks like all 3 bits must be on, but not sure what happens if the craft doesn't have ions
+	// 0x0010 is the beam weapon
+	// 0x0020 is the shields display
+	// 0x0040 is the throttle (text) display
+	// 0x0180 both sensors. Both bits must be on, if either bit is off, both sensors will shut down
+	// 0x0200 lasers recharge rate
+	// 0x0400 engine level
+	// 0x0800 shields recharge rate
+	// 0x1000 beam recharge rate
+	/*
+	FILE *FileMask = NULL;
+	uint32_t Mask = 0x0;
+	fopen_s(&FileMask, "CockpitMask.txt", "rt");
+	if (FileMask != NULL) {
+		fscanf_s(FileMask, "0x%x", &Mask);
+		fclose(FileMask);
+	}
+	log_debug("InitialCockpitInstruments: 0x%x, CockpitInstrumentStatus: 0x%x",
+		craftInstance->InitialCockpitInstruments, craftInstance->CockpitInstrumentStatus);
+	//log_debug("InitialSubsystems: 0x%x, SubsystemStatus: 0x%x",
+	//	craftInstance->InitialSubsystems, craftInstance->SubsystemStatus);
+	craftInstance->CockpitInstrumentStatus = craftInstance->InitialCockpitInstruments & Mask;
+	log_debug("Current Cockpit Instruments: 0x%x", craftInstance->CockpitInstrumentStatus);
+	*/
 
 	//log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].externalCameraDistance);
 	//log_debug("Dumping Debug info...");
