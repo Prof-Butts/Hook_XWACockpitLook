@@ -607,7 +607,7 @@ void animTickZ(Vector3 *headPos) {
 void DumpDebugInfo(int playerIndex) {
 	static int counter = 0;
 	FILE *filePD = NULL, *fileCI = NULL;
-	int error = 0, size;
+	int error = 0;
 	char sFileNamePD[128], sFileNameCI[128];
 	sprintf_s(sFileNamePD, 128, "./PlayerDataTable%d", counter);
 	sprintf_s(sFileNameCI, 128, "./CraftInstance%d", counter);
@@ -716,23 +716,26 @@ void DumpDebugInfo(int playerIndex) {
 	// 0x1000 beam recharge rate
 	/*
 	FILE *FileMask = NULL;
-	uint32_t Mask = 0x0;
-	fopen_s(&FileMask, "CockpitMask.txt", "rt");
+	fopen_s(&FileMask, "CockpitDamage.txt", "rt");
 	if (FileMask != NULL) {
+		uint32_t Mask = 0x0;
 		fscanf_s(FileMask, "0x%x", &Mask);
 		fclose(FileMask);
+
+		log_debug("InitialCockpitInstruments: 0x%x, CockpitInstrumentStatus: 0x%x",
+			craftInstance->InitialCockpitInstruments, craftInstance->CockpitInstrumentStatus);
+		//log_debug("InitialSubsystems: 0x%x, SubsystemStatus: 0x%x",
+		//	craftInstance->InitialSubsystems, craftInstance->SubsystemStatus);
+		craftInstance->CockpitInstrumentStatus = craftInstance->InitialCockpitInstruments & Mask;
+		log_debug("Current Cockpit Instruments: 0x%x", craftInstance->CockpitInstrumentStatus);
 	}
-	log_debug("InitialCockpitInstruments: 0x%x, CockpitInstrumentStatus: 0x%x",
-		craftInstance->InitialCockpitInstruments, craftInstance->CockpitInstrumentStatus);
-	//log_debug("InitialSubsystems: 0x%x, SubsystemStatus: 0x%x",
-	//	craftInstance->InitialSubsystems, craftInstance->SubsystemStatus);
-	craftInstance->CockpitInstrumentStatus = craftInstance->InitialCockpitInstruments & Mask;
-	log_debug("Current Cockpit Instruments: 0x%x", craftInstance->CockpitInstrumentStatus);
 	*/
 
 	//log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].externalCameraDistance);
 	//log_debug("Dumping Debug info...");
 
+	// Dump the current PlayerDataTable and CraftInstance
+	/*
 	try {
 		error = fopen_s(&filePD, sFileNamePD, "wb");
 	}
@@ -758,6 +761,7 @@ void DumpDebugInfo(int playerIndex) {
 	size = fwrite(craftInstance, sizeof(CraftInstance), 1, fileCI);
 	fclose(fileCI);
 	log_debug("Dumped %s", sFileNameCI);
+	*/
 }
 
 void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
@@ -1711,6 +1715,11 @@ void LoadParams() {
 
 			else if (_stricmp(param, "test_joystick") == 0) {
 				g_bTestJoystick = (bool)fValue;
+			}
+
+			else if (_stricmp(param, "predicted_seconds_to_photons") == 0) {
+				g_fPredictedSecondsToPhotons = fValue;
+				log_debug("predicted_seconds_to_photons set to: %0.6f", g_fPredictedSecondsToPhotons);
 			}
 			
 			// UDP settings

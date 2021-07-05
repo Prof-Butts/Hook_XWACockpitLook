@@ -1,6 +1,13 @@
 #include "SteamVR.h"
 #include "SharedMem.h"
 
+// The default predicted seconds to photons was previously 0.011 in Release 1.1.5.
+// I'm not sure, but it looks like this may have caused some jittering issues for
+// a number of players. Before that release, this value was set to 0, so let's use
+// that again to see if that helps.
+constexpr float DEFAULT_PREDICTED_SECONDS_TO_PHOTONS = 0.0f;
+float g_fPredictedSecondsToPhotons = DEFAULT_PREDICTED_SECONDS_TO_PHOTONS;
+
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
 vr::IVRSystem *g_pHMD = NULL;
@@ -147,7 +154,9 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
 
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
-		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.042f, &g_hmdPose, 1);
+		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.042f, &g_hmdPose, 1);
+		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.011f, &g_hmdPose, 1);
+		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, g_fPredictedSecondsToPhotons, &g_hmdPose, 1);
 
 		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
 		   This should remove jitter although it may introduce some error due to the prediction when doing quick changes of velocity/direction.
