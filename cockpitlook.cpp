@@ -1717,11 +1717,13 @@ void LoadParams() {
 				g_bTestJoystick = (bool)fValue;
 			}
 
+			/*
 			else if (_stricmp(param, "predicted_seconds_to_photons") == 0) {
 				g_fPredictedSecondsToPhotons = fValue;
 				log_debug("predicted_seconds_to_photons set to: %0.6f", g_fPredictedSecondsToPhotons);
 			}
-			
+			*/
+
 			// UDP settings
 			else if (_stricmp(param, "UDP_telemetry_enabled") == 0) {
 				g_bUDPEnabled = (bool)fValue;

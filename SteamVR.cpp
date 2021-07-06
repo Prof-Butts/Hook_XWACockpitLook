@@ -145,6 +145,8 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 
 	float roll;
 	vr::TrackedDeviceIndex_t unDevice = vr::k_unTrackedDeviceIndex_Hmd;
+	vr::Compositor_FrameTiming frametiming;
+	frametiming.m_nSize = sizeof(vr::Compositor_FrameTiming);
 	if (!g_pHMD->IsTrackedDeviceConnected(unDevice))
 		return false;
 
@@ -160,12 +162,10 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.042f, &g_hmdPose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.011f, &g_hmdPose, 1);
-		vr::Compositor_FrameTiming *frametiming = new vr::Compositor_FrameTiming();
-		frametiming->m_nSize = sizeof(vr::Compositor_FrameTiming);
-		vr::VRCompositor()->GetFrameTiming(frametiming);
+		vr::VRCompositor()->GetFrameTiming(&frametiming);
 
 		//g_fPredictedSecondsToPhotons = GetFrameTimingRemaining + (m_nNumMisPresented / Prop_DisplayFrequency_Float) + Prop_SecondsFromVsyncToPhotons_Float;
-		g_fPredictedSecondsToPhotons = vr::VRCompositor()->GetFrameTimeRemaining() + frametiming->m_nNumVSyncsToFirstView/g_fHMDDisplayFreq + g_fVsyncToPhotons;
+		g_fPredictedSecondsToPhotons = vr::VRCompositor()->GetFrameTimeRemaining() + frametiming.m_nNumVSyncsToFirstView / g_fHMDDisplayFreq + g_fVsyncToPhotons;
 		//log_debug("[DBG][CockpitLook] g_fPredictedSecondsToPhotons = %f",g_fPredictedSecondsToPhotons);
 		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, g_fPredictedSecondsToPhotons, &g_hmdPose, 1);
 
