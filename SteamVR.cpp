@@ -7,6 +7,7 @@
 // that again to see if that helps.
 constexpr float DEFAULT_PREDICTED_SECONDS_TO_PHOTONS = 0.0f;
 float g_fPredictedSecondsToPhotons = DEFAULT_PREDICTED_SECONDS_TO_PHOTONS;
+float g_fVsyncToPhotons, g_fHMDDisplayFreq = 0;
 
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
@@ -30,6 +31,9 @@ bool InitSteamVR()
 	log_debug("VR runtime loaded");
 
 	g_bSteamVRInitialized = true;
+	vr::TrackedDeviceIndex_t unDevice = vr::k_unTrackedDeviceIndex_Hmd;
+	g_fVsyncToPhotons = g_pHMD->GetFloatTrackedDeviceProperty(unDevice, vr::ETrackedDeviceProperty::Prop_SecondsFromVsyncToPhotons_Float);
+	g_fHMDDisplayFreq = g_pHMD->GetFloatTrackedDeviceProperty(unDevice, vr::ETrackedDeviceProperty::Prop_DisplayFrequency_Float);
 
 	// Put the address of g_hmdPose in shared memory. We only need to do this once.
 	// Setting bDataReady to true means that pDataPtr has been initialized to a valid
@@ -156,6 +160,13 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.042f, &g_hmdPose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.011f, &g_hmdPose, 1);
+		vr::Compositor_FrameTiming *frametiming = new vr::Compositor_FrameTiming();
+		frametiming->m_nSize = sizeof(vr::Compositor_FrameTiming);
+		vr::VRCompositor()->GetFrameTiming(frametiming);
+
+		//g_fPredictedSecondsToPhotons = GetFrameTimingRemaining + (m_nNumMisPresented / Prop_DisplayFrequency_Float) + Prop_SecondsFromVsyncToPhotons_Float;
+		g_fPredictedSecondsToPhotons = vr::VRCompositor()->GetFrameTimeRemaining() + frametiming->m_nNumVSyncsToFirstView/g_fHMDDisplayFreq + g_fVsyncToPhotons;
+		//log_debug("[DBG][CockpitLook] g_fPredictedSecondsToPhotons = %f",g_fPredictedSecondsToPhotons);
 		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, g_fPredictedSecondsToPhotons, &g_hmdPose, 1);
 
 		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
