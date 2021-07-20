@@ -145,6 +145,8 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 
 	float roll;
 	vr::TrackedDeviceIndex_t unDevice = vr::k_unTrackedDeviceIndex_Hmd;
+	vr::Compositor_FrameTiming frametiming;
+	frametiming.m_nSize = sizeof(vr::Compositor_FrameTiming);
 	if (!g_pHMD->IsTrackedDeviceConnected(unDevice))
 		return false;
 
@@ -152,7 +154,7 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 	if (g_pHMD->GetControllerState(unDevice, &state, sizeof(state)))
 	{
 		//vr::TrackedDevicePose_t trackedDevicePose;
-		//vr::TrackedDevicePose_t trackedDevicePoseArray[vr::k_unMaxTrackedDeviceCount];
+		vr::TrackedDevicePose_t trackedDevicePoseArray[vr::k_unMaxTrackedDeviceCount];
 		vr::HmdMatrix34_t poseMatrix;
 		vr::HmdQuaternionf_t q;
 		//vr::ETrackedDeviceClass trackedDeviceClass = vr::VRSystem()->GetTrackedDeviceClass(unDevice);
@@ -160,14 +162,12 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.042f, &g_hmdPose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.011f, &g_hmdPose, 1);
-		vr::Compositor_FrameTiming *frametiming = new vr::Compositor_FrameTiming();
-		frametiming->m_nSize = sizeof(vr::Compositor_FrameTiming);
-		vr::VRCompositor()->GetFrameTiming(frametiming);
+		vr::VRCompositor()->GetFrameTiming(&frametiming);
 
 		//g_fPredictedSecondsToPhotons = GetFrameTimingRemaining + (m_nNumMisPresented / Prop_DisplayFrequency_Float) + Prop_SecondsFromVsyncToPhotons_Float;
-		g_fPredictedSecondsToPhotons = vr::VRCompositor()->GetFrameTimeRemaining() + frametiming->m_nNumVSyncsToFirstView/g_fHMDDisplayFreq + g_fVsyncToPhotons;
+		//g_fPredictedSecondsToPhotons = vr::VRCompositor()->GetFrameTimeRemaining() + frametiming.m_nNumVSyncsToFirstView / g_fHMDDisplayFreq + g_fVsyncToPhotons;
 		//log_debug("[DBG][CockpitLook] g_fPredictedSecondsToPhotons = %f",g_fPredictedSecondsToPhotons);
-		vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, g_fPredictedSecondsToPhotons, &g_hmdPose, 1);
+		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, g_fPredictedSecondsToPhotons, &g_hmdPose, 1);
 
 		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
 		   This should remove jitter although it may introduce some error due to the prediction when doing quick changes of velocity/direction.
@@ -175,11 +175,11 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		*/
 		//vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
 		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
-		//vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
-		//if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
-		if (g_hmdPose.bPoseIsValid) {
-			//poseMatrix = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
+		if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
+		//if (g_hmdPose.bPoseIsValid) {
+			g_hmdPose = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd]; // This matrix contains all positional and rotational data.
 			poseMatrix = g_hmdPose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
 			q = rotationToQuaternion(poseMatrix);
 			quatToEuler(q, yaw, pitch, &roll);
