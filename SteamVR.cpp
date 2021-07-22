@@ -162,7 +162,7 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.029, &trackedDevicePose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.042f, &g_hmdPose, 1);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, 0.011f, &g_hmdPose, 1);
-		vr::VRCompositor()->GetFrameTiming(&frametiming);
+		//vr::VRCompositor()->GetFrameTiming(&frametiming);
 
 		//g_fPredictedSecondsToPhotons = GetFrameTimingRemaining + (m_nNumMisPresented / Prop_DisplayFrequency_Float) + Prop_SecondsFromVsyncToPhotons_Float;
 		//g_fPredictedSecondsToPhotons = vr::VRCompositor()->GetFrameTimeRemaining() + frametiming.m_nNumVSyncsToFirstView / g_fHMDDisplayFreq + g_fVsyncToPhotons;
@@ -170,12 +170,11 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, g_fPredictedSecondsToPhotons, &g_hmdPose, 1);
 
 		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
-		   This should remove jitter although it may introduce some error due to the prediction when doing quick changes of velocity/direction.
-		   Also, it removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
+		   It removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
 		*/
-		//vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
+		vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
 		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
-		vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		//vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
 
 		if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
 		//if (g_hmdPose.bPoseIsValid) {
