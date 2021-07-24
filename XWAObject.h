@@ -235,7 +235,7 @@ struct ObjectEntry
 	char objectGenus;
 	char FGIndex;
 	char region;
-	int x;
+	int x; // (x,y,z) is the actual position of this craft. We can use this to move the player or pretty much any ship.
 	int y;
 	int z;
 	__int16 yaw;
@@ -620,7 +620,7 @@ struct PlayerDataEntry
 	char field_1E9;
 	__int16 consoleCharacterCount;
 	int aiObjectIndex;
-	char field_1F0;
+	char field_1F0; // FlightCommandMainNumOfOptions
 	char field_1F1;
 	char field_1F2;
 	char field_1F3;
@@ -630,15 +630,21 @@ struct PlayerDataEntry
 	char field_1F7;
 	char field_1F8;
 	char cockpitDisplayed;
-	char cockpitDisplayed2;
-	char field_1FB;
+	char cockpitDisplayed2; // HasCockpitOpt
+	char field_1FB; // HasTurretOpt
 	char field_1FC;
-	__int16 cockpitCameraYaw;
-	__int16 cockpitCameraPitch;
-	float _Pitch_;
-	float _Yaw_;
-	float _Roll_; // Looks like these should be float's, according to Justagai.
-	char field_20D[12];
+	__int16 cockpitCameraYaw; // MousePositionX
+	__int16 cockpitCameraPitch; // MousePositionY
+	//float _Pitch_; // CockpitPositionTranformed -- NOT pitch, yaw, roll!
+	//float _Yaw_;
+	//float _Roll_; // Looks like these should be float's, according to Justagai.
+	float CockpitPositionTransformedX;
+	float CockpitPositionTransformedY;
+	float CockpitPositionTransformedZ;
+	//char field_20D[12]; // float CockpitPosition[3];
+	float CockpitPositionX;
+	float CockpitPositionY;
+	float CockpitPositionZ;
 	__int16 gunnerTurretActive;
 	__int16 numberOfGunnerHardpoints;
 	char currentGunnerHardpointActive;
@@ -1041,6 +1047,7 @@ struct PlayerDataEntry
 	char chatStringTerminator;
 	char chatStringCharCount;
 	char multiChatMode;
+	// PlayerCamera struct begins here
 	int cameraX;
 	int cameraY;
 	int cameraZ;
@@ -1073,7 +1080,8 @@ struct PlayerDataEntry
 	char field_B92;
 	char field_B93;
 	char field_B94;
-	__int16 screenResolutionSetting;
+	// PlayerCamera struct ends here
+	__int16 screenResolutionSetting; // Ofs: 0x0B95
 	int rosterID;
 	int missionTime;
 	int posX;

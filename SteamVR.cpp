@@ -35,14 +35,18 @@ bool InitSteamVR()
 	g_fVsyncToPhotons = g_pHMD->GetFloatTrackedDeviceProperty(unDevice, vr::ETrackedDeviceProperty::Prop_SecondsFromVsyncToPhotons_Float);
 	g_fHMDDisplayFreq = g_pHMD->GetFloatTrackedDeviceProperty(unDevice, vr::ETrackedDeviceProperty::Prop_DisplayFrequency_Float);
 
+	/*
+	// If we ever share any SteamVR data between this hook and ddraw, we should put that here.
+
 	// Put the address of g_hmdPose in shared memory. We only need to do this once.
 	// Setting bDataReady to true means that pDataPtr has been initialized to a valid
 	// address.
-	SharedData* pSharedData = (SharedData *)g_SharedMem.GetMemoryPtr();
+	SharedDataProxy* pSharedData = (SharedDataProxy *)g_SharedMem.GetMemoryPtr();
 	if (pSharedData != nullptr) {
-		pSharedData->pDataPtr = &(g_hmdPose);
+		pSharedData->pSharedData = &(g_hmdPose);
 		pSharedData->bDataReady = true;
 	}
+	*/
 	return true;
 }
 

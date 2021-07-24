@@ -1,5 +1,7 @@
 #include "SharedMem.h"
 
+SharedData g_SharedData;
+
 void log_debug(const char *format, ...);
 
 SharedMem::SharedMem(bool OpenCreate) 

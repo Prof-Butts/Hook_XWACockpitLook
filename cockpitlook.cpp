@@ -1044,7 +1044,11 @@ int CockpitLookHook(int* params)
 							//log_debug("Fs: %0.3f, %0.3f, %0.3f", Fs.x, Fs.y, Fs.z);
 							ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 						}
-						// Apply the inertia:
+						// Apply the current POVOffset
+						g_headPos.x += g_SharedData.POVOffsetX;
+						g_headPos.y += g_SharedData.POVOffsetY;
+						g_headPos.z += g_SharedData.POVOffsetZ;
+						// Apply inertia:
 						if (g_bCockpitInertiaEnabled) {
 							g_headPos.x += XDisp;
 							g_headPos.y += YDisp;
@@ -1058,6 +1062,7 @@ int CockpitLookHook(int* params)
 						g_headPos = g_prevHeadingMatrix * g_headPos;
 					else
 						g_headPos = HeadingMatrix * g_headPos;
+					// TRACKER_NONE path, when mouse look is enabled
 					PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
 					PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
 					PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
@@ -1082,7 +1087,11 @@ int CockpitLookHook(int* params)
 								//log_debug("Fs: %0.3f, %0.3f, %0.3f", Fs.x, Fs.y, Fs.z);
 								ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
 							}
-							// Apply the inertia:
+							// Apply the current POVOffset
+							g_headPos.x += g_SharedData.POVOffsetX;
+							g_headPos.y += g_SharedData.POVOffsetY;
+							g_headPos.z += g_SharedData.POVOffsetZ;
+							// Apply inertia:
 							if (g_bCockpitInertiaEnabled) {
 								g_headPos.x += XDisp;
 								g_headPos.y += YDisp;
@@ -1096,6 +1105,7 @@ int CockpitLookHook(int* params)
 							g_headPos = g_prevHeadingMatrix * g_headPos;
 						else
 							g_headPos = HeadingMatrix * g_headPos;
+						// TRACKER_NONE path, when mouse look is disabled
 						PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
 						PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
 						PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
@@ -1300,7 +1310,11 @@ int CockpitLookHook(int* params)
 						ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
 					else
 						ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
-					// Apply the inertia:
+					// Apply the current POVOffset
+					g_headPos.x += g_SharedData.POVOffsetX;
+					g_headPos.y += g_SharedData.POVOffsetY;
+					g_headPos.z += g_SharedData.POVOffsetZ;
+					// Apply inertia:
 					if (g_bCockpitInertiaEnabled) {
 						g_headPos.x += XDisp;
 						g_headPos.y += YDisp;
@@ -1314,6 +1328,7 @@ int CockpitLookHook(int* params)
 					g_headPos = g_prevHeadingMatrix * g_headPos;
 				else
 					g_headPos = HeadingMatrix * g_headPos;
+				// Regular path: write the X,Y,Z position from g_headPos (when tracking is on).
 				PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
 				PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
 				PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
@@ -1466,7 +1481,7 @@ int CockpitLookHook(int* params)
 			//log_debug("lastCamera (2): %d, %d", lastCameraYaw, lastCameraPitch);
 
 			SmoothInertia(&yawInertia, &pitchInertia);
-			// Apply the inertia
+			// Apply inertia
 			if (g_bExtInertiaEnabled) {
 				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
 				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
@@ -1765,10 +1780,13 @@ void InitKeyboard()
 }
 
 void InitSharedMem() {
-	SharedData *pSharedData = (SharedData *)g_SharedMem.GetMemoryPtr();
+	SharedDataProxy *pSharedData = (SharedDataProxy *)g_SharedMem.GetMemoryPtr();
 	if (pSharedData == nullptr) {
 		log_debug("Could not load shared data ptr");
+		return;
 	}
+	pSharedData->pSharedData = &g_SharedData;
+	pSharedData->bDataReady = true;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
