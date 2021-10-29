@@ -8,6 +8,7 @@
 constexpr float DEFAULT_PREDICTED_SECONDS_TO_PHOTONS = 0.0f;
 float g_fPredictedSecondsToPhotons = DEFAULT_PREDICTED_SECONDS_TO_PHOTONS;
 float g_fVsyncToPhotons, g_fHMDDisplayFreq = 0;
+bool g_bCorrectedHeadTracking = false;
 
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
@@ -169,12 +170,23 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//log_debug("[DBG][CockpitLook] g_fPredictedSecondsToPhotons = %f",g_fPredictedSecondsToPhotons);
 		//vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseSeated, g_fPredictedSecondsToPhotons, &g_hmdPose, 1);
 
-		/* Get the last pose predicted for the current frame during WaitGetPoses for the last frame.
-		   It removes the need to deal with prediction time calculations. All is handled by WaitGetPoses as part of running start algorithm.
-		*/
-		vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
-		//vr::VRCompositor()->GetLastPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
-		//vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		if (g_bCorrectedHeadTracking) {
+			// Get the last pose predicted for the current frame during WaitGetPoses() of the previous frame (pGamePoseArray parameter).
+			vr::VRCompositor()->GetLastPoses(NULL, 0, trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount);
+			// This allows to call WaitGetPoses() in ddraw.dll::Direct3DDevice::Execute(), just before the Direct3D rendering starts.
+			// This way the CPU can continue working while the GPU is drawing the previous frame, which improves performance.
+			// It also delegates the prediction time calculations to WaitGetPoses as part of running start algorithm.
+			// To avoid jitter, ddraw will need to compensate the difference between the predicted HMD pose used here
+			// and the actual one at the time of starting the GPU rendering.
+		}
+		else {
+			// Legacy head tracking, with sub-optimal performance and bigger latency, but no jitter from pose prediction errors.
+			// CockpitLookHook will block the CPU work until the vsync, waiting for the previous frame to finish rendering in GPU.
+			// ddraw.dll will use the same pose obtained here by calling GetLastPoses(), but by that time it will be "old"
+			// especially for low FPS situations.
+			vr::VRCompositor()->WaitGetPoses(trackedDevicePoseArray, vr::k_unMaxTrackedDeviceCount, NULL, 0);
+		}
+
 
 		if (trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd].bPoseIsValid) {
 		//if (g_hmdPose.bPoseIsValid) {
@@ -182,9 +194,16 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 			poseMatrix = g_hmdPose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
 			q = rotationToQuaternion(poseMatrix);
 			quatToEuler(q, yaw, pitch, &roll);
-			*x = poseMatrix.m[0][3];
-			*y = poseMatrix.m[1][3];
-			*z = poseMatrix.m[2][3];
+			if (g_bCorrectedHeadTracking) {
+				// Disable positional tracking here if we are using the corrected tracking
+				// It will be applied later in ddraw
+				// This avoids using cockpit shake and reduces the jitter at the cost of some visible culling
+				*x = *y = *z = 0;
+			} else{
+				*x = poseMatrix.m[0][3];
+				*y = poseMatrix.m[1][3];
+				*z = poseMatrix.m[2][3];			
+			}
 			return true;
 		}
 		else

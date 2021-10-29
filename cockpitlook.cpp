@@ -192,6 +192,7 @@ const char *TRACKER_TYPE_FREEPIE		= "FreePIE"; // Use FreePIE as the tracker
 const char *TRACKER_TYPE_STEAMVR		= "SteamVR"; // Use SteamVR as the tracker
 const char *TRACKER_TYPE_TRACKIR		= "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
 const char *TRACKER_TYPE_NONE			= "None";
+const char *POSE_CORRECTED_HEADTRACKING = "pose_corrected_headtracking";
 const char *YAW_MULTIPLIER				= "yaw_multiplier";
 const char *PITCH_MULTIPLIER			= "pitch_multiplier";
 const char *YAW_OFFSET					= "yaw_offset";
@@ -1584,6 +1585,10 @@ void LoadParams() {
 					log_debug("Tracking disabled");
 					g_TrackerType = TRACKER_NONE;
 				}
+			}
+			else if (_stricmp(param, POSE_CORRECTED_HEADTRACKING) == 0) {
+				log_debug("Using pose corrected head tracking");
+				g_bCorrectedHeadTracking = (bool)fValue;
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
 				g_fYawMultiplier = fValue;

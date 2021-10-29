@@ -3,6 +3,7 @@
 #include "cockpitlook.h"
 
 extern float g_fPredictedSecondsToPhotons;
+extern bool g_bCorrectedHeadTracking;
 
 bool InitSteamVR();
 void ShutdownSteamVR();
