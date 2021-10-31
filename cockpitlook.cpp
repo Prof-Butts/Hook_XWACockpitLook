@@ -640,6 +640,40 @@ void DumpDebugInfo(int playerIndex) {
 	//}
 
 	/*
+	LaserNextHardpoint tells us which laser cannon is ready to fire.
+	LaserLinkStatus: 0x1 -- Single fire.
+	LaserLinkStatus: 0x2 -- Dual fire. LaserHardpoint will now be either 0x0 or 0x1 and it will skip one laser
+	LaserLinkStatus: 0x3 -- Fire all lasers in the current group. LaserHardpoint stays at 0x0 -- all cannons ready to fire
+	LaserLinkStatus: 0x4 -- Fire all lasers in all groups. All LaserLinkStatus indices become 0x4 as soon as one of them is 0x4
+
+	X/W, single fire:
+	[808][DBG][Cockpitlook] WarheadArmed: 0, NumberOfLaserSets : 1, NumberOfLasers : 4, NumWarheadLauncherGroups : 1, Countermeasures : 0
+	[808][DBG][Cockpitlook] LaserNextHardpoint[0] : 0x0,
+	[808][DBG][Cockpitlook] LaserNextHardpoint[0] : 0x1,
+	[808][DBG][Cockpitlook] LaserNextHardpoint[0] : 0x2,
+	[808][DBG][Cockpitlook] LaserNextHardpoint[0] : 0x3, ... then it goes back to 0
+	The other indices in LaserNextHardpoint remain at 0:
+	[808] [DBG] [Cockpitlook] LaserNextHardpoint[1]: 0x0, <-- This is the second set of lasers/ions (when it exists)
+	[808] [DBG] [Cockpitlook] LaserNextHardpoint[2]: 0x0, <-- Maybe the third set of lasers, if it exists?
+
+	For the B-Wing the first LaserNextHardpoint group goes 0x0, 0x1, 0x2
+	The second group (ions) goes 0x3, 0x4, 0x5.
+	LaserLinkStatus is either 0x1 or 0x3. There's no dual fire
+	The B-Wing has 6 lasers and 2 groups
+
+	For the T/D the first LaserNextHardpoint group goes 0x0, 0x1, 0x2, 0x3
+	The second group goes: 0x4, 0x5
+	LaserLinkStatus goes 0x1, 0x2, 0x3 and 0x4. There's single fire, dual fire, set fire and all sets fire.
+	The T/D has 6 lasers and 2 groups.
+
+	*/
+
+	for (int i = 0; i < 3; i++)
+		log_debug("LaserNextHardpoint[%d]: 0x%x, LaserLinkStatus[%d]: 0x%x",
+			i, craftInstance->LaserNextHardpoint[i],
+			i, craftInstance->LaserLinkStatus[i]);
+
+	/*
 	MIS:
 	[14848] [DBG] [Cockpitlook] NumberOfLaserSets: 1, NumberOfLasers: 1, NumWarheadLauncherGroups: 2
 	[14848] [DBG] [Cockpitlook] WarheadNextHardpoint[0]: 1
@@ -691,6 +725,7 @@ void DumpDebugInfo(int playerIndex) {
 	[14848] [DBG] [Cockpitlook] [7] Type: 3, Count: 6
 	*/
 
+#ifdef DISPLAY_HARDPOINT_DEBUG_DATA
 	for (int i = 0; i < 16; i++) {
 		// WeaponType: 0 == None, 1 == Lasers? 3 == Concussion Missiles? 4 == Gunner hardpoint!
 		// NOTE: Gunner hardpoint's energy level never depletes.
@@ -702,8 +737,9 @@ void DumpDebugInfo(int playerIndex) {
 			craftInstance->Hardpoints[i].Energy // Only applies for lasers, max is 127, min is 0. For warheads, this is always 127
 		);
 	}
+#endif
 
-	log_debug("Throttle: %0.3f", (float)craftInstance->EngineThrottleInput / 65535.0f);
+	//log_debug("Throttle: %0.3f", (float)craftInstance->EngineThrottleInput / 65535.0f);
 
 	// 0x0001 is the CMD/Targeting computer.
 	// 0x000E is the laser/ion display. Looks like all 3 bits must be on, but not sure what happens if the craft doesn't have ions
