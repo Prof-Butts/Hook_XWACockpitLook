@@ -324,9 +324,9 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 	Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
 	Vector4 T, B, N;
 	// Compute the full rotation
-	yaw   = PlayerDataTable[playerIndex].yaw   / 65536.0f * 360.0f;
-	pitch = PlayerDataTable[playerIndex].pitch / 65536.0f * 360.0f;
-	roll  = PlayerDataTable[playerIndex].roll  / 65536.0f * 360.0f;
+	yaw   = PlayerDataTable[playerIndex].Camera.CraftYaw / 65536.0f * 360.0f;
+	pitch = PlayerDataTable[playerIndex].Camera.CraftPitch / 65536.0f * 360.0f;
+	roll  = PlayerDataTable[playerIndex].Camera.CraftRoll  / 65536.0f * 360.0f;
 
 	// yaw-pitch-roll gets reset to: ypr: 0.000, 90.000, 0.000 when entering hyperspace
 	/*if (!g_bInHyperspace)
@@ -768,7 +768,7 @@ void DumpDebugInfo(int playerIndex) {
 	}
 	*/
 
-	//log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].externalCameraDistance);
+	//log_debug("External Camera Distance: %d", PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist);
 	//log_debug("Dumping Debug info...");
 
 	// Dump the current PlayerDataTable and CraftInstance
@@ -942,7 +942,7 @@ int CockpitLookHook(int* params)
 	float yaw = 0.0f, pitch = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
 	bool dataReady = false, enableTrackedYawPitch = true;
-	bool bExternalCamera = PlayerDataTable[playerIndex].externalCamera;
+	bool bExternalCamera = PlayerDataTable[playerIndex].Camera.ExternalCamera;
 	static bool bLastExternalCamera = bExternalCamera;
 	static short lastCameraYaw = 0, lastCameraPitch = 0; // These are the pre-inertia values from the last frame
 	static int lastCameraDist = 1024;
@@ -951,7 +951,7 @@ int CockpitLookHook(int* params)
 	float yawInertia = 0.0f, pitchInertia = 0.0f, distInertia = 0.0f;
 	/*static bool bFirstFrame = true;
 	if (bFirstFrame) {
-		log_debug("External Dist: %d", PlayerDataTable[playerIndex].externalCameraDistance);
+		log_debug("External Dist: %d", PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist);
 		bFirstFrame = false;
 	}*/
 
@@ -979,11 +979,11 @@ int CockpitLookHook(int* params)
 	if (bExternalCamera) 
 	{
 		//log_debug("------------------");
-		//log_debug("yaw,pitch: %d, %d", PlayerDataTable[playerIndex].cameraYaw, PlayerDataTable[playerIndex].cameraPitch);
+		//log_debug("yaw,pitch: %d, %d", PlayerDataTable[playerIndex].Camera.Yaw, PlayerDataTable[playerIndex].Camera.Pitch);
 		// Detect changes to the camera performed between calls to this hook:
-		short yawDiff   = PlayerDataTable[playerIndex].cameraYaw - prevCameraYaw;
-		short pitchDiff = PlayerDataTable[playerIndex].cameraPitch - prevCameraPitch;
-		int   distDiff  = PlayerDataTable[playerIndex].externalCameraDistance - prevCameraDist;
+		short yawDiff   = PlayerDataTable[playerIndex].Camera.Yaw - prevCameraYaw;
+		short pitchDiff = PlayerDataTable[playerIndex].Camera.Pitch - prevCameraPitch;
+		int   distDiff  = PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist - prevCameraDist;
 		//log_debug("diff: %d, %d", yawDiff, pitchDiff);
 		// Adjust the pre-inertia yaw/pitch if the camera moved between calls to this hook. This adjustment
 		// is only possible if prevCameraYaw/Pitch is valid (that is, if the previous frame was rendered in
@@ -999,9 +999,9 @@ int CockpitLookHook(int* params)
 		// Restore the position of the camera before adding external view inertia
 		//if (g_bExtInertiaEnabled) 
 		{
-			PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
-			PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
-			PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
+			PlayerDataTable[playerIndex].Camera.Yaw = lastCameraYaw;
+			PlayerDataTable[playerIndex].Camera.Pitch = lastCameraPitch;
+			PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = lastCameraDist;
 		}
 	}
 
@@ -1100,9 +1100,9 @@ int CockpitLookHook(int* params)
 					else
 						g_headPos = HeadingMatrix * g_headPos;
 					// TRACKER_NONE path, when mouse look is enabled
-					PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
-					PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
-					PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
+					PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+					PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+					PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 					dataReady = false;
 				} 
 				else if (!*mouseLook) {
@@ -1143,9 +1143,9 @@ int CockpitLookHook(int* params)
 						else
 							g_headPos = HeadingMatrix * g_headPos;
 						// TRACKER_NONE path, when mouse look is disabled
-						PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
-						PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
-						PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
+						PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+						PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+						PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 					}
 				}
 
@@ -1189,8 +1189,8 @@ int CockpitLookHook(int* params)
 
 					if (g_bYawPitchFromMouseOverride) {
 						// If FreePIE could not be read, then get the yaw/pitch from the mouse:
-						yaw   =  (float)PlayerDataTable[playerIndex].cockpitCameraYaw   / 32768.0f * 180.0f;
-						pitch = -(float)PlayerDataTable[playerIndex].cockpitCameraPitch / 32768.0f * 180.0f;
+						yaw   =  (float)PlayerDataTable[playerIndex].MousePositionX   / 32768.0f * 180.0f;
+						pitch = -(float)PlayerDataTable[playerIndex].MousePositionY / 32768.0f * 180.0f;
 					}
 
 					Vector4 pos(g_FreePIEData.x, g_FreePIEData.y, -g_FreePIEData.z, 1.0f);
@@ -1316,8 +1316,8 @@ int CockpitLookHook(int* params)
 				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
 				// look around
 				if (enableTrackedYawPitch) {
-					PlayerDataTable[playerIndex].cockpitCameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
-					PlayerDataTable[playerIndex].cockpitCameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+					PlayerDataTable[playerIndex].MousePositionX   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+					PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
@@ -1366,12 +1366,18 @@ int CockpitLookHook(int* params)
 				else
 					g_headPos = HeadingMatrix * g_headPos;
 				// Regular path: write the X,Y,Z position from g_headPos (when tracking is on).
-				PlayerDataTable[playerIndex].cockpitXReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
-				PlayerDataTable[playerIndex].cockpitYReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
-				PlayerDataTable[playerIndex].cockpitZReference = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
+				PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+				PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+				PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
+
+				// Apply the offset to the cockpit position relative to the craft OBJ
+				/*PlayerDataTable[playerIndex].Camera. += (g_fXWAUnitsToMetersScale * g_headPos.x);
+				PlayerDataTable[playerIndex].cockpitCameraY += (g_fXWAUnitsToMetersScale * g_headPos.y);
+				PlayerDataTable[playerIndex].cockpitCameraZ += (g_fXWAUnitsToMetersScale * g_headPos.z);*/
+
 			/*} else {
-				PlayerDataTable[playerIndex].cameraYaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
-				PlayerDataTable[playerIndex].cameraPitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+				PlayerDataTable[playerIndex].Camera.Yaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+				PlayerDataTable[playerIndex].Camera.Pitch = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 			}*/
 		}
 
@@ -1396,30 +1402,30 @@ int CockpitLookHook(int* params)
 		//if (*win32NumPad4Pressed || keycodePressed == KeyCode_ARROWLEFT)
 		// NUMPAD1,NUMPAD3 rolls the craft; but it doesn't affect the yaw/pitch
 		if (*win32NumPad4Pressed || keycodePressed == KeyCode_NUMPAD4)
-			PlayerDataTable[playerIndex].cockpitCameraYaw -= moveDelta; // This was 1200 previously
+			PlayerDataTable[playerIndex].MousePositionX -= moveDelta; // This was 1200 previously
 
 		//if (*win32NumPad6Pressed || keycodePressed == KeyCode_ARROWRIGHT)
 		if (*win32NumPad6Pressed || keycodePressed == KeyCode_NUMPAD6)
-			PlayerDataTable[playerIndex].cockpitCameraYaw += moveDelta;
+			PlayerDataTable[playerIndex].MousePositionX += moveDelta;
 
 		//if (*win32NumPad8Pressed || keycodePressed == KeyCode_ARROWDOWN)
 		if (*win32NumPad8Pressed || keycodePressed == KeyCode_NUMPAD8)
-			PlayerDataTable[playerIndex].cockpitCameraPitch += moveDelta;
+			PlayerDataTable[playerIndex].MousePositionY += moveDelta;
 
 		//if (*win32NumPad2Pressed || keycodePressed == KeyCode_ARROWUP)
 		if (*win32NumPad2Pressed || keycodePressed == KeyCode_NUMPAD2)
-			PlayerDataTable[playerIndex].cockpitCameraPitch -= moveDelta;
+			PlayerDataTable[playerIndex].MousePositionY -= moveDelta;
 
 		if (*win32NumPad5Pressed || keycodePressed == KeyCode_NUMPAD5 || keycodePressed == KeyCode_PERIOD)
 		{
 			if (!bExternalCamera) {
 				// Reset cockpit camera
-				PlayerDataTable[playerIndex].cockpitCameraYaw = 0;
-				PlayerDataTable[playerIndex].cockpitCameraPitch = 0;
+				PlayerDataTable[playerIndex].MousePositionX = 0;
+				PlayerDataTable[playerIndex].MousePositionY = 0;
 			} else {
 				// Reset external camera
-				PlayerDataTable[playerIndex].cameraYaw   = 0;
-				PlayerDataTable[playerIndex].cameraPitch = 0;
+				PlayerDataTable[playerIndex].Camera.Yaw   = 0;
+				PlayerDataTable[playerIndex].Camera.Pitch = 0;
 			}
 			//cockpitRefX = 0;
 			//cockpitRefY = 0;
@@ -1429,16 +1435,16 @@ int CockpitLookHook(int* params)
 		// Use NumPad9 and NumPad7 to zoom in/out the external camera
 		if (bExternalCamera) {
 			// These limits (80, 8192) were observed empirically.
-			if (g_bNumPad9 && PlayerDataTable[playerIndex].externalCameraDistance > 80) {
-				PlayerDataTable[playerIndex].externalCameraDistance -= 16;
-				if (PlayerDataTable[playerIndex].externalCameraDistance < 80)
-					PlayerDataTable[playerIndex].externalCameraDistance = 80;
+			if (g_bNumPad9 && PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist > 80) {
+				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist -= 16;
+				if (PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist < 80)
+					PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = 80;
 			}
 
-			if (g_bNumPad7 && PlayerDataTable[playerIndex].externalCameraDistance < 8192) {
-				PlayerDataTable[playerIndex].externalCameraDistance += 16;
-				if (PlayerDataTable[playerIndex].externalCameraDistance > 8192)
-					PlayerDataTable[playerIndex].externalCameraDistance = 8192;
+			if (g_bNumPad7 && PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist < 8192) {
+				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist += 16;
+				if (PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist > 8192)
+					PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = 8192;
 			}
 		}
 
@@ -1460,18 +1466,18 @@ int CockpitLookHook(int* params)
 						char _mouseLookInverted = *mouseLookInverted;
 
 						if (!bExternalCamera) {
-							PlayerDataTable[playerIndex].cockpitCameraYaw += 40 * *mouseLook_X;
+							PlayerDataTable[playerIndex].MousePositionX += 40 * *mouseLook_X;
 							if (_mouseLookInverted)
-								PlayerDataTable[playerIndex].cockpitCameraPitch +=  40 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].MousePositionY +=  40 * _mouseLook_Y;
 							else
-								PlayerDataTable[playerIndex].cockpitCameraPitch += -40 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].MousePositionY += -40 * _mouseLook_Y;
 						}
 						else {
-							PlayerDataTable[playerIndex].cameraYaw += 40 * *mouseLook_X;
+							PlayerDataTable[playerIndex].Camera.Yaw += 40 * *mouseLook_X;
 							if (_mouseLookInverted)
-								PlayerDataTable[playerIndex].cameraPitch +=  40 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].Camera.Pitch +=  40 * _mouseLook_Y;
 							else
-								PlayerDataTable[playerIndex].cameraPitch += -40 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].Camera.Pitch += -40 * _mouseLook_Y;
 						}
 					}
 					else
@@ -1479,18 +1485,18 @@ int CockpitLookHook(int* params)
 						char _mouseLookInverted = *mouseLookInverted;
 
 						if (!bExternalCamera) {
-							PlayerDataTable[playerIndex].cockpitCameraYaw += 15 * *mouseLook_X;
+							PlayerDataTable[playerIndex].MousePositionX += 15 * *mouseLook_X;
 							if (_mouseLookInverted)
-								PlayerDataTable[playerIndex].cockpitCameraPitch += 15 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].MousePositionY += 15 * _mouseLook_Y;
 							else
-								PlayerDataTable[playerIndex].cockpitCameraPitch += -15 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].MousePositionY += -15 * _mouseLook_Y;
 						}
 						else {
-							PlayerDataTable[playerIndex].cameraYaw += 15 * *mouseLook_X;
+							PlayerDataTable[playerIndex].Camera.Yaw += 15 * *mouseLook_X;
 							if (_mouseLookInverted)
-								PlayerDataTable[playerIndex].cameraPitch +=  15 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].Camera.Pitch +=  15 * _mouseLook_Y;
 							else
-								PlayerDataTable[playerIndex].cameraPitch += -15 * _mouseLook_Y;
+								PlayerDataTable[playerIndex].Camera.Pitch += -15 * _mouseLook_Y;
 						}
 					}
 				}
@@ -1498,10 +1504,10 @@ int CockpitLookHook(int* params)
 
 			if (*mouseLookResetPosition)
 			{
-				PlayerDataTable[playerIndex].cockpitCameraYaw = 0;
-				PlayerDataTable[playerIndex].cockpitCameraPitch = 0;
-				PlayerDataTable[playerIndex].cameraYaw = 0;
-				PlayerDataTable[playerIndex].cameraPitch = 0;
+				PlayerDataTable[playerIndex].MousePositionX = 0;
+				PlayerDataTable[playerIndex].MousePositionY = 0;
+				PlayerDataTable[playerIndex].Camera.Yaw = 0;
+				PlayerDataTable[playerIndex].Camera.Pitch = 0;
 			}
 			if (*mouseLookWasNotEnabled)
 				*mouseLookWasNotEnabled = 0;
@@ -1512,30 +1518,30 @@ int CockpitLookHook(int* params)
 		{
 			// Save the current yaw/pitch before adding external view inertia, we'll restore these values the
 			// next time we enter this hook
-			lastCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
-			lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-			lastCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
+			lastCameraYaw   = PlayerDataTable[playerIndex].Camera.Yaw;
+			lastCameraPitch = PlayerDataTable[playerIndex].Camera.Pitch;
+			lastCameraDist  = PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist;
 			//log_debug("lastCamera (2): %d, %d", lastCameraYaw, lastCameraPitch);
 
 			SmoothInertia(&yawInertia, &pitchInertia);
 			// Apply inertia
 			if (g_bExtInertiaEnabled) {
-				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
-				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
-				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
+				PlayerDataTable[playerIndex].Camera.Yaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].Camera.Pitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
 			}
 			else {
-				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
-				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
-				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
+				PlayerDataTable[playerIndex].Camera.Yaw = lastCameraYaw;
+				PlayerDataTable[playerIndex].Camera.Pitch = lastCameraPitch;
+				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = lastCameraDist;
 			}
 
 			// Add the tilt even if external inertia is off:
-			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
+			PlayerDataTable[playerIndex].Camera.Pitch += g_externalTilt;
 			// Save the final values for yaw/pitch -- this will help us detect changes performed in other places
-			prevCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
-			prevCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-			prevCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
+			prevCameraYaw   = PlayerDataTable[playerIndex].Camera.Yaw;
+			prevCameraPitch = PlayerDataTable[playerIndex].Camera.Pitch;
+			prevCameraDist  = PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist;
 			//log_debug("prevCamera: %d, %d", prevCameraYaw, prevCameraPitch);
 			//log_debug("=================");
 		}
@@ -1545,9 +1551,9 @@ int CockpitLookHook(int* params)
 		// The mouse look is disabled because the cockpit isn't displayed, the gunner turret is active, or
 		// we're in multiplayer: let's update the yaw/pitch and tilt to avoid spinning out of control when
 		// switching from no-cockpit to exterior view
-		lastCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
-		lastCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-		lastCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
+		lastCameraYaw   = PlayerDataTable[playerIndex].Camera.Yaw;
+		lastCameraPitch = PlayerDataTable[playerIndex].Camera.Pitch;
+		lastCameraDist  = PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist;
 
 		// Apply External View Inertia when the cockpit is not displayed
 		if (bExternalCamera && *numberOfPlayersInGame == 1) 
@@ -1565,22 +1571,22 @@ int CockpitLookHook(int* params)
 			SmoothInertia(&yawInertia, &pitchInertia);
 			// Apply the inertia
 			if (g_bExtInertiaEnabled) {
-				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
-				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
-				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
+				PlayerDataTable[playerIndex].Camera.Yaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].Camera.Pitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
+				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
 			}
 			else {
-				PlayerDataTable[playerIndex].cameraYaw = lastCameraYaw;
-				PlayerDataTable[playerIndex].cameraPitch = lastCameraPitch;
-				PlayerDataTable[playerIndex].externalCameraDistance = lastCameraDist;
+				PlayerDataTable[playerIndex].Camera.Yaw = lastCameraYaw;
+				PlayerDataTable[playerIndex].Camera.Pitch = lastCameraPitch;
+				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = lastCameraDist;
 			}
 
 			// Add the tilt even if external inertia is off:
-			PlayerDataTable[playerIndex].cameraPitch += g_externalTilt;
+			PlayerDataTable[playerIndex].Camera.Pitch += g_externalTilt;
 		}
-		prevCameraYaw   = PlayerDataTable[playerIndex].cameraYaw;
-		prevCameraPitch = PlayerDataTable[playerIndex].cameraPitch;
-		prevCameraDist  = PlayerDataTable[playerIndex].externalCameraDistance;
+		prevCameraYaw   = PlayerDataTable[playerIndex].Camera.Yaw;
+		prevCameraPitch = PlayerDataTable[playerIndex].Camera.Pitch;
+		prevCameraDist  = PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist;
 	}
 	
 //out:
@@ -1828,6 +1834,15 @@ void InitSharedMem() {
 	}
 	pSharedData->pSharedData = &g_SharedData;
 	pSharedData->bDataReady = true;
+}
+
+int PlayerCameraUpdateHook(int* params)
+{
+	char (*PlayerCameraUpdate)() = (char (*)())0x004EE820;
+
+	log_debug("[DBG][CockpitLook] Running hooked PlayerCameraUpdate");
+
+	return PlayerCameraUpdate();
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
