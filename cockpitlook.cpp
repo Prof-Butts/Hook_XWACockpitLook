@@ -65,7 +65,7 @@ void log_debug(const char *format, ...)
 	va_start(args, format);
 
 	vsprintf_s(buf, 300, format, args);
-	sprintf_s(out, 300, "[DBG] [Cockpitlook] %s", buf);
+	sprintf_s(out, 300, "[DBG] [Cockpitlook] %s\n", buf);
 	OutputDebugString(out);
 #ifdef DEBUG_TO_FILE
 	if (g_DebugFile != NULL) {
@@ -1365,15 +1365,12 @@ int CockpitLookHook(int* params)
 					g_headPos = g_prevHeadingMatrix * g_headPos;
 				else
 					g_headPos = HeadingMatrix * g_headPos;
-				// Regular path: write the X,Y,Z position from g_headPos (when tracking is on).
-				PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
-				PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
-				PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 
-				// Apply the offset to the cockpit position relative to the craft OBJ
-				/*PlayerDataTable[playerIndex].Camera. += (g_fXWAUnitsToMetersScale * g_headPos.x);
-				PlayerDataTable[playerIndex].cockpitCameraY += (g_fXWAUnitsToMetersScale * g_headPos.y);
-				PlayerDataTable[playerIndex].cockpitCameraZ += (g_fXWAUnitsToMetersScale * g_headPos.z);*/
+				// MOVED TO PlayerCameraUpdateHook() to avoid using Camera.Shake
+				// Regular path: write the X,Y,Z position from g_headPos (when tracking is on).
+				/*PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+				PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+				PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);*/
 
 			/*} else {
 				PlayerDataTable[playerIndex].Camera.Yaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
@@ -1838,11 +1835,26 @@ void InitSharedMem() {
 
 int PlayerCameraUpdateHook(int* params)
 {
-	char (*PlayerCameraUpdate)() = (char (*)())0x004EE820;
+	//log_debug("Running hooked PlayerCameraUpdate");
+	
+	int playerIndex = params[0];
+	// Apply the offset to the cockpit position relative to the craft OBJ
+	PlayerDataTable[playerIndex].Camera.ShakeX = (g_fXWAUnitsToMetersScale * g_headPos.x);
+	PlayerDataTable[playerIndex].Camera.ShakeY = (g_fXWAUnitsToMetersScale * g_headPos.y);
+	PlayerDataTable[playerIndex].Camera.ShakeZ = (g_fXWAUnitsToMetersScale * g_headPos.z);
 
-	log_debug("[DBG][CockpitLook] Running hooked PlayerCameraUpdate");
+	/*log_debug("g_headPos = {%f,%f,%f}", g_headPos.x, g_headPos.y, g_headPos.z);
+	log_debug("CockpitPositionTransformed = {%f,%f,%f}",
+		PlayerDataTable[playerIndex].CockpitPositionTransformedX,
+		PlayerDataTable[playerIndex].CockpitPositionTransformedY,
+		PlayerDataTable[playerIndex].CockpitPositionTransformedZ);
+	log_debug("Camera.Position = {%f,%f,%f}",
+		PlayerDataTable[playerIndex].Camera.PositionX,
+		PlayerDataTable[playerIndex].Camera.PositionY,
+		PlayerDataTable[playerIndex].Camera.PositionZ);*/
 
-	return PlayerCameraUpdate();
+	int(*PlayerCameraUpdate)(int) = (int(*)(int)) 0x004EE820;
+	return PlayerCameraUpdate(params[0]);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)

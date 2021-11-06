@@ -198,7 +198,8 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 			poseMatrix = g_hmdPose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
 			q = rotationToQuaternion(poseMatrix);
 			quatToEuler(q, yaw, pitch, &roll);
-			if (g_bCorrectedHeadTracking) {
+			//if (g_bCorrectedHeadTracking) {
+			if (false) {
 				// Disable positional tracking here if we are using the corrected tracking
 				// It will be applied later in ddraw
 				// This avoids using cockpit shake and reduces the jitter at the cost of some visible culling
