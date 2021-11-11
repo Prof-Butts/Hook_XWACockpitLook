@@ -321,6 +321,43 @@ struct MobileObjectEntry
 
 static_assert(sizeof(MobileObjectEntry) == 229, "size of MobileObjectEntry must be 229");
 
+struct PlayerCamera {
+	int PositionX;
+	int PositionY;
+	int PositionZ;
+	int CraftIndex;
+	int RelatedToMap;
+	__int16 CraftPitch;
+	__int16 CraftYaw;
+	__int16 CraftRoll;
+	__int16 Roll;
+	__int16 Pitch;
+	__int16 Yaw;
+	int ShakeX;
+	int ShakeY;
+	int ShakeZ;
+	__int16 collisionPitch;
+	__int16 collisionYaw;
+	__int16 collisionRoll;
+	__int16 field_32;
+	char ViewMode1;
+	char ViewMode2;
+	char field_36;
+	char S0x08B94E0_B48_m37;
+	char unk38;
+	__int16 S0x08B94E0_B48_m39;
+	__int16 S0x08B94E0_B48_m3B;
+	__int16 MapMode;
+	__int16 _RelatedToCamera_;
+	__int16 ExternalCamera;
+	int ExternalCameraZoomDist;
+	__int16 FlyByCameraTime;    // Starts at 0 when Alt-J is pressed and goes all the way to ~1175 before being reset to 0
+	__int16 S0x08B94E0_B48_m49;
+	char unk4B[2];
+};
+
+static_assert(sizeof(PlayerCamera) == 0x4D, "size of PlayerCamera must be 0x4D");
+
 struct PlayerDataEntry
 {
 	int objectIndex;
@@ -633,18 +670,14 @@ struct PlayerDataEntry
 	char cockpitDisplayed2; // HasCockpitOpt
 	char field_1FB; // HasTurretOpt
 	char field_1FC;
-	__int16 cockpitCameraYaw; // MousePositionX
-	__int16 cockpitCameraPitch; // MousePositionY
-	//float _Pitch_; // CockpitPositionTranformed -- NOT pitch, yaw, roll!
-	//float _Yaw_;
-	//float _Roll_; // Looks like these should be float's, according to Justagai.
+	__int16 MousePositionX;
+	__int16 MousePositionY;
 	float CockpitPositionTransformedX;
 	float CockpitPositionTransformedY;
 	float CockpitPositionTransformedZ;
-	//char field_20D[12]; // float CockpitPosition[3];
 	float CockpitPositionX;
 	float CockpitPositionY;
-	float CockpitPositionZ;
+	float CockpitPositionZ; // Looks like these should be float's, according to Justagai.
 	__int16 gunnerTurretActive;
 	__int16 numberOfGunnerHardpoints;
 	char currentGunnerHardpointActive;
@@ -1047,40 +1080,7 @@ struct PlayerDataEntry
 	char chatStringTerminator;
 	char chatStringCharCount;
 	char multiChatMode;
-	// PlayerCamera struct begins here
-	int cameraX;
-	int cameraY;
-	int cameraZ;
-	int cameraFG;
-	int RelatedToMap;
-	__int16 pitch;
-	__int16 yaw;
-	__int16 roll;
-	__int16 cameraRoll;
-	__int16 cameraPitch;
-	__int16 cameraYaw;
-	int cockpitXReference;
-	int cockpitYReference;
-	int cockpitZReference;
-	__int16 cockpitPitchReference;
-	__int16 cockpitYawReference;
-	__int16 cockpitRollReference;
-
-	char field_B7A;
-	char field_B7B;
-	char viewMode1;
-	char viewMode2;
-	char field_B7E[7];
-	__int16 mapMode;
-	__int16 _RelatedToCamera_;
-	__int16 externalCamera;
-	int externalCameraDistance;
-	__int16 FlyByCameraTime;    // Starts at 0 when Alt-J is pressed and goes all the way to ~1175 before being reset to 0
-	char field_B91;
-	char field_B92;
-	char field_B93;
-	char field_B94;
-	// PlayerCamera struct ends here
+	PlayerCamera Camera;
 	__int16 screenResolutionSetting; // Ofs: 0x0B95
 	int rosterID;
 	int missionTime;
