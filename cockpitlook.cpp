@@ -518,7 +518,8 @@ float centeredSigmoid(float x) {
 
 // TODO: Remove all these variables from ddraw once the migration is complete.
 //float g_fXWAUnitsToMetersScale = 655.36f; // This is technically correct; but it seems too much for me
-float g_fXWAUnitsToMetersScale = 400.0f; // This value feels better
+// float g_fXWAUnitsToMetersScale = 400.0f; // This value feels better
+float g_fXWAUnitsToMetersScale = 25.0f; // New value to be applied in CockpitPositionReferenceHook
 float g_fPosXMultiplier = 1.666f, g_fPosYMultiplier = 1.666f, g_fPosZMultiplier = 1.666f;
 float g_fMinPositionX = -2.50f, g_fMaxPositionX = 2.50f;
 float g_fMinPositionY = -2.50f, g_fMaxPositionY = 2.50f;
@@ -1364,7 +1365,10 @@ int CockpitLookHook(int* params)
 				if (g_bInHyperspace)
 					g_headPos = g_prevHeadingMatrix * g_headPos;
 				else
-					g_headPos = HeadingMatrix * g_headPos;
+					1;
+					// It is not necessary to apply the headingmatrix transformation when applying the positional offset
+					// in CockpitPositionTransform instead of Shake. 
+					//g_headPos = HeadingMatrix * g_headPos;
 
 				// MOVED TO PlayerCameraUpdateHook() to avoid using Camera.Shake
 				// Regular path: write the X,Y,Z position from g_headPos (when tracking is on).
@@ -1838,23 +1842,24 @@ int PlayerCameraUpdateHook(int* params)
 	//log_debug("Running hooked PlayerCameraUpdate");
 	
 	int playerIndex = params[0];
-	// Apply the offset to the cockpit position relative to the craft OBJ
-	PlayerDataTable[playerIndex].Camera.ShakeX = (g_fXWAUnitsToMetersScale * g_headPos.x);
-	PlayerDataTable[playerIndex].Camera.ShakeY = (g_fXWAUnitsToMetersScale * g_headPos.y);
-	PlayerDataTable[playerIndex].Camera.ShakeZ = (g_fXWAUnitsToMetersScale * g_headPos.z);
-
-	/*log_debug("g_headPos = {%f,%f,%f}", g_headPos.x, g_headPos.y, g_headPos.z);
-	log_debug("CockpitPositionTransformed = {%f,%f,%f}",
-		PlayerDataTable[playerIndex].CockpitPositionTransformedX,
-		PlayerDataTable[playerIndex].CockpitPositionTransformedY,
-		PlayerDataTable[playerIndex].CockpitPositionTransformedZ);
-	log_debug("Camera.Position = {%f,%f,%f}",
-		PlayerDataTable[playerIndex].Camera.PositionX,
-		PlayerDataTable[playerIndex].Camera.PositionY,
-		PlayerDataTable[playerIndex].Camera.PositionZ);*/
 
 	int(*PlayerCameraUpdate)(int) = (int(*)(int)) 0x004EE820;
 	return PlayerCameraUpdate(params[0]);
+}
+
+int CockpitPositionTransformHook(int* params)
+{
+	//log_debug("Running hooked Vector3Transform in CockpitPositionTransformHook\n");
+	
+	Vector3* vec = (Vector3*)params[0];	
+	
+	// Recommended value for g_fXWAUnitsToMetersScale = 25.
+	vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
+	vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
+	vec->y -= (g_fXWAUnitsToMetersScale * g_headPos.z);
+	void* (*Vector3Transform)(void*, void*) = (void* (*)(void*, void*)) 0x439B30;
+	Vector3Transform( (void*)vec, (void*)params[1]);
+	return 0;
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
