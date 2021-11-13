@@ -36,6 +36,7 @@ extern bool g_bSteamVRInitialized;
 SharedMem g_SharedMem(true);
 char shared_msg[80] = "message from the CokpitLookHook";
 vr::TrackedDevicePose_t g_hmdPose;
+float g_fRoll = 0;
 
 
 #define DEBUG_TO_FILE 1
@@ -216,7 +217,7 @@ const char *MAX_POSITIONAL_Z_VRPARAM = "max_positional_track_z";
 // give users the option to invert the axis if needed.
 const float DEFAULT_YAW_MULTIPLIER = 1.0f;
 const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
-//const float DEFAULT_ROLL_MULTIPLIER = 1.0f;
+const float DEFAULT_ROLL_MULTIPLIER = 1.0f;
 const float DEFAULT_YAW_OFFSET = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
 const int   DEFAULT_FREEPIE_SLOT = 0;
@@ -243,6 +244,7 @@ TrackerType g_TrackerType = TRACKER_NONE;
 
 float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
+float g_fRollMultiplier = DEFAULT_ROLL_MULTIPLIER;
 float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
 float g_fPitchOffset	 = DEFAULT_PITCH_OFFSET;
 int   g_iFreePIESlot	 = DEFAULT_FREEPIE_SLOT;
@@ -940,7 +942,7 @@ Params[-15] = EBP
 int CockpitLookHook(int* params)
 {
 	int playerIndex = params[-10]; // Using -10 instead of -6, prevents this hook from crashing in Multiplayer
-	float yaw = 0.0f, pitch = 0.0f;
+	float yaw = 0.0f, pitch = 0.0f, roll = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
 	bool dataReady = false, enableTrackedYawPitch = true;
 	bool bExternalCamera = PlayerDataTable[playerIndex].Camera.ExternalCamera;
@@ -1216,7 +1218,7 @@ int CockpitLookHook(int* params)
 				else
 					g_headPosFromKeyboard.set(0, 0, 0);
 
-				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &x, &y, &z);
+				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &roll, &x, &y, &z);
 				// We need to invert the Z-axis because of XWA's coordinate system.
 				z = -z;
 
@@ -1234,6 +1236,7 @@ int CockpitLookHook(int* params)
 
 				yaw      *= RAD_TO_DEG * g_fYawMultiplier;
 				pitch    *= RAD_TO_DEG * g_fPitchMultiplier;
+				roll     *= RAD_TO_DEG * g_fRollMultiplier;
 				yawSign   = -1.0f;
 				if (g_bResetHeadCenter) {
 					g_headCenter[0] = x;
@@ -1319,6 +1322,8 @@ int CockpitLookHook(int* params)
 				if (enableTrackedYawPitch) {
 					PlayerDataTable[playerIndex].MousePositionX   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 					PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+					// Save roll value to use later in another hooked function
+					g_fRoll = (short)(roll / 360.0f * 65535.0f);
 				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
@@ -1836,7 +1841,7 @@ void InitSharedMem() {
 	pSharedData->bDataReady = true;
 }
 
-int PlayerCameraUpdateHook(int* params)
+/*int PlayerCameraUpdateHook(int* params)
 {
 	//log_debug("Running hooked PlayerCameraUpdate");
 	
@@ -1844,7 +1849,7 @@ int PlayerCameraUpdateHook(int* params)
 
 	int(*PlayerCameraUpdate)(int) = (int(*)(int)) 0x004EE820;
 	return PlayerCameraUpdate(params[0]);
-}
+}*/
 
 int CockpitPositionTransformHook(int* params)
 {
@@ -1857,6 +1862,30 @@ int CockpitPositionTransformHook(int* params)
 	vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
 	vec->y -= (g_fXWAUnitsToMetersScale * g_headPos.z);
 	Vector3Transform( (Vector3_float*)vec, (XwaMatrix3x3*)params[1]);
+	return 0;
+}
+
+int UpdateCameraTransformHook(int* params) {
+	// This function will run when the engine tries to apply the Camera.Pitch to the transformation matrix
+	// used later for 3D rendering. We can inject the roll after applying the Pitch (pitch->roll->yaw)
+	// I have tried also to apply it before roll->pitch->yaw and pitch->yaw->roll, but this one seems 
+	// to provide the correct result.
+	// TODO: fix things that this breaks
+	// - the sound (it enters some kind of loop)
+	// - the targeting reticle is not anymore where it should be.
+
+	void (*DoRotation)(int, int, int, __int16) = (void (*)(int, int, int, __int16)) 0x440E40;
+
+	// Obtain the current rear-looking vector that we need to rotate around for applying roll
+	int* g_objectTransformRear_X = (int*)0x910934;
+	int* g_objectTransformRear_Y = (int*)0x910938;
+	int* g_objectTransformRear_Z = (int*)0x910944;
+
+	// Apply the expected Pitch rotation
+	DoRotation(params[0], params[1], params[2], params[3]);
+
+	DoRotation(*g_objectTransformRear_X, *g_objectTransformRear_Y, *g_objectTransformRear_Z, (short) -g_fRoll);
+		
 	return 0;
 }
 

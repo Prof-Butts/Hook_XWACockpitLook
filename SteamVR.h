@@ -7,4 +7,4 @@ extern bool g_bCorrectedHeadTracking;
 
 bool InitSteamVR();
 void ShutdownSteamVR();
-bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, float *z);
+bool GetSteamVRPositionalData(float *yaw, float *pitch, float *roll, float *x, float *y, float *z);
