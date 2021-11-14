@@ -1875,17 +1875,18 @@ int UpdateCameraTransformHook(int* params) {
 	// - the targeting reticle is not anymore where it should be.
 
 	void (*DoRotation)(int, int, int, __int16) = (void (*)(int, int, int, __int16)) 0x440E40;
-
-	// Obtain the current rear-looking vector that we need to rotate around for applying roll
-	int* g_objectTransformRear_X = (int*)0x910934;
-	int* g_objectTransformRear_Y = (int*)0x910938;
-	int* g_objectTransformRear_Z = (int*)0x910944;
-
 	// Apply the expected Pitch rotation
 	DoRotation(params[0], params[1], params[2], params[3]);
 
-	DoRotation(*g_objectTransformRear_X, *g_objectTransformRear_Y, *g_objectTransformRear_Z, (short) -g_fRoll);
-		
+
+	if (g_bCorrectedHeadTracking) {
+		// Only apply roll for the new corrected tracking, for now.
+		// Obtain the current rear-looking vector that we need to rotate around for applying roll
+		int* g_objectTransformRear_X = (int*)0x910934;
+		int* g_objectTransformRear_Y = (int*)0x910938;
+		int* g_objectTransformRear_Z = (int*)0x910944;
+		DoRotation(*g_objectTransformRear_X, *g_objectTransformRear_Y, *g_objectTransformRear_Z, (short)-g_fRoll);
+	}		
 	return 0;
 }
 
