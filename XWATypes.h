@@ -24,3 +24,21 @@ typedef struct _RECT {
 	LONG bottom;
 } RECT, *PRECT;
 */
+
+typedef struct Vector3_float {
+	float x;
+	float y;
+	float z;
+} Vector3_float;
+
+typedef struct XwaMatrix3x3 {
+	float _11;
+	float _12;
+	float _13;
+	float _21;
+	float _22;
+	float _23;
+	float _31;
+	float _32;
+	float _33;
+} XwaMatrix3x3;

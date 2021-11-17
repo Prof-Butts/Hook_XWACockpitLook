@@ -1096,14 +1096,14 @@ int CockpitLookHook(int* params)
 						yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 					}
 
-					if (g_bInHyperspace)
-						g_headPos = g_prevHeadingMatrix * g_headPos;
-					else
-						g_headPos = HeadingMatrix * g_headPos;
+					//if (g_bInHyperspace)
+					//	g_headPos = g_prevHeadingMatrix * g_headPos;
+					//else
+					//	g_headPos = HeadingMatrix * g_headPos;
 					// TRACKER_NONE path, when mouse look is enabled
-					PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
-					PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
-					PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
+					//PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+					//PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+					//PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 					dataReady = false;
 				} 
 				else if (!*mouseLook) {
@@ -1139,14 +1139,14 @@ int CockpitLookHook(int* params)
 							yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 						}
 
-						if (g_bInHyperspace)
-							g_headPos = g_prevHeadingMatrix * g_headPos;
-						else
-							g_headPos = HeadingMatrix * g_headPos;
-						// TRACKER_NONE path, when mouse look is disabled
-						PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
-						PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
-						PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
+						//if (g_bInHyperspace)
+						//	g_headPos = g_prevHeadingMatrix * g_headPos;
+						//else
+						//	g_headPos = HeadingMatrix * g_headPos;
+						//// TRACKER_NONE path, when mouse look is disabled
+						//PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+						//PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+						//PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 					}
 				}
 
@@ -1154,7 +1154,7 @@ int CockpitLookHook(int* params)
 				if (g_FreePIEOutputSlot > -1) {
 					g_FreePIEData.yaw   = fake_yaw;
 					g_FreePIEData.pitch = fake_pitch;
-					g_FreePIEData.roll  = 0.0f;
+						g_FreePIEData.roll  = 0.0f;
 					g_FreePIEData.x =  g_headPos.x;
 					g_FreePIEData.y =  g_headPos.y;
 					g_FreePIEData.z = -g_headPos.z;
@@ -1362,19 +1362,18 @@ int CockpitLookHook(int* params)
 					yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
 				}
 
-				if (g_bInHyperspace)
-					g_headPos = g_prevHeadingMatrix * g_headPos;
-				else
-					1;
+				//if (g_bInHyperspace)
+				//	g_headPos = g_prevHeadingMatrix * g_headPos;
+				//else
 					// It is not necessary to apply the headingmatrix transformation when applying the positional offset
 					// in CockpitPositionTransform instead of Shake. 
 					//g_headPos = HeadingMatrix * g_headPos;
 
 				// MOVED TO PlayerCameraUpdateHook() to avoid using Camera.Shake
 				// Regular path: write the X,Y,Z position from g_headPos (when tracking is on).
-				/*PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
-				PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
-				PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);*/
+				//PlayerDataTable[playerIndex].Camera.ShakeX = (int)(g_fXWAUnitsToMetersScale * g_headPos.x);
+				//PlayerDataTable[playerIndex].Camera.ShakeY = (int)(g_fXWAUnitsToMetersScale * g_headPos.y);
+				//PlayerDataTable[playerIndex].Camera.ShakeZ = (int)(g_fXWAUnitsToMetersScale * g_headPos.z);
 
 			/*} else {
 				PlayerDataTable[playerIndex].Camera.Yaw   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
@@ -1851,14 +1850,13 @@ int CockpitPositionTransformHook(int* params)
 {
 	//log_debug("Running hooked Vector3Transform in CockpitPositionTransformHook\n");
 	
-	Vector3* vec = (Vector3*)params[0];	
+	Vector3_float* vec = (Vector3_float*)params[0];	
 	
 	// Recommended value for g_fXWAUnitsToMetersScale = 25.
 	vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
 	vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
 	vec->y -= (g_fXWAUnitsToMetersScale * g_headPos.z);
-	void* (*Vector3Transform)(void*, void*) = (void* (*)(void*, void*)) 0x439B30;
-	Vector3Transform( (void*)vec, (void*)params[1]);
+	Vector3Transform( (Vector3_float*)vec, (XwaMatrix3x3*)params[1]);
 	return 0;
 }
 
