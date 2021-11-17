@@ -49,6 +49,7 @@ const auto PositionImage = (int(*)(char* image, int height, int width))0x534A60;
 const auto DisplayMessage = (int(*)(int messageIndex, int playerIndex))0x497D40;
 const auto GetKeyboardDeviceState = (int(*)())0x42B900;
 const auto DirectInputKeyboardReaquire = (char(*)())0x42B920;
+const auto Vector3Transform = (void* (*)(Vector3_float* vec, XwaMatrix3x3* mat)) 0x439B30;
 
 
 
