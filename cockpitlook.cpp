@@ -36,8 +36,6 @@ extern bool g_bSteamVRInitialized;
 SharedMem g_SharedMem(true);
 char shared_msg[80] = "message from the CokpitLookHook";
 vr::TrackedDevicePose_t g_hmdPose;
-float g_fRoll = 0;
-
 
 #define DEBUG_TO_FILE 1
 //#undef DEBUG_TO_FILE
@@ -252,6 +250,7 @@ bool  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 bool  g_bTestJoystick = true;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0, 0, 0);
+int g_headYaw = 0, g_headPitch, g_headRoll = 0;
 Vector3 g_headPosFromKeyboard(0, 0, 0);
 Vector4 g_prevFs(0, 0, 1, 0);
 int g_FreePIEOutputSlot = -1;
@@ -1320,10 +1319,13 @@ int CockpitLookHook(int* params)
 				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
 				// look around
 				if (enableTrackedYawPitch) {
-					PlayerDataTable[playerIndex].MousePositionX   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
-					PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
-					// Save roll value to use later in another hooked function
-					g_fRoll = (short)(roll / 360.0f * 65535.0f);
+					//PlayerDataTable[playerIndex].MousePositionX   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+					//PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+					// Save rotation values to use later in another hooked function
+					g_headYaw = (short)(yaw / 360.0f * 65535.0f);
+					g_headPitch = (short)(pitch / 360.0f * 65535.0f);
+					g_headRoll = (short)(roll / 360.0f * 65535.0f);
+					
 				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
@@ -1841,15 +1843,30 @@ void InitSharedMem() {
 	pSharedData->bDataReady = true;
 }
 
-/*int PlayerCameraUpdateHook(int* params)
+int UpdateCameraTransformHook(int* params)
 {
-	//log_debug("Running hooked PlayerCameraUpdate");
+	//log_debug("Running hooked UpdateCameraTransform()");
 	
 	int playerIndex = params[0];
 
-	int(*PlayerCameraUpdate)(int) = (int(*)(int)) 0x004EE820;
-	return PlayerCameraUpdate(params[0]);
-}*/
+	int(*UpdateCameraTransform)(int,int,int,int,_int16,_int16,int,int) = (int(*)(
+		int cameraCraftRoll,
+		int cameraCraftPitch,
+		int cameraCraftYaw,
+		int cameraRoll,
+		__int16 cameraPitch,
+		__int16 cameraYaw,
+		int object,
+		int playerIndex)) 0x43F8E0;
+
+	// Apply rotations coming from XWA engine	
+	//g_headRoll += params[3];
+	g_headRoll = params[3];
+	g_headPitch += params[4];
+	g_headYaw += params[5];
+
+	return UpdateCameraTransform(params[0], params[1], params[2], g_headRoll, g_headYaw, g_headPitch, params[6], params[7]);
+}
 
 int CockpitPositionTransformHook(int* params)
 {
@@ -1865,7 +1882,8 @@ int CockpitPositionTransformHook(int* params)
 	return 0;
 }
 
-int UpdateCameraTransformHook(int* params) {
+int DoRotationHook(int* params)
+{
 	// This function will run when the engine tries to apply the Camera.Pitch to the transformation matrix
 	// used later for 3D rendering. We can inject the roll after applying the Pitch (pitch->roll->yaw)
 	// I have tried also to apply it before roll->pitch->yaw and pitch->yaw->roll, but this one seems 
@@ -1874,7 +1892,6 @@ int UpdateCameraTransformHook(int* params) {
 	// - the sound (it enters some kind of loop)
 	// - the targeting reticle is not anymore where it should be.
 
-	void (*DoRotation)(int, int, int, __int16) = (void (*)(int, int, int, __int16)) 0x440E40;
 	// Apply the expected Pitch rotation
 	DoRotation(params[0], params[1], params[2], params[3]);
 
