@@ -1844,6 +1844,12 @@ void InitSharedMem() {
 	pSharedData->bDataReady = true;
 }
 
+/*
+ NOT CURRENTLY USED
+ This function runs when UpdateCameraTransform is called from PlayerCameraUpdate() for the normal in-flight camera (not map, not external)
+
+ It does NOT currently modify the XWA engine behavior, just calls the original function.
+*/
 int UpdateCameraTransformHook(int* params)
 {
 	//log_debug("Running hooked UpdateCameraTransform()");
@@ -1860,13 +1866,16 @@ int UpdateCameraTransformHook(int* params)
 		int object,
 		int playerIndex)) 0x43F8E0;
 
-	// Apply rotations coming from XWA engine
-	/*g_headPitch += params[4];
-	g_headYaw += params[5];*/
-	g_headPitch = params[4];
-	g_headYaw = params[5];
-
+	// Apply headtracking to rotations coming from XWA engine
+	/*
+	g_headPitch += params[4];
+	g_headYaw += params[5];
 	return UpdateCameraTransform(params[0], params[1], params[2], params[3], g_headPitch, g_headYaw, params[6], params[7]);
+	*/
+
+	// Since the headtracking is either applied in CockpitLookHook through MousePosition_X,Y, or through the matrix in DoRotate()
+	// We don't need to apply it here.
+	return UpdateCameraTransform(params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7]);
 }
 
 int CockpitPositionTransformHook(int* params)
@@ -1903,8 +1912,10 @@ int DoRotationPitchHook(int* params)
 			(float)*g_objectTransformRear_X, (float)*g_objectTransformRear_Y, (float)*g_objectTransformRear_Z
 		);
 
-		// Apply the headtracking from
+		// Apply the rotation matrix from headtracking
 		xwaCameraTransform *= g_headRotation;
+
+		// Rewrite the composed rotation matrix (original+headtracking) into XWA globals
 		*g_objectTransformRight_X = -(int)xwaCameraTransform[0];
 		*g_objectTransformRight_Y = -(int)xwaCameraTransform[1];
 		*g_objectTransformRight_Z = -(int)xwaCameraTransform[2];
