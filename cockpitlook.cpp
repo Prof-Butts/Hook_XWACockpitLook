@@ -36,6 +36,8 @@ extern bool g_bSteamVRInitialized;
 SharedMem g_SharedMem(true);
 char shared_msg[80] = "message from the CokpitLookHook";
 vr::TrackedDevicePose_t g_hmdPose;
+Matrix3 g_headRotation;
+int g_headYaw = 0, g_headPitch, g_headRoll = 0;
 
 #define DEBUG_TO_FILE 1
 //#undef DEBUG_TO_FILE
@@ -250,7 +252,6 @@ bool  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 bool  g_bTestJoystick = true;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0, 0, 0);
-int g_headYaw = 0, g_headPitch, g_headRoll = 0;
 Vector3 g_headPosFromKeyboard(0, 0, 0);
 Vector4 g_prevFs(0, 0, 1, 0);
 int g_FreePIEOutputSlot = -1;
@@ -1217,7 +1218,7 @@ int CockpitLookHook(int* params)
 				else
 					g_headPosFromKeyboard.set(0, 0, 0);
 
-				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &roll, &x, &y, &z);
+				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &roll, &x, &y, &z, &g_headRotation );
 				// We need to invert the Z-axis because of XWA's coordinate system.
 				z = -z;
 
@@ -1319,8 +1320,8 @@ int CockpitLookHook(int* params)
 				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
 				// look around
 				if (enableTrackedYawPitch) {
-					//PlayerDataTable[playerIndex].MousePositionX   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
-					//PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+					PlayerDataTable[playerIndex].MousePositionX   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+					PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 					// Save rotation values to use later in another hooked function
 					g_headYaw = (short)(yaw / 360.0f * 65535.0f);
 					g_headPitch = (short)(pitch / 360.0f * 65535.0f);
@@ -1859,13 +1860,13 @@ int UpdateCameraTransformHook(int* params)
 		int object,
 		int playerIndex)) 0x43F8E0;
 
-	// Apply rotations coming from XWA engine	
-	//g_headRoll += params[3];
-	g_headRoll = params[3];
-	g_headPitch += params[4];
-	g_headYaw += params[5];
+	// Apply rotations coming from XWA engine
+	/*g_headPitch += params[4];
+	g_headYaw += params[5];*/
+	g_headPitch = params[4];
+	g_headYaw = params[5];
 
-	return UpdateCameraTransform(params[0], params[1], params[2], g_headRoll, g_headYaw, g_headPitch, params[6], params[7]);
+	return UpdateCameraTransform(params[0], params[1], params[2], params[3], g_headPitch, g_headYaw, params[6], params[7]);
 }
 
 int CockpitPositionTransformHook(int* params)
@@ -1882,28 +1883,58 @@ int CockpitPositionTransformHook(int* params)
 	return 0;
 }
 
-int DoRotationHook(int* params)
+/* This function will run when the engine tries to apply the Camera.Pitch to the transformation matrix
+   used later for 3D rendering.
+   TODO: fix the targeting reticle is not anymore where it should be.
+   TODO: put conditions to support all types of headtracking (matrix or yaw,pitch,roll based like FreePIE and TrackIR)
+*/
+int DoRotationPitchHook(int* params)
 {
-	// This function will run when the engine tries to apply the Camera.Pitch to the transformation matrix
-	// used later for 3D rendering. We can inject the roll after applying the Pitch (pitch->roll->yaw)
-	// I have tried also to apply it before roll->pitch->yaw and pitch->yaw->roll, but this one seems 
-	// to provide the correct result.
-	// TODO: fix things that this breaks
-	// - the sound (it enters some kind of loop)
-	// - the targeting reticle is not anymore where it should be.
 
-	// Apply the expected Pitch rotation
-	DoRotation(params[0], params[1], params[2], params[3]);
-
+	// We need to apply the rotation matrix obtained from the headtracking here
+	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
+	// First construct the rotation matrix from current XWA globals
+	// We follow the same convention as SteamVR (+y is up, +x is to the right, -z is forward)
 
 	if (g_bCorrectedHeadTracking) {
-		// Only apply roll for the new corrected tracking, for now.
-		// Obtain the current rear-looking vector that we need to rotate around for applying roll
-		int* g_objectTransformRear_X = (int*)0x910934;
-		int* g_objectTransformRear_Y = (int*)0x910938;
-		int* g_objectTransformRear_Z = (int*)0x910944;
-		DoRotation(*g_objectTransformRear_X, *g_objectTransformRear_Y, *g_objectTransformRear_Z, (short)-g_fRoll);
-	}		
+		Matrix3 xwaCameraTransform = Matrix3(
+			-(float)*g_objectTransformRight_X, -(float)*g_objectTransformRight_Y, -(float)*g_objectTransformRight_Z,
+			(float)*g_objectTransformUp_X, (float)*g_objectTransformUp_Y, (float)*g_objectTransformUp_Z,
+			(float)*g_objectTransformRear_X, (float)*g_objectTransformRear_Y, (float)*g_objectTransformRear_Z
+		);
+
+		// Apply the headtracking from
+		xwaCameraTransform *= g_headRotation;
+		*g_objectTransformRight_X = -(int)xwaCameraTransform[0];
+		*g_objectTransformRight_Y = -(int)xwaCameraTransform[1];
+		*g_objectTransformRight_Z = -(int)xwaCameraTransform[2];
+		*g_objectTransformUp_X = (int)xwaCameraTransform[3];
+		*g_objectTransformUp_Y = (int)xwaCameraTransform[4];
+		*g_objectTransformUp_Z = (int)xwaCameraTransform[5];
+		*g_objectTransformRear_X = (int)xwaCameraTransform[6];
+		*g_objectTransformRear_Y = (int)xwaCameraTransform[7];
+		*g_objectTransformRear_Z = (int)xwaCameraTransform[8];
+	}
+	else {
+		// Apply the expected Pitch rotation
+		DoRotation(params[0], params[1], params[2], params[3]);
+	}
+	return 0;
+}
+
+/* This function will run when the engine tries to apply the Camera.Yaw to the transformation matrix
+   used later for 3D rendering.
+*/
+int DoRotationYawHook(int* params)
+{
+	if (g_bCorrectedHeadTracking) {
+		// Since we applied the full rotation matrix in DoRotationPitchHook(), we don't need to do anything here.		
+		return 0;
+	}
+	else {
+		// Apply the expected Yaw rotation
+		DoRotation(params[0], params[1], params[2], params[3]);
+	}
 	return 0;
 }
 

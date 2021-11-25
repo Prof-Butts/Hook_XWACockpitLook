@@ -8,8 +8,8 @@ static const HookFunction g_hookFunctions[] =
 	{ 0x4F9A66, CockpitLookHook },
 	{ 0x4EE9DA, UpdateCameraTransformHook },
 	{ 0x497ABB, CockpitPositionTransformHook },
-	{ 0x43FB57, DoRotationHook}, //DoRotation(Pitch)
-	//{ 0x43FB67, DoRotationHook }, //DoRotation(Yaw)
+	{ 0x43FB57, DoRotationPitchHook}, //DoRotation(Pitch)
+	{ 0x43FB67, DoRotationYawHook }, //DoRotation(Yaw)
 };
 
 static const HookPatchItem g_patch[] =
@@ -33,7 +33,7 @@ static const HookPatchItem g_patch[] =
 	{ 0x43FB52 - 0x400C00, "E8E9120000", "E8C98F1600"},
 
 	// Hook call to DoRotation(Yaw) inside UpdateCameraTransform (0x43FB52)
-	//{ 0x43FB62 - 0x400C00, "E8D9120000", "E8B98F1600"},
+	{ 0x43FB62 - 0x400C00, "E8D9120000", "E8B98F1600"},
 };
 
 static const HookPatch g_patches[] =

@@ -161,3 +161,13 @@ const auto g_localPlayerObjectIndex = (int *)0x0634370;
 const auto g_localPlayerObjectIndex2 = (int *)0x0631B70;
 
 const auto *g_playerInHangar = (unsigned int *)0x09C6E40;
+
+const auto g_objectTransformRear_X = (int *)0x910934;
+const auto g_objectTransformRear_Y = (int *)0x910938;
+const auto g_objectTransformRear_Z = (int *)0x910944;
+const auto g_objectTransformRight_X = (int*)0x8D93D8;
+const auto g_objectTransformRight_Y = (int*)0x8D93C8;
+const auto g_objectTransformRight_Z = (int*)0x8D93D0;
+const auto g_objectTransformUp_X = (int*)0x8D9400;
+const auto g_objectTransformUp_Y = (int*)0x8D93E8;
+const auto g_objectTransformUp_Z = (int*)0x8D93F4;
