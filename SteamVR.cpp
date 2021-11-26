@@ -58,6 +58,15 @@ void ShutdownSteamVR() {
 	log_debug("SteamVR shut down");
 }
 
+Matrix3 HmdMatrix34toMatrix3(const vr::HmdMatrix34_t& mat) {
+	Matrix3 matrixObj(
+		mat.m[0][0], mat.m[1][0], mat.m[2][0],
+		mat.m[0][1], mat.m[1][1], mat.m[2][1],
+		mat.m[0][2], mat.m[1][2], mat.m[2][2]
+	);
+	return matrixObj;
+}
+
 /*
  * Convert a rotation matrix to a normalized quaternion.
  * From: http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/
@@ -133,7 +142,145 @@ void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch) 
 	*roll = atan2(2.0f * q.x*q.w - 2.0f * q.y*q.z, 1.0f - 2.0f * sqx - 2.0f * sqz);
 }
 
-bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, float *z)
+/* DEPRECATED, WE APPLY ROTATION MATRIX DIRECTLY INSTEAD
+Formulas from https://www.geometrictools.com/Documentation/EulerAngles.pdf
+
+The formulas are for Extrinsic convention, so we take the formulas for the rotation in inverse order
+(see https://en.wikipedia.org/wiki/Davenport_chained_rotations#Conversion_between_intrinsic_and_extrinsic_rotations)
+
+We should use ZYX to match the order of rotations in XWA (pitch->yaw->roll in ddraw). However, this convention has singularities
+in yaw = +-90, with an inversion of the axes that are not acceptable.
+
+An alternative YZX is used to move the singularity to roll=+-90 which is a much less pose, and behavior is similar to the original
+matrix->quaternion->Euler functions.
+
+*/
+void rotMatrixToEuler(vr::HmdMatrix34_t pose, float* yaw, float* pitch, float* roll)
+{
+	float thetaX, thetaY, thetaZ;
+
+/* Extrinsic ZYX */
+	//if(pose.m[2][0] < 0.999f)
+	//{
+	//	if(pose.m[2][0] > -0.999f)
+	//	{
+	//		thetaY = asin(-pose.m[2][0]);
+	//		thetaZ = atan2(pose.m[1][0], pose.m[0][0]);
+	//		thetaX = atan2(pose.m[2][1], pose.m[2][2]);
+	//	}
+	//	else // r20 = -1
+	//	{
+	//		thetaY = PI / 2;
+	//		thetaZ = -(atan2(-pose.m[1][2], pose.m[1][1]));
+	//		thetaX = 0;
+	//	}
+	//}
+	//else // r20 = +1
+	//{
+	//	thetaY = -PI / 2;
+	//	thetaZ = atan2(-pose.m[1][2], pose.m[1][1]);
+	//	thetaX = 0;
+	//}
+
+/* Extrinsic ZXY */
+	//if(pose.m[2][1] < 0.999f)
+	//{
+	//	if(pose.m[2][1] > -0.999f)
+	//	{
+	//		thetaX = asin(pose.m[2][1]);
+	//		thetaZ = atan2(-pose.m[0][1], pose.m[1][1]);
+	//		thetaY = atan2(-pose.m[2][0], pose.m[2][2]);
+	//	}
+	//	else // r21 = -1
+	//	{
+	//		thetaX = -PI / 2;
+	//		thetaZ = -(atan2(pose.m[0][2], pose.m[0][0]));
+	//		thetaY = 0;
+	//	}
+	//}
+	//else // r21 = +1
+	//{
+	//	thetaX = PI / 2;
+	//	thetaZ = atan2(pose.m[0][2], pose.m[0][0]);
+	//	thetaY = 0;
+	//}
+
+/* Extrinsic XYZ */
+	//if (pose.m[0][2] < 0.999f)
+	//{
+	//	if (pose.m[0][2] > -0.999f)
+	//	{
+	//		thetaY = asin(pose.m[0][2]);
+	//		thetaX = atan2(-pose.m[1][2], pose.m[2][2]);
+	//		thetaZ = atan2(-pose.m[0][1], pose.m[0][0]);
+	//	}
+	//	else // r21 = -1
+	//	{
+	//		thetaY = -PI / 2;
+	//		thetaX = -(atan2(pose.m[1][0], pose.m[1][1]));
+	//		thetaZ = 0;
+	//	}
+	//}
+	//else // r21 = +1
+	//{
+	//	thetaY = PI / 2;
+	//	thetaX = atan2(pose.m[1][0], pose.m[1][1]);
+	//	thetaZ = 0;
+	//}
+
+/* Extrinsic XZY*/
+	//if (pose.m[0][1] < 0.999f)
+	//{
+	//	if (pose.m[0][1] > -0.999f)
+	//	{
+	//		thetaZ = asin(-pose.m[0][1]);
+	//		thetaX = atan2(pose.m[2][1], pose.m[1][1]);
+	//		thetaY = atan2(pose.m[0][2], pose.m[0][0]);
+	//	}
+	//	else // r01 = -1
+	//	{
+	//		thetaZ = PI / 2;
+	//		thetaX = -(atan2(-pose.m[2][0], pose.m[2][2]));
+	//		thetaY = 0;
+	//	}
+	//}
+	//else // r01 = +1
+	//{
+	//	thetaZ = -PI / 2;
+	//	thetaX = atan2(-pose.m[2][0], pose.m[2][2]);
+	//	thetaY = 0;
+	//}
+
+/* Extrinsic YZX */
+	if (pose.m[1][0] < 0.999f)
+	{
+		if (pose.m[1][0] > -0.999f)
+		{
+			thetaZ = asin(pose.m[1][0]);
+			thetaY = atan2(-pose.m[2][0], pose.m[0][0]);
+			thetaX = atan2(-pose.m[1][2], pose.m[1][1]);
+		}
+		else // r10 = -1
+		{
+			thetaZ = -PI / 2;
+			thetaY = -(atan2(pose.m[2][1], pose.m[2][2]));
+			thetaX = 0;
+		}
+	}
+	else // r10 = +1
+	{
+		thetaZ = PI / 2;
+		thetaY = atan2(pose.m[2][1], pose.m[2][2]);
+		thetaX = 0;
+	}
+
+
+	*pitch = thetaX;
+	*yaw = -thetaY;
+	*roll = -thetaZ;
+}
+
+bool GetSteamVRPositionalData(float *yaw, float *pitch, float *roll, float *x, float *y, float *z, Matrix3* rotMatrix)
 {
 	if (g_pHMD == NULL) {
 		log_debug("GetSteamVRPositional Data with g_pHMD = NULL");
@@ -148,7 +295,6 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		log_debug("SteamVR initialized in the second attempt, continuing");
 	}
 
-	float roll;
 	vr::TrackedDeviceIndex_t unDevice = vr::k_unTrackedDeviceIndex_Hmd;
 	vr::Compositor_FrameTiming frametiming;
 	frametiming.m_nSize = sizeof(vr::Compositor_FrameTiming);
@@ -196,19 +342,14 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *x, float *y, floa
 		//if (g_hmdPose.bPoseIsValid) {
 			g_hmdPose = trackedDevicePoseArray[vr::k_unTrackedDeviceIndex_Hmd]; // This matrix contains all positional and rotational data.
 			poseMatrix = g_hmdPose.mDeviceToAbsoluteTracking; // This matrix contains all positional and rotational data.
+			//rotMatrixToEuler(poseMatrix, yaw, pitch, roll);
+			*rotMatrix = HmdMatrix34toMatrix3(poseMatrix);
+
 			q = rotationToQuaternion(poseMatrix);
-			quatToEuler(q, yaw, pitch, &roll);
-			//if (g_bCorrectedHeadTracking) {
-			if (false) {
-				// Disable positional tracking here if we are using the corrected tracking
-				// It will be applied later in ddraw
-				// This avoids using cockpit shake and reduces the jitter at the cost of some visible culling
-				*x = *y = *z = 0;
-			} else{
-				*x = poseMatrix.m[0][3];
-				*y = poseMatrix.m[1][3];
-				*z = poseMatrix.m[2][3];			
-			}
+			quatToEuler(q, yaw, pitch, roll);
+			*x = poseMatrix.m[0][3];
+			*y = poseMatrix.m[1][3];
+			*z = poseMatrix.m[2][3];
 			return true;
 		}
 		else

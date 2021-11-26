@@ -50,7 +50,7 @@ const auto DisplayMessage = (int(*)(int messageIndex, int playerIndex))0x497D40;
 const auto GetKeyboardDeviceState = (int(*)())0x42B900;
 const auto DirectInputKeyboardReaquire = (char(*)())0x42B920;
 const auto Vector3Transform = (void* (*)(Vector3_float* vec, XwaMatrix3x3* mat)) 0x439B30;
-
+const auto DoRotation = (void (*)(int, int, int, __int16)) 0x440E40;
 
 
 // Globals from XWA
@@ -161,3 +161,13 @@ const auto g_localPlayerObjectIndex = (int *)0x0634370;
 const auto g_localPlayerObjectIndex2 = (int *)0x0631B70;
 
 const auto *g_playerInHangar = (unsigned int *)0x09C6E40;
+
+const auto g_objectTransformRear_X = (int *)0x910934;
+const auto g_objectTransformRear_Y = (int *)0x910938;
+const auto g_objectTransformRear_Z = (int *)0x910944;
+const auto g_objectTransformRight_X = (int*)0x8D93D8;
+const auto g_objectTransformRight_Y = (int*)0x8D93C8;
+const auto g_objectTransformRight_Z = (int*)0x8D93D0;
+const auto g_objectTransformUp_X = (int*)0x8D9400;
+const auto g_objectTransformUp_Y = (int*)0x8D93E8;
+const auto g_objectTransformUp_Z = (int*)0x8D93F4;
