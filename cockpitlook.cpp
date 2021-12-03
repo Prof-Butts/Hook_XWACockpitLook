@@ -1320,8 +1320,11 @@ int CockpitLookHook(int* params)
 				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
 				// look around
 				if (enableTrackedYawPitch) {
-					PlayerDataTable[playerIndex].MousePositionX   = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+					PlayerDataTable[playerIndex].MousePositionX = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 					PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+					// The following line will keep the reticle fixed on the screen:
+					//PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
+
 					// Save rotation values to use later in another hooked function
 					g_headYaw = (short)(yaw / 360.0f * 65535.0f);
 					g_headPitch = (short)(pitch / 360.0f * 65535.0f);

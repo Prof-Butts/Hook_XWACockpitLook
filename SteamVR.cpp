@@ -228,7 +228,7 @@ void rotMatrixToEuler(vr::HmdMatrix34_t pose, float* yaw, float* pitch, float* r
 	//	thetaZ = 0;
 	//}
 
-/* Extrinsic XZY*/
+/* Extrinsic XZY */
 	//if (pose.m[0][1] < 0.999f)
 	//{
 	//	if (pose.m[0][1] > -0.999f)
@@ -347,6 +347,9 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *roll, float *x, f
 
 			q = rotationToQuaternion(poseMatrix);
 			quatToEuler(q, yaw, pitch, roll);
+			g_SharedData.Yaw   = *yaw;
+			g_SharedData.Pitch = *pitch;
+			g_SharedData.Roll  = *roll;
 			*x = poseMatrix.m[0][3];
 			*y = poseMatrix.m[1][3];
 			*z = poseMatrix.m[2][3];

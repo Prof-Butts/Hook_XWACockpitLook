@@ -9,12 +9,18 @@ struct SharedData {
 	// Offset added to the current POV when VR is active. This is controlled by ddraw
 	float POVOffsetX, POVOffsetY, POVOffsetZ;
 	void *pDataPtr;
+	// Euler angles for the current camera matrix coming from SteamVR. This is writen by
+	// CockpitLookHook:
+	float Yaw, Pitch, Roll;
 
 	SharedData() {
 		this->POVOffsetX = 0.0f;
 		this->POVOffsetY = 0.0f;
 		this->POVOffsetZ = 0.0f;
 		this->pDataPtr = NULL;
+		this->Yaw = 0.0f;
+		this->Pitch = 0.0f;
+		this->Roll = 0.0f;
 	}
 };
 
