@@ -31,6 +31,7 @@
 HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
+bool g_bForceSteamVRShutdown = false;
 
 // The hooks are loaded before ddraw, so we can create the shared memory handle here
 SharedMem g_SharedMem(true);
@@ -189,16 +190,16 @@ void LoadParams();
 
 // cockpitlook.cfg parameter names
 const char *TRACKER_TYPE				= "tracker_type"; // Defines which tracker to use
-const char *TRACKER_TYPE_FREEPIE		= "FreePIE"; // Use FreePIE as the tracker
-const char *TRACKER_TYPE_STEAMVR		= "SteamVR"; // Use SteamVR as the tracker
-const char *TRACKER_TYPE_TRACKIR		= "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
+const char *TRACKER_TYPE_FREEPIE			= "FreePIE"; // Use FreePIE as the tracker
+const char *TRACKER_TYPE_STEAMVR			= "SteamVR"; // Use SteamVR as the tracker
+const char *TRACKER_TYPE_TRACKIR			= "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
 const char *TRACKER_TYPE_NONE			= "None";
 const char *POSE_CORRECTED_HEADTRACKING = "pose_corrected_headtracking";
 const char *YAW_MULTIPLIER				= "yaw_multiplier";
-const char *PITCH_MULTIPLIER			= "pitch_multiplier";
+const char *PITCH_MULTIPLIER				= "pitch_multiplier";
 const char *YAW_OFFSET					= "yaw_offset";
-const char *PITCH_OFFSET				= "pitch_offset";
-const char *FREEPIE_SLOT				= "freepie_slot";
+const char *PITCH_OFFSET					= "pitch_offset";
+const char *FREEPIE_SLOT					= "freepie_slot";
 
 const char *POS_X_MULTIPLIER_VRPARAM = "positional_x_multiplier";
 const char *POS_Y_MULTIPLIER_VRPARAM = "positional_y_multiplier";
@@ -244,10 +245,10 @@ TrackerType g_TrackerType = TRACKER_NONE;
 
 float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
-float g_fRollMultiplier = DEFAULT_ROLL_MULTIPLIER;
+float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
 float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
-float g_fPitchOffset	 = DEFAULT_PITCH_OFFSET;
-int   g_iFreePIESlot	 = DEFAULT_FREEPIE_SLOT;
+float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
+int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
 bool  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 bool  g_bTestJoystick = true;
@@ -1192,7 +1193,7 @@ int CockpitLookHook(int* params)
 
 					if (g_bYawPitchFromMouseOverride) {
 						// If FreePIE could not be read, then get the yaw/pitch from the mouse:
-						yaw   =  (float)PlayerDataTable[playerIndex].MousePositionX   / 32768.0f * 180.0f;
+						yaw   =  (float)PlayerDataTable[playerIndex].MousePositionX / 32768.0f * 180.0f;
 						pitch = -(float)PlayerDataTable[playerIndex].MousePositionY / 32768.0f * 180.0f;
 					}
 
@@ -1678,6 +1679,10 @@ void LoadParams() {
 				g_iFreePIESlot = (int )fValue;
 				log_debug("FreePIE slot: %d", g_iFreePIESlot);
 			}
+			else if (_stricmp(param, "force_steamvr_shutdown") == 0) {
+				g_bForceSteamVRShutdown = (bool)fValue;
+			}
+			
 
 			// Extra parameters to enable positional tracking
 			else if (_stricmp(param, "yaw_pitch_from_mouse_override") == 0) {
@@ -1999,6 +2004,15 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		case TRACKER_STEAMVR:
 			// We can't shutdown SteamVR twice: we either shut it down here, or in ddraw.dll.
 			// It looks like the right order is to shut it down here.
+
+			// For some reason, sometimes xwingalliance.exe just stays running in the background
+			// after exiting. It seems to get hung when shutting down SteamVR. This block will
+			// forcefully exit the game if "force_steamvr_shutdown" is set in CockpitLook.cfg
+			if (g_bForceSteamVRShutdown) {
+				if (g_bSteamVRPosFromFreePIE)
+					ShutdownFreePIE();
+				exit(0);
+			}
 			ShutdownSteamVR();
 			if (g_bSteamVRPosFromFreePIE)
 				ShutdownFreePIE();
