@@ -40,6 +40,9 @@ vr::TrackedDevicePose_t g_hmdPose;
 Matrix3 g_headRotation;
 int g_headYaw = 0, g_headPitch, g_headRoll = 0;
 
+vr::HmdQuaternionf_t rotationToQuaternion(vr::HmdMatrix34_t m);
+void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch);
+
 #define DEBUG_TO_FILE 1
 //#undef DEBUG_TO_FILE
 
@@ -231,7 +234,7 @@ const int	VK_U_KEY = 0x55;
 //const int   VK_K_KEY = 0x4b;
 //const int   VK_L_KEY = 0x4c;
 const int VK_X_KEY = 0x58; // Ctrl+X is used to dump debug info
-bool g_bNumPadAdd = false, g_bNumPadSub = false, g_bCtrl = false;
+bool g_bNumPadAdd = false, g_bNumPadSub = false, g_bCtrl = false, g_bAlt;
 bool g_bNumPad7 = false, g_bNumPad9 = false;
 
 // General types and globals
@@ -311,6 +314,13 @@ inline float smoothstep(const float min, const float max, float x) {
 	x = clamp((x - min) / (max - min), 0.0f, 1.0f);
 	// Evaluate polynomial
 	return x * x * (3.0f - 2.0f * x);
+}
+
+void Matrix4toHmdMatrix34(const Matrix4& m4, vr::HmdMatrix34_t& mat) {
+	mat.m[0][0] = m4[0];  mat.m[1][0] = m4[1];  mat.m[2][0] = m4[2];
+	mat.m[0][1] = m4[4];  mat.m[1][1] = m4[5];  mat.m[2][1] = m4[6];
+	mat.m[0][2] = m4[8];  mat.m[1][2] = m4[9];  mat.m[2][2] = m4[10];
+	mat.m[0][3] = m4[12]; mat.m[1][3] = m4[13]; mat.m[2][3] = m4[14];
 }
 
 /*
@@ -527,7 +537,7 @@ float g_fPosXMultiplier = 1.666f, g_fPosYMultiplier = 1.666f, g_fPosZMultiplier 
 float g_fMinPositionX = -2.50f, g_fMaxPositionX = 2.50f;
 float g_fMinPositionY = -2.50f, g_fMaxPositionY = 2.50f;
 float g_fMinPositionZ = -2.50f, g_fMaxPositionZ = 2.50f;
-HeadPos g_HeadPosAnim = { 0 }, g_HeadPos = { 0 };
+HeadPos g_HeadPosAnim = { 0 };
 bool g_bLeftKeyDown = false, g_bRightKeyDown = false, g_bUpKeyDown = false, g_bDownKeyDown = false;
 bool g_bUpKeyDownShift = false, g_bDownKeyDownShift = false, g_bStickyArrowKeys = true, g_bLimitCockpitLean = true;
 bool g_bInvertCockpitLeanY = false;
@@ -814,11 +824,11 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	//bool bAlt = *s_XwaIsAltKeyPressed;
 	g_bCtrl			= GetAsyncKeyState(VK_CONTROL);
 	bool bShift		= GetAsyncKeyState(VK_SHIFT);
-	bool bAlt		= GetAsyncKeyState(VK_MENU);
+	g_bAlt			= GetAsyncKeyState(VK_MENU);
 	bool bRightAlt	= GetAsyncKeyState(VK_RMENU);
 	bool bLeftAlt	= GetAsyncKeyState(VK_LMENU);
-	g_bNumPadAdd	= GetAsyncKeyState(VK_ADD);
-	g_bNumPadSub	= GetAsyncKeyState(VK_SUBTRACT);
+	g_bNumPadAdd		= GetAsyncKeyState(VK_ADD);
+	g_bNumPadSub		= GetAsyncKeyState(VK_SUBTRACT);
 	g_bNumPad7		= GetAsyncKeyState(VK_NUMPAD7);
 	g_bNumPad9		= GetAsyncKeyState(VK_NUMPAD9);
 	// I,J,X,T key states:
@@ -851,7 +861,7 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	// Alt+T: Reload TrackIR
 	if (g_TrackerType == TRACKER_TRACKIR)
 	{
-		if (bAlt && bLastTKeyState && !bCurTKeyState) {
+		if (g_bAlt && bLastTKeyState && !bCurTKeyState) {
 			if (g_bTrackIRLoaded) {
 				log_debug("Unloading TrackIR");
 				ShutdownTrackIR();
@@ -869,11 +879,13 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 		g_bExtInertiaEnabled = !g_bExtInertiaEnabled;
 	}
 
-	if (bAlt || g_bCtrl) {
-		g_bLeftKeyDown = false;
-		g_bRightKeyDown = false;
-		g_bUpKeyDown = false;
-		g_bDownKeyDown = false;
+	if (g_bAlt || g_bCtrl) {
+		//g_bLeftKeyDown = false;
+		//g_bRightKeyDown = false;
+		g_bLeftKeyDown = GetAsyncKeyState(VK_LEFT);
+		g_bRightKeyDown = GetAsyncKeyState(VK_RIGHT);
+		g_bUpKeyDown = GetAsyncKeyState(VK_UP);
+		g_bDownKeyDown = GetAsyncKeyState(VK_DOWN);
 		g_bUpKeyDownShift = false;
 		g_bDownKeyDownShift = false;
 		return;
@@ -1211,7 +1223,9 @@ int CockpitLookHook(int* params)
 			case TRACKER_STEAMVR: 
 			{
 				float x, y, z;
-				
+				static float fake_yaw = 0.0f, fake_pitch = 0.0f, fake_roll = 0.0f;
+				static float fake_pos_x = 0.0f, fake_pos_y = 0.0f, fake_pos_z = 0.0f;
+
 				if (g_bKeyboardLean) {
 					ComputeCockpitLean(&g_headPosFromKeyboard);
 					g_headPosFromKeyboard = -g_headPosFromKeyboard;
@@ -1219,7 +1233,7 @@ int CockpitLookHook(int* params)
 				else
 					g_headPosFromKeyboard.set(0, 0, 0);
 
-				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &roll, &x, &y, &z, &g_headRotation );
+				dataReady = GetSteamVRPositionalData(&yaw, &pitch, &roll, &x, &y, &z, &g_headRotation);
 				// We need to invert the Z-axis because of XWA's coordinate system.
 				z = -z;
 
@@ -1243,9 +1257,76 @@ int CockpitLookHook(int* params)
 					g_headCenter[0] = x;
 					g_headCenter[1] = y;
 					g_headCenter[2] = z;
+					fake_yaw = fake_pitch = fake_roll = 0.0f;
+					fake_pos_x = fake_pos_y = fake_pos_z = 0.0f;
 				}
 				Vector4 pos(x, y, z, 1.0f);
 				g_headPos = (pos - g_headCenter);
+
+				// The following code will fake rotational tracking in SteamVR mode through the use
+				// of the keyboard. To enable it, add "keyboard_look = 1" in CockpitLook.cfg. This
+				// code is useful for debugging SteamVR with the null driver (i.e. we don't have to
+				// use a real HMD)
+				if (g_bKeyboardLook) {
+					// Modify g_headRotation (the rotational tracking) using the keyboard
+					if (g_bAlt) {
+						if (g_bLeftKeyDown)  fake_roll -= 1.0f;
+						if (g_bRightKeyDown) fake_roll += 1.0f;
+					}
+					else {
+						if (g_bLeftKeyDown)  fake_yaw -= 1.0f;
+						if (g_bRightKeyDown) fake_yaw += 1.0f;
+					}
+					if (g_bDownKeyDown)  fake_pitch -= 1.0f;
+					if (g_bUpKeyDown)	 fake_pitch += 1.0f;
+					yaw = fake_yaw; pitch = fake_pitch; roll = fake_roll;
+					Matrix4 rX, rY, rZ;
+					rX.rotateX(fake_pitch);
+					rY.rotateY(fake_yaw);
+					rZ.rotateZ(fake_roll);
+
+					Matrix4 rotMatrix = rZ * rY * rX;
+					// Here we're replicating the same code we have in GetSteamVRPositionalData to ensure that
+					// the reticle roll fix still works when using the keyboard to apply fake tracking
+					vr::HmdMatrix34_t poseMatrix;
+					Matrix4toHmdMatrix34(rotMatrix, poseMatrix);
+					g_headRotation = HmdMatrix34toMatrix3(poseMatrix);
+
+					vr::HmdQuaternionf_t q = rotationToQuaternion(poseMatrix);
+					quatToEuler(q, &yaw, &pitch, &roll);
+					yaw   *= RAD_TO_DEG;
+					pitch *= RAD_TO_DEG;
+					roll  *= RAD_TO_DEG;
+				}
+
+				// The following code will fake positional tracking in SteamVR mode through the use
+				// of the keyboard. To enable it, add "keyboard_lean = 1" in CockpitLook.cfg. This
+				// code is useful for debugging SteamVR with the null driver (i.e. we don't have to
+				// use a real HMD)
+				if (g_bKeyboardLean) {
+					// Modify g_headPos (the positional tracking) using the keyboard
+					if (g_bAlt) {
+						if (g_bDownKeyDown)	fake_pos_z -= 0.01f;
+						if (g_bUpKeyDown)	fake_pos_z += 0.01f;
+					}
+					else {
+						if (g_bDownKeyDown)	fake_pos_y -= 0.01f;
+						if (g_bUpKeyDown)	fake_pos_y += 0.01f;
+					}
+					if (g_bLeftKeyDown)  fake_pos_x -= 0.01f;
+					if (g_bRightKeyDown)	 fake_pos_x += 0.01f;
+					
+					g_headCenter.x = -fake_pos_x;
+					g_headCenter.y = -fake_pos_y;
+					g_headCenter.z = -fake_pos_z;
+				}
+
+				g_SharedData.Yaw		= yaw;
+				g_SharedData.Pitch	= pitch;
+				g_SharedData.Roll	= roll;
+				g_SharedData.X		= g_headPos.x;
+				g_SharedData.Y		= g_headPos.y;
+				g_SharedData.Z		= g_headPos.z;
 			}
 			break;
 
@@ -1682,7 +1763,6 @@ void LoadParams() {
 			else if (_stricmp(param, "force_steamvr_shutdown") == 0) {
 				g_bForceSteamVRShutdown = (bool)fValue;
 			}
-			
 
 			// Extra parameters to enable positional tracking
 			else if (_stricmp(param, "yaw_pitch_from_mouse_override") == 0) {
@@ -1916,8 +1996,8 @@ int DoRotationPitchHook(int* params)
 	if (g_bCorrectedHeadTracking) {
 		Matrix3 xwaCameraTransform = Matrix3(
 			-(float)*g_objectTransformRight_X, -(float)*g_objectTransformRight_Y, -(float)*g_objectTransformRight_Z,
-			(float)*g_objectTransformUp_X, (float)*g_objectTransformUp_Y, (float)*g_objectTransformUp_Z,
-			(float)*g_objectTransformRear_X, (float)*g_objectTransformRear_Y, (float)*g_objectTransformRear_Z
+			 (float)*g_objectTransformUp_X,     (float)*g_objectTransformUp_Y,     (float)*g_objectTransformUp_Z,
+			 (float)*g_objectTransformRear_X,   (float)*g_objectTransformRear_Y,   (float)*g_objectTransformRear_Z
 		);
 
 		// Apply the rotation matrix from headtracking

@@ -59,12 +59,11 @@ void ShutdownSteamVR() {
 }
 
 Matrix3 HmdMatrix34toMatrix3(const vr::HmdMatrix34_t& mat) {
-	Matrix3 matrixObj(
+	return Matrix3(
 		mat.m[0][0], mat.m[1][0], mat.m[2][0],
 		mat.m[0][1], mat.m[1][1], mat.m[2][1],
 		mat.m[0][2], mat.m[1][2], mat.m[2][2]
 	);
-	return matrixObj;
 }
 
 /*
@@ -347,9 +346,6 @@ bool GetSteamVRPositionalData(float *yaw, float *pitch, float *roll, float *x, f
 
 			q = rotationToQuaternion(poseMatrix);
 			quatToEuler(q, yaw, pitch, roll);
-			g_SharedData.Yaw   = *yaw;
-			g_SharedData.Pitch = *pitch;
-			g_SharedData.Roll  = *roll;
 			*x = poseMatrix.m[0][3];
 			*y = poseMatrix.m[1][3];
 			*z = poseMatrix.m[2][3];
