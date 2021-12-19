@@ -8,7 +8,7 @@
 constexpr float DEFAULT_PREDICTED_SECONDS_TO_PHOTONS = 0.0f;
 float g_fPredictedSecondsToPhotons = DEFAULT_PREDICTED_SECONDS_TO_PHOTONS;
 float g_fVsyncToPhotons, g_fHMDDisplayFreq = 0;
-bool g_bCorrectedHeadTracking = false;
+bool g_bCorrectedHeadTracking = true;
 
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
