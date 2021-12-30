@@ -1992,7 +1992,7 @@ int DoRotationPitchHook(int* params)
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
 	// First construct the rotation matrix from current XWA globals
 	// We follow the same convention as SteamVR (+y is up, +x is to the right, -z is forward)
-	if (g_bCorrectedHeadTracking && g_TrackerType == TRACKER_STEAMVR) {
+	if (!*g_playerInHangar && g_bCorrectedHeadTracking && g_TrackerType == TRACKER_STEAMVR) {
 		Matrix3 xwaCameraTransform = Matrix3(
 			-(float)*g_objectTransformRight_X, -(float)*g_objectTransformRight_Y, -(float)*g_objectTransformRight_Z,
 			 (float)*g_objectTransformUp_X,     (float)*g_objectTransformUp_Y,     (float)*g_objectTransformUp_Z,
@@ -2025,7 +2025,7 @@ int DoRotationPitchHook(int* params)
 */
 int DoRotationYawHook(int* params)
 {
-	if (g_bCorrectedHeadTracking && g_TrackerType == TRACKER_STEAMVR) {
+	if (!*g_playerInHangar && g_bCorrectedHeadTracking && g_TrackerType == TRACKER_STEAMVR) {
 		// Since we applied the full rotation matrix in DoRotationPitchHook(), we don't need to do anything here.		
 		return 0;
 	}
