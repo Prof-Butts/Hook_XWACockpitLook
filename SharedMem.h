@@ -14,6 +14,9 @@ struct SharedData {
 	float Yaw, Pitch, Roll;
 	// Positional tracking data. Written by CockpitLookHook:
 	float X, Y, Z;
+	// Joystick's position, written by the joystick hook, or by the joystick emulation code.
+	// These values are normalized in the range -1..1
+	float JoystickYaw, JoystickPitch;
 
 	SharedData() {
 		this->POVOffsetX = 0.0f;
@@ -26,6 +29,8 @@ struct SharedData {
 		this->X = 0.0f;
 		this->Y = 0.0f;
 		this->Z = 0.0f;
+		this->JoystickYaw = 0.0f;
+		this->JoystickPitch = 0.0f;
 	}
 };
 
