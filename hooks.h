@@ -10,7 +10,7 @@ static const HookFunction g_hookFunctions[] =
 	{ 0x4EEB56, UpdateCameraTransformHook }, //UpdateCameraTransform for external camera
 	{ 0x4EF044, UpdateCameraTransformHook }, //UpdateCameraTransform for no cockpit camera
 	{ 0x459AC7, UpdateCameraTransformHook }, //UpdateCameraTransform for hangar external camera
-	{ 0x4A131C, UpdateCameraTransformHook }, //UpdateCameraTransform for map
+	{ 0x49F111, UpdateCameraTransformHook }, //UpdateCameraTransform for map
 	{ 0x497ABB, CockpitPositionTransformHook },
 	{ 0x43FB57, DoRotationPitchHook}, //DoRotation(Pitch)
 	{ 0x43FB67, DoRotationYawHook }, //DoRotation(Yaw)
@@ -37,8 +37,8 @@ static const HookPatchItem g_patch[] =
 	{ 0x459AC2 - 0x400C00, "E8195EFEFF", "E859F01400"},
 
 	// Hook calls to UpdateCameraTransform inside RotateCameraInMap()
-	// call (0x5A8B20 - 0x4A131C) = 0x107804
-	{ 0x4A1317 - 0x400C00, "E8C4E5F9FF", "E804781000"},
+	// call (0x5A8B20 - 0x49F111) = 0x107804
+	{ 0x49F10C - 0x400C00, "E8CF07FAFF", "E80F9A1000"},
 
 	// Hook last call to Vector3Transform() inside UpdatePlayerMovement() that provides the values for CockpitPositionTransformed.
 	// To add positional tracking. This only works in cockpit view mode!
