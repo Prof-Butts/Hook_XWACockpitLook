@@ -1939,17 +1939,15 @@ void InitSharedMem() {
 }
 
 /*
-  This function runs when UpdateCameraTransform is called from PlayerCameraUpdate() for the normal in-flight camera (not map, not external)
+  This function runs when UpdateCameraTransform is called from PlayerCameraUpdate() for in-flight and external cameras)
 
- It does NOT currently modify the XWA engine behavior, just calls the original function.
+ It calls the function to update the tracking data.
 */
 int UpdateCameraTransformHook(int* params)
 {
 	//log_debug("UpdateCameraTransform() executed");
 
 	UpdateTrackingData();
-	
-	int playerIndex = params[0];
 
 	int(*UpdateCameraTransform)(int,int,int,int,_int16,_int16,int,int) = (int(*)(
 		int cameraCraftRoll,
@@ -1964,6 +1962,20 @@ int UpdateCameraTransformHook(int* params)
 	// Since the headtracking is either applied in CockpitLookHook through MousePosition_X,Y, or through the matrix in DoRotate()
 	// We don't need to apply it here.
 	return UpdateCameraTransform(params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7]);
+}
+
+/*
+  This function runs when MapCameraUpdate (0x49EE90) is called from PlayerCameraUpdate() for map mode)
+
+ It calls the function to update the tracking data.
+*/
+int MapCameraUpdateHook(int* params)
+{
+	int (*MapCameraUpdate)(int, int) = (int(*)(int a1, int a2)) 0x49EE90;
+	UpdateTrackingData();
+	MapCameraUpdate(params[0], params[1]);
+	return 0;
+
 }
 
 /*	This function will run when the engine calls Vector3Transform() inside UpdatePlayerMovement() to get the values for CockpitPositionTransformed.
@@ -1989,7 +2001,6 @@ int CockpitPositionTransformHook(int* params)
 
 /* This function will run when the engine tries to apply the Camera.Pitch to the transformation matrix
    used later for 3D rendering.
-   TODO: fix the targeting reticle is not anymore where it should be.
    TODO: put conditions to support all types of headtracking (matrix or yaw,pitch,roll based like FreePIE and TrackIR)
 */
 int DoRotationPitchHook(int* params)
