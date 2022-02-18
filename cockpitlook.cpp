@@ -39,7 +39,7 @@ SharedMem g_SharedMem(true);
 char shared_msg[80] = "message from the CokpitLookHook";
 vr::TrackedDevicePose_t g_hmdPose;
 Matrix3 g_headRotation;
-int g_headYaw = 0, g_headPitch, g_headRoll = 0;
+float g_headYaw = 0.0f, g_headPitch = 0.0f, g_headRoll = 0.0f;
 
 vr::HmdQuaternionf_t rotationToQuaternion(vr::HmdMatrix34_t m);
 void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch);
@@ -1370,8 +1370,11 @@ int UpdateTrackingData()
 					z		 *=  scale_z;
 					yaw		 *=  g_fYawMultiplier;
 					pitch	 *=  g_fPitchMultiplier;
-					yawSign   = -1.0f;
+					yawSign   = 1.0f;
 					pitchSign = -1.0f;
+					pitch	 *= pitchSign;
+					yaw		 *= yawSign;
+					roll	  = 0;
 
 					if (g_bFlipYZAxes) {
 						float temp = y; y = z; z = temp;
@@ -1411,13 +1414,13 @@ int UpdateTrackingData()
 					//PlayerDataTable[playerIndex].MousePositionX = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 					//PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 					// The following line will keep the reticle fixed on the screen:
-					//PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
+					PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
 
 					// Save rotation values to use later in another hooked function
-					g_headYaw = (short)(yaw / 360.0f * 65535.0f);
-					g_headPitch = (short)(pitch / 360.0f * 65535.0f);
-					g_headRoll = (short)(roll / 360.0f * 65535.0f);
-					
+					g_headYaw = yaw;
+					g_headPitch = pitch;
+					g_headRoll = roll;
+
 				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
@@ -1971,10 +1974,9 @@ int UpdateCameraTransformHook(int* params)
 */
 int MapCameraUpdateHook(int* params)
 {
-	int (*MapCameraUpdate)(int, int) = (int(*)(int a1, int a2)) 0x49EE90;
 	UpdateTrackingData();
-	MapCameraUpdate(params[0], params[1]);
-	return 0;
+	int (*MapCameraUpdate)(int, int) = (int(*)(int a1, int a2)) 0x49EE90;
+	return MapCameraUpdate(params[0], params[1]);
 
 }
 
@@ -2007,11 +2009,26 @@ int DoRotationPitchHook(int* params)
 {
 	//log_debug("DoRotationPitchHook() executed");
 
-	// We need to apply the rotation matrix obtained from the headtracking here
+	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
-	// First construct the rotation matrix from current XWA globals
-	// We follow the same convention as SteamVR (+y is up, +x is to the right, -z is forward)
-	if (g_TrackerType == TRACKER_STEAMVR) {
+
+	if (g_TrackerType != TRACKER_NONE || g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
+
+		if (g_TrackerType == TRACKER_TRACKIR || g_TrackerType == TRACKER_FREEPIE) {
+			// We need to build the rotation matrix from yaw,pitch,roll
+			Matrix4 rX, rY, rZ;
+			rX.rotateX(g_headPitch);
+			rY.rotateY(g_headYaw);
+			rZ.rotateZ(g_headRoll);
+
+			Matrix4 rotMatrix = rZ * rY * rX;
+			vr::HmdMatrix34_t poseMatrix;
+			Matrix4toHmdMatrix34(rotMatrix, poseMatrix);
+			g_headRotation = HmdMatrix34toMatrix3(poseMatrix);
+		}
+
+		// First construct the rotation matrix from current XWA globals
+		// We follow the same convention as SteamVR (+y is up, +x is to the right, -z is forward)
 		Matrix3 xwaCameraTransform = Matrix3(
 			-(float)*g_objectTransformRight_X, -(float)*g_objectTransformRight_Y, -(float)*g_objectTransformRight_Z,
 			 (float)*g_objectTransformUp_X,     (float)*g_objectTransformUp_Y,     (float)*g_objectTransformUp_Z,
@@ -2032,8 +2049,9 @@ int DoRotationPitchHook(int* params)
 		*g_objectTransformRear_Y = (int)xwaCameraTransform[7];
 		*g_objectTransformRear_Z = (int)xwaCameraTransform[8];
 	}
-	else {
-		// Apply the expected Pitch rotation
+	else
+	{
+		// Apply the expected Pitch rotation without injecting anything
 		DoRotation(params[0], params[1], params[2], params[3]);
 	}
 	return 0;
