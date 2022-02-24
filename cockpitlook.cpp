@@ -32,13 +32,14 @@ HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
 bool g_bForceSteamVRShutdown = false;
+bool g_bHeadtrackingApplied = false;
 
 // The hooks are loaded before ddraw, so we can create the shared memory handle here
 SharedMem g_SharedMem(true);
 char shared_msg[80] = "message from the CokpitLookHook";
 vr::TrackedDevicePose_t g_hmdPose;
 Matrix3 g_headRotation;
-int g_headYaw = 0, g_headPitch, g_headRoll = 0;
+float g_headYaw = 0.0f, g_headPitch = 0.0f, g_headRoll = 0.0f;
 
 vr::HmdQuaternionf_t rotationToQuaternion(vr::HmdMatrix34_t m);
 void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch);
@@ -952,9 +953,11 @@ Params[-11] = ESP
 Params[-15] = EBP
 */
 
-int CockpitLookHook(int* params)
+//int CockpitLookHook(int* params)
+int UpdateTrackingData()
 {
-	int playerIndex = params[-10]; // Using -10 instead of -6, prevents this hook from crashing in Multiplayer
+	//int playerIndex = params[-10]; // Using -10 instead of -6, prevents this hook from crashing in Multiplayer
+	const int playerIndex = * (int *)0x8C1CC8;
 	float yaw = 0.0f, pitch = 0.0f, roll = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
 	bool dataReady = false, enableTrackedYawPitch = true;
@@ -977,6 +980,8 @@ int CockpitLookHook(int* params)
 	shared_msg[0] = 'A' + index;
 	index = (index + 1) % 10;
 	*/
+
+	//log_debug("UpdateTrackingData() executed");
 
 	// For some reason, TrackIR won't load if the game is run from the launcher. So, let's
 	// try to reload TrackIR here.
@@ -1032,10 +1037,11 @@ int CockpitLookHook(int* params)
 	// look parameters, so that makes MP unplayable. We won't be able to enable this hook in MP
 	// until the MP networking code has been translated/fixed to allow per-player mouse look params
 	if (//!PlayerDataTable[playerIndex].hyperspacePhase && // Enable mouse-look during hyperspace
-		PlayerDataTable[playerIndex].cockpitDisplayed
-		&& !PlayerDataTable[playerIndex].gunnerTurretActive
-		&& PlayerDataTable[playerIndex].cockpitDisplayed2
-		&& *numberOfPlayersInGame == 1)
+		//PlayerDataTable[playerIndex].cockpitDisplayed
+		//&& !PlayerDataTable[playerIndex].gunnerTurretActive
+		//&& PlayerDataTable[playerIndex].cockpitDisplayed2
+		//&& *numberOfPlayersInGame == 1
+		 *numberOfPlayersInGame == 1)
 	{
 		// Keyboard code for moving the cockpit camera angle
 		//__int16 keycodePressed = *keyPressedAfterLocaleAfterMapping;
@@ -1364,8 +1370,11 @@ int CockpitLookHook(int* params)
 					z		 *=  scale_z;
 					yaw		 *=  g_fYawMultiplier;
 					pitch	 *=  g_fPitchMultiplier;
-					yawSign   = -1.0f;
+					yawSign   = 1.0f;
 					pitchSign = -1.0f;
+					pitch	 *= pitchSign;
+					yaw		 *= yawSign;
+					roll	  = 0;
 
 					if (g_bFlipYZAxes) {
 						float temp = y; y = z; z = temp;
@@ -1402,16 +1411,16 @@ int CockpitLookHook(int* params)
 				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
 				// look around
 				if (enableTrackedYawPitch) {
-					PlayerDataTable[playerIndex].MousePositionX = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
-					PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
+					//PlayerDataTable[playerIndex].MousePositionX = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
+					//PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
 					// The following line will keep the reticle fixed on the screen:
-					//PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
+					PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
 
 					// Save rotation values to use later in another hooked function
-					g_headYaw = (short)(yaw / 360.0f * 65535.0f);
-					g_headPitch = (short)(pitch / 360.0f * 65535.0f);
-					g_headRoll = (short)(roll / 360.0f * 65535.0f);
-					
+					g_headYaw = yaw;
+					g_headPitch = pitch;
+					g_headRoll = roll;
+
 				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
@@ -1686,7 +1695,7 @@ int CockpitLookHook(int* params)
 	g_bResetHeadCenter = false;
 	bLastExternalCamera = bExternalCamera;
 
-	params[-1] = 0x4F9C33;
+	//params[-1] = 0x4F9C33;
 	return 0;
 }
 
@@ -1933,16 +1942,15 @@ void InitSharedMem() {
 }
 
 /*
- NOT CURRENTLY USED
- This function runs when UpdateCameraTransform is called from PlayerCameraUpdate() for the normal in-flight camera (not map, not external)
+  This function runs when UpdateCameraTransform is called from PlayerCameraUpdate() for in-flight and external cameras)
 
- It does NOT currently modify the XWA engine behavior, just calls the original function.
+ It calls the function to update the tracking data.
 */
 int UpdateCameraTransformHook(int* params)
 {
-	//log_debug("Running hooked UpdateCameraTransform()");
-	
-	int playerIndex = params[0];
+	//log_debug("UpdateCameraTransform() executed");
+
+	UpdateTrackingData();
 
 	int(*UpdateCameraTransform)(int,int,int,int,_int16,_int16,int,int) = (int(*)(
 		int cameraCraftRoll,
@@ -1954,45 +1962,73 @@ int UpdateCameraTransformHook(int* params)
 		int object,
 		int playerIndex)) 0x43F8E0;
 
-	// Apply headtracking to rotations coming from XWA engine
-	/*
-	g_headPitch += params[4];
-	g_headYaw += params[5];
-	return UpdateCameraTransform(params[0], params[1], params[2], params[3], g_headPitch, g_headYaw, params[6], params[7]);
-	*/
-
 	// Since the headtracking is either applied in CockpitLookHook through MousePosition_X,Y, or through the matrix in DoRotate()
 	// We don't need to apply it here.
 	return UpdateCameraTransform(params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7]);
 }
 
+/*
+  This function runs when MapCameraUpdate (0x49EE90) is called from PlayerCameraUpdate() for map mode)
+
+ It calls the function to update the tracking data.
+*/
+int MapCameraUpdateHook(int* params)
+{
+	UpdateTrackingData();
+	int (*MapCameraUpdate)(int, int) = (int(*)(int a1, int a2)) 0x49EE90;
+	return MapCameraUpdate(params[0], params[1]);
+
+}
+
+/*	This function will run when the engine calls Vector3Transform() inside UpdatePlayerMovement() to get the values for CockpitPositionTransformed.
+	It injects the positional offset directly in the Cockpit POV.
+
+	This function is called 2 times per frame. One before UpdateCameraTransform() and another one after.
+*/
+
 int CockpitPositionTransformHook(int* params)
 {
-	//log_debug("Running hooked Vector3Transform in CockpitPositionTransformHook\n");
+	//log_debug("CockpitPositionTransformHook() executed");
 	
-	Vector3_float* vec = (Vector3_float*)params[0];	
-	
+	Vector3_float* vec = (Vector3_float*)params[0];
+
 	// Recommended value for g_fXWAUnitsToMetersScale = 25.
 	vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
 	vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
 	vec->y -= (g_fXWAUnitsToMetersScale * g_headPos.z);
+
 	Vector3Transform( (Vector3_float*)vec, (XwaMatrix3x3*)params[1]);
 	return 0;
 }
 
 /* This function will run when the engine tries to apply the Camera.Pitch to the transformation matrix
    used later for 3D rendering.
-   TODO: fix the targeting reticle is not anymore where it should be.
    TODO: put conditions to support all types of headtracking (matrix or yaw,pitch,roll based like FreePIE and TrackIR)
 */
 int DoRotationPitchHook(int* params)
 {
+	//log_debug("DoRotationPitchHook() executed");
 
-	// We need to apply the rotation matrix obtained from the headtracking here
+	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
-	// First construct the rotation matrix from current XWA globals
-	// We follow the same convention as SteamVR (+y is up, +x is to the right, -z is forward)
-	if (!*g_playerInHangar && g_bCorrectedHeadTracking && g_TrackerType == TRACKER_STEAMVR) {
+
+	if (g_TrackerType != TRACKER_NONE || g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
+
+		if (g_TrackerType == TRACKER_TRACKIR || g_TrackerType == TRACKER_FREEPIE) {
+			// We need to build the rotation matrix from yaw,pitch,roll
+			Matrix4 rX, rY, rZ;
+			rX.rotateX(g_headPitch);
+			rY.rotateY(g_headYaw);
+			rZ.rotateZ(g_headRoll);
+
+			Matrix4 rotMatrix = rZ * rY * rX;
+			vr::HmdMatrix34_t poseMatrix;
+			Matrix4toHmdMatrix34(rotMatrix, poseMatrix);
+			g_headRotation = HmdMatrix34toMatrix3(poseMatrix);
+		}
+
+		// First construct the rotation matrix from current XWA globals
+		// We follow the same convention as SteamVR (+y is up, +x is to the right, -z is forward)
 		Matrix3 xwaCameraTransform = Matrix3(
 			-(float)*g_objectTransformRight_X, -(float)*g_objectTransformRight_Y, -(float)*g_objectTransformRight_Z,
 			 (float)*g_objectTransformUp_X,     (float)*g_objectTransformUp_Y,     (float)*g_objectTransformUp_Z,
@@ -2013,8 +2049,9 @@ int DoRotationPitchHook(int* params)
 		*g_objectTransformRear_Y = (int)xwaCameraTransform[7];
 		*g_objectTransformRear_Z = (int)xwaCameraTransform[8];
 	}
-	else {
-		// Apply the expected Pitch rotation
+	else
+	{
+		// Apply the expected Pitch rotation without injecting anything
 		DoRotation(params[0], params[1], params[2], params[3]);
 	}
 	return 0;
@@ -2025,7 +2062,7 @@ int DoRotationPitchHook(int* params)
 */
 int DoRotationYawHook(int* params)
 {
-	if (!*g_playerInHangar && g_bCorrectedHeadTracking && g_TrackerType == TRACKER_STEAMVR) {
+	if (g_TrackerType == TRACKER_STEAMVR) {
 		// Since we applied the full rotation matrix in DoRotationPitchHook(), we don't need to do anything here.		
 		return 0;
 	}
