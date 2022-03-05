@@ -1327,7 +1327,7 @@ int UpdateTrackingData()
 					g_headCenter.z = -fake_pos_z;
 				}
 
-				g_SharedData.Yaw		= yaw;
+				g_SharedData.Yaw	= yaw;
 				g_SharedData.Pitch	= pitch;
 				g_SharedData.Roll	= roll;
 				g_SharedData.X		= g_headPos.x;
@@ -1370,7 +1370,7 @@ int UpdateTrackingData()
 					z		 *=  scale_z;
 					yaw		 *=  g_fYawMultiplier;
 					pitch	 *=  g_fPitchMultiplier;
-					yawSign   = 1.0f;
+					yawSign   =  1.0f;
 					pitchSign = -1.0f;
 					pitch	 *= pitchSign;
 					yaw		 *= yawSign;
@@ -2011,8 +2011,7 @@ int DoRotationPitchHook(int* params)
 
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
-
-	if (g_TrackerType != TRACKER_NONE || g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
+	if (g_TrackerType != TRACKER_NONE)	{
 
 		if (g_TrackerType == TRACKER_TRACKIR || g_TrackerType == TRACKER_FREEPIE) {
 			// We need to build the rotation matrix from yaw,pitch,roll
