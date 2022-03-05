@@ -2050,6 +2050,11 @@ int DoRotationPitchHook(int* params)
 	}
 	else
 	{
+		const int playerIndex = *(int *)0x8C1CC8;
+		// TODO: This if disables mouse look while the gunner turret is active. Enabling it is nice
+		// but it breaks the reticle, so more work is needed to fix it.
+		if (PlayerDataTable[playerIndex].gunnerTurretActive)
+			PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
 		// Apply the expected Pitch rotation without injecting anything
 		DoRotation(params[0], params[1], params[2], params[3]);
 	}
