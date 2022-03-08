@@ -338,7 +338,7 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 	Matrix4 rotMatrixFull, rotMatrixYaw, rotMatrixPitch, rotMatrixRoll;
 	Vector4 T, B, N;
 	// Compute the full rotation
-	yaw   = PlayerDataTable[playerIndex].Camera.CraftYaw / 65536.0f * 360.0f;
+	yaw   = PlayerDataTable[playerIndex].Camera.CraftYaw   / 65536.0f * 360.0f;
 	pitch = PlayerDataTable[playerIndex].Camera.CraftPitch / 65536.0f * 360.0f;
 	roll  = PlayerDataTable[playerIndex].Camera.CraftRoll  / 65536.0f * 360.0f;
 
@@ -519,6 +519,71 @@ void SmoothInertia(float *inout_yawInertia, float *inout_pitchInertia)
 
 	*inout_yawInertia = yawInertia;
 	*inout_pitchInertia = pitchInertia;
+}
+
+/*
+ * Returns a matrix that transforms from canonical axes to the gunner turret frame of reference and
+ * then into world space. This function uses the craft's current heading internally.
+ * The matrix returned can be used to transform a vector in ViewSpace (like the SteamVR positional
+ * tracking data) into World space, so that the translation happens in the Gunner Turret framework.
+ */
+void GetGunnerTurretMatrix(Matrix4 *result) {
+	constexpr float factor = 32768.0f;
+
+	Vector3 F(
+		PlayerDataTable[*localPlayerIndex].gunnerTurretF[0] / factor,
+		PlayerDataTable[*localPlayerIndex].gunnerTurretF[1] / factor,
+		PlayerDataTable[*localPlayerIndex].gunnerTurretF[2] / factor
+	);
+	Vector3 R(
+		PlayerDataTable[*localPlayerIndex].gunnerTurretR[0] / factor,
+		PlayerDataTable[*localPlayerIndex].gunnerTurretR[1] / factor,
+		PlayerDataTable[*localPlayerIndex].gunnerTurretR[2] / factor
+	);
+	Vector3 U(
+		PlayerDataTable[*localPlayerIndex].gunnerTurretU[0] / factor,
+		PlayerDataTable[*localPlayerIndex].gunnerTurretU[1] / factor,
+		PlayerDataTable[*localPlayerIndex].gunnerTurretU[2] / factor
+	);
+	//log_debug("(1) R: [%0.3f, %0.3f, %0.3f], U: [%0.3f, %0.3f, %0.3f], F: [%0.3f, %0.3f, %0.3f]",
+	//	R.x, R.y, R.z, U.x, U.y, U.z, F.x, F.y, F.z);
+
+	Vector4 Rs, Us, Fs;
+	Matrix4 Heading = GetCurrentHeadingMatrix(*localPlayerIndex, Rs, Us, Fs);
+	//log_debug("[DBG] [GUN] (H) Rs: [%0.3f, %0.3f, %0.3f], Us: [%0.3f, %0.3f, %0.3f], Fs: [%0.3f, %0.3f, %0.3f]",
+	//	Rs.x, Rs.y, Rs.z, Us.x, Us.y, Us.z, Fs.x, Fs.y, Fs.z);
+
+	// This matrix transforms the Gunner Turret orientation to the canonical axes.
+	// Multiplying viewMatrixDebug * [R, U, F] should always map to [1,0,0], [0,-1,0], [0,0,1], even if the turret moves
+	/*
+	Matrix4 viewMatrixDebug = Matrix4(
+		R.x, -U.x, F.x, 0,
+		R.y, -U.y, F.y, 0,
+		R.z, -U.z, F.z, 0,
+		0, 0, 0, 1
+	);
+	*/
+
+	Matrix4 viewMatrixInv = Matrix4(
+		 R.x,  R.y,  R.z, 0,
+		-U.x, -U.y, -U.z, 0,
+		 F.x,  F.y,  F.z, 0,
+		 0,    0,    0,   1
+	);
+
+	int curTurret = PlayerDataTable[*localPlayerIndex].gunnerTurretActive;
+	*result = Heading * viewMatrixInv;
+
+	// The YT-2000 has two (2) turrets and for some reason, the second turret has the R and F axes
+	// oriented "backwards" (it's rotated by 180 degrees around the U axis). If you transform both
+	// turrets' [R,U,F] by Heading, you'll notice that U = [-1,0,0] for both of them. But their
+	// R and F are flipped. This is equivalent to rotating around U (-X) by 180 degrees. I couldn't
+	// find a way to do this automatically, so here I'm adding the 180 degree rotation about U to
+	// take care of that. If people complain later that positional tracking is broken for their
+	// XYZ custom OPT, then we can come back here and maybe read additional data from external files
+	// to give us a hint how to fix this.
+	if (curTurret == 2)
+		*result = Matrix4().rotateX(180.0f) * (*result);
 }
 
 typedef struct HeadPosStruct {
@@ -1266,68 +1331,16 @@ int UpdateTrackingData()
 					fake_yaw = fake_pitch = fake_roll = 0.0f;
 					fake_pos_x = fake_pos_y = fake_pos_z = 0.0f;
 				}
-				Vector4 pos(x, y, z, 1.0f);
+				Vector4 pos(x, y, z, 0.0f);
 				g_headPos = (pos - g_headCenter);
 
-				// The following code will fake rotational tracking in SteamVR mode through the use
-				// of the keyboard. To enable it, add "keyboard_look = 1" in CockpitLook.cfg. This
-				// code is useful for debugging SteamVR with the null driver (i.e. we don't have to
-				// use a real HMD)
-				if (g_bKeyboardLook) {
-					// Modify g_headRotation (the rotational tracking) using the keyboard
-					if (g_bAlt) {
-						if (g_bLeftKeyDown)  fake_roll -= 1.0f;
-						if (g_bRightKeyDown) fake_roll += 1.0f;
-					}
-					else {
-						if (g_bLeftKeyDown)  fake_yaw -= 1.0f;
-						if (g_bRightKeyDown) fake_yaw += 1.0f;
-					}
-					if (g_bDownKeyDown)  fake_pitch -= 1.0f;
-					if (g_bUpKeyDown)	 fake_pitch += 1.0f;
-					yaw = fake_yaw; pitch = fake_pitch; roll = fake_roll;
-					Matrix4 rX, rY, rZ;
-					rX.rotateX(fake_pitch);
-					rY.rotateY(fake_yaw);
-					rZ.rotateZ(fake_roll);
-
-					Matrix4 rotMatrix = rZ * rY * rX;
-					// Here we're replicating the same code we have in GetSteamVRPositionalData to ensure that
-					// the reticle roll fix still works when using the keyboard to apply fake tracking
-					vr::HmdMatrix34_t poseMatrix;
-					Matrix4toHmdMatrix34(rotMatrix, poseMatrix);
-					g_headRotation = HmdMatrix34toMatrix3(poseMatrix);
-
-					vr::HmdQuaternionf_t q = rotationToQuaternion(poseMatrix);
-					quatToEuler(q, &yaw, &pitch, &roll);
-					yaw   *= RAD_TO_DEG;
-					pitch *= RAD_TO_DEG;
-					roll  *= RAD_TO_DEG;
+				if (PlayerDataTable[*localPlayerIndex].gunnerTurretActive) {
+					Matrix4 ViewMatrix;
+					GetGunnerTurretMatrix(&ViewMatrix);
+					g_headPos = ViewMatrix * g_headPos;
 				}
 
-				// The following code will fake positional tracking in SteamVR mode through the use
-				// of the keyboard. To enable it, add "keyboard_lean = 1" in CockpitLook.cfg. This
-				// code is useful for debugging SteamVR with the null driver (i.e. we don't have to
-				// use a real HMD)
-				if (g_bKeyboardLean) {
-					// Modify g_headPos (the positional tracking) using the keyboard
-					if (g_bAlt) {
-						if (g_bDownKeyDown)	fake_pos_z -= 0.01f;
-						if (g_bUpKeyDown)	fake_pos_z += 0.01f;
-					}
-					else {
-						if (g_bDownKeyDown)	fake_pos_y -= 0.01f;
-						if (g_bUpKeyDown)	fake_pos_y += 0.01f;
-					}
-					if (g_bLeftKeyDown)  fake_pos_x -= 0.01f;
-					if (g_bRightKeyDown)	 fake_pos_x += 0.01f;
-					
-					g_headCenter.x = -fake_pos_x;
-					g_headCenter.y = -fake_pos_y;
-					g_headCenter.z = -fake_pos_z;
-				}
-
-				g_SharedData.Yaw	= yaw;
+				g_SharedData.Yaw		= yaw;
 				g_SharedData.Pitch	= pitch;
 				g_SharedData.Roll	= roll;
 				g_SharedData.X		= g_headPos.x;

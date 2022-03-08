@@ -681,24 +681,9 @@ struct PlayerDataEntry
 	__int16 gunnerTurretActive;
 	__int16 numberOfGunnerHardpoints;
 	char currentGunnerHardpointActive;
-	char field_21E;
-	char field_21F;
-	char field_220;
-	char field_221;
-	char field_222;
-	char field_223;
-	char field_224;
-	char field_225;
-	char field_226;
-	char field_227;
-	char field_228;
-	char field_229;
-	char field_22A;
-	char field_22B;
-	char field_22C;
-	char field_22D;
-	char field_22E;
-	char field_22F;
+	short gunnerTurretF[3]; // offset 0x021e - 0x223
+	short gunnerTurretR[3]; // offset 0x0224 - 0x229
+	short gunnerTurretU[3]; // offset 0x022a - 0x22f
 	int score;
 	int promoPoints;
 	int worsePromoPoints;
