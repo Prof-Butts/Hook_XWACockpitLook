@@ -39,7 +39,7 @@ SharedMem g_SharedMem(true);
 char shared_msg[80] = "message from the CokpitLookHook";
 vr::TrackedDevicePose_t g_hmdPose;
 Matrix3 g_headRotation;
-float g_headYaw = 0.0f, g_headPitch = 0.0f, g_headRoll = 0.0f;
+float g_headYaw = 0.0f, g_headPitch = 0.0f, g_headRoll = 0.0f, g_rollInertia = 0.0f;
 
 vr::HmdQuaternionf_t rotationToQuaternion(vr::HmdMatrix34_t m);
 void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch);
@@ -97,6 +97,7 @@ enum HyperspacePhaseEnum {
 HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST;
 bool g_bHyperspaceFirstFrame = false, g_bInHyperspace = false, g_bHyperspaceLastFrame = false, g_bHyperspaceTunnelLastFrame = false;
 int g_iHyperspaceFrame = -1;
+Vector4 g_LastRsBeforeHyperspace;
 Vector4 g_LastFsBeforeHyperspace;
 Matrix4 g_prevHeadingMatrix;
 float g_fLastSpeedBeforeHyperspace = 0.0f;
@@ -258,6 +259,7 @@ bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 bool  g_bTestJoystick = true;
 Vector4 g_headCenter(0, 0, 0, 0), g_headPos(0, 0, 0, 0), g_headRotationHome(0, 0, 0, 0);
 Vector3 g_headPosFromKeyboard(0, 0, 0);
+Vector4 g_prevRs(1, 0, 0, 0);
 Vector4 g_prevFs(0, 0, 1, 0);
 int g_FreePIEOutputSlot = -1;
 bool g_bTrackIRLoaded = false;
@@ -415,6 +417,7 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 
 	// Store data for the next frame if we're not in hyperspace
 	if (!g_bInHyperspace || g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST) {
+		g_LastRsBeforeHyperspace = Rs;
 		g_LastFsBeforeHyperspace = Fs;
 		g_prevHeadingMatrix = viewMatrix;
 		g_fLastSpeedBeforeHyperspace = (float)PlayerDataTable[playerIndex].currentSpeed;
@@ -425,9 +428,9 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 /*
  * Computes cockpit inertia
  * Input: The current Heading matrix H, the current forward vector Fs
- * Output: The X,Y displacement
+ * Output: The X,Y,Z displacement plus the acceleration inertia
  */
-void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerIndex, float *XDisp, float *YDisp, float *ZDisp) {
+void ComputeInertia(const Matrix4 &H, Vector4 Rs, Vector4 Fs, float fCurSpeed, int playerIndex, float *XDisp, float *YDisp, float *ZDisp, float *AccelDisp) {
 	static bool bFirstFrame = true;
 	static float fLastSpeed = 0.0f;
 	static time_t prevT = 0;
@@ -440,9 +443,10 @@ void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerInd
 	if (bFirstFrame || !InertiaEnabled || g_bHyperspaceTunnelLastFrame || g_bHyperspaceLastFrame)
 	{
 		bFirstFrame = false;
-		*XDisp = *YDisp = *ZDisp = 0.0f;
+		*XDisp = *YDisp = *ZDisp = *AccelDisp = 0.0f;
 		//log_debug("Resetting X/Y/ZDisp");
 		// Update the previous heading vectors
+		g_prevRs = Rs;
 		g_prevFs = Fs;
 		prevT = curT;
 		fLastSpeed = fCurSpeed;
@@ -458,30 +462,34 @@ void ComputeInertia(const Matrix4 &H, Vector4 Fs, float fCurSpeed, int playerInd
 	//log_debug("[DBG] X: [%0.3f, %0.3f, %0.3f], Y: [%0.3f, %0.3f, %0.3f], Z: [%0.3f, %0.3f, %0.3f]",
 	//	X.x, X.y, X.z, Y.x, Y.y, Y.z, Z.x, Z.y, Z.z);
 
-	//Vector4 X = HT * g_prevRs; // --> returns something close to [1, 0, 0]
+	Vector4 X = HT * g_prevRs; // --> returns something close to [1, 0, 0]
 	//Vector4 Y = HT * g_prevUs; // --> returns something close to [0, 1, 0]
 	Vector4 Z = HT * g_prevFs; // --> returns something close to [0, 0, 1]
 	//log_debug("[DBG] X: [%0.3f, %0.3f, %0.3f], Y: [%0.3f, %0.3f, %0.3f], Z: [%0.3f, %0.3f, %0.3f]",
 	//	X.x, X.y, X.z, Y.x, Y.y, Y.z, Z.x, Z.y, Z.z);
-	Vector4 curFs(0, 0, 1, 0);
+	Vector4 curRs(1, 0, 0, 0), curFs(0, 0, 1, 0);
+	Vector4 diffX = curRs - X;
 	Vector4 diffZ = curFs - Z;
+	float MaxAngularInertia = g_fCockpitMaxInertia * 60.0f;
 
 	*XDisp = g_fCockpitInertia * diffZ.x;
 	*YDisp = g_fCockpitInertia * diffZ.y;
-	//ZDisp can be g_fCockpitInertia * diffZ.z to compute roll; but let's do accel/decel instead
-	*ZDisp = -g_fCockpitSpeedInertia * (fCurSpeed - fLastSpeed);
+	*ZDisp = g_fCockpitInertia * 60.0f * diffX.y; // Roll inertia
+	*AccelDisp = -g_fCockpitSpeedInertia * (fCurSpeed - fLastSpeed);
 	if (*XDisp < -g_fCockpitMaxInertia) *XDisp = -g_fCockpitMaxInertia; else if (*XDisp > g_fCockpitMaxInertia) *XDisp = g_fCockpitMaxInertia;
 	if (*YDisp < -g_fCockpitMaxInertia) *YDisp = -g_fCockpitMaxInertia; else if (*YDisp > g_fCockpitMaxInertia) *YDisp = g_fCockpitMaxInertia;
-	if (*ZDisp < -g_fCockpitMaxInertia) *ZDisp = -g_fCockpitMaxInertia; else if (*ZDisp > g_fCockpitMaxInertia) *ZDisp = g_fCockpitMaxInertia;
+	if (*ZDisp < -MaxAngularInertia)		*ZDisp = -MaxAngularInertia;		else if (*ZDisp > MaxAngularInertia)		*ZDisp = MaxAngularInertia;
+	if (*AccelDisp < -g_fCockpitMaxInertia) *AccelDisp = -g_fCockpitMaxInertia; else if (*AccelDisp > g_fCockpitMaxInertia) *AccelDisp = g_fCockpitMaxInertia;
 
 	// Update the previous heading smoothly, otherwise the cockpit may shake a bit
+	g_prevRs = 0.1f * Rs + 0.9f * g_prevRs;
 	g_prevFs = 0.1f * Fs + 0.9f * g_prevFs;
 	fLastSpeed = 0.1f * fCurSpeed + 0.9f * fLastSpeed;
 	prevT = curT;
 
 	if (g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST || g_bHyperspaceLastFrame) 
 	{
-		*ZDisp = 0.0f;
+		*AccelDisp = 0.0f;
 		fLastSpeed = fCurSpeed;
 	}
 
@@ -1161,12 +1169,14 @@ int UpdateTrackingData()
 					Vector4 Rs, Us, Fs;
 					Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 					if (g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
-						float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
+						float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f, AccelDisp = 0.0f;
 						if (g_bInHyperspace)
-							ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
+							ComputeInertia(g_prevHeadingMatrix, g_LastRsBeforeHyperspace, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex,
+								&XDisp, &YDisp, &ZDisp, &AccelDisp);
 						else {
 							//log_debug("Fs: %0.3f, %0.3f, %0.3f", Fs.x, Fs.y, Fs.z);
-							ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
+							ComputeInertia(HeadingMatrix, Rs, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex,
+								&XDisp, &YDisp, &ZDisp, &AccelDisp);
 						}
 						// Apply the current POVOffset
 						g_headPos.x += g_SharedData.POVOffsetX;
@@ -1176,10 +1186,11 @@ int UpdateTrackingData()
 						if (g_bCockpitInertiaEnabled) {
 							g_headPos.x += XDisp;
 							g_headPos.y += YDisp;
-							g_headPos.z += ZDisp;
+							g_headPos.z += AccelDisp;
+							g_rollInertia = ZDisp;
 						}
 
-						yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
+						yawInertia = XDisp; pitchInertia = YDisp; distInertia = AccelDisp;
 					}
 
 					//if (g_bInHyperspace)
@@ -1204,12 +1215,14 @@ int UpdateTrackingData()
 						Vector4 Rs, Us, Fs;
 						Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 						if (g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
-							float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
+							float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f, AccelDisp = 0.0f;
 							if (g_bInHyperspace)
-								ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
+								ComputeInertia(g_prevHeadingMatrix, g_LastRsBeforeHyperspace, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex,
+									&XDisp, &YDisp, &ZDisp, &AccelDisp);
 							else {
 								//log_debug("Fs: %0.3f, %0.3f, %0.3f", Fs.x, Fs.y, Fs.z);
-								ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
+								ComputeInertia(HeadingMatrix, Rs, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex,
+									&XDisp, &YDisp, &ZDisp, &AccelDisp);
 							}
 							// Apply the current POVOffset
 							g_headPos.x += g_SharedData.POVOffsetX;
@@ -1219,10 +1232,11 @@ int UpdateTrackingData()
 							if (g_bCockpitInertiaEnabled) {
 								g_headPos.x += XDisp;
 								g_headPos.y += YDisp;
-								g_headPos.z += ZDisp;
+								g_headPos.z += AccelDisp;
+								g_rollInertia = ZDisp;
 							}
 							
-							yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
+							yawInertia = XDisp; pitchInertia = YDisp; distInertia = AccelDisp;
 						}
 
 						//if (g_bInHyperspace)
@@ -1273,6 +1287,7 @@ int UpdateTrackingData()
 					}
 					yaw    = (g_FreePIEData.yaw   - g_headRotationHome.y) * g_fYawMultiplier;
 					pitch  = (g_FreePIEData.pitch - g_headRotationHome.x) * g_fPitchMultiplier;
+					// TODO: what about the roll?
 
 					if (g_bYawPitchFromMouseOverride) {
 						// If FreePIE could not be read, then get the yaw/pitch from the mouse:
@@ -1433,7 +1448,6 @@ int UpdateTrackingData()
 					g_headYaw = yaw;
 					g_headPitch = pitch;
 					g_headRoll = roll;
-
 				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
@@ -1458,11 +1472,13 @@ int UpdateTrackingData()
 				Vector4 Rs, Us, Fs;
 				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
 				if (g_bCockpitInertiaEnabled || g_bExtInertiaEnabled) {
-					float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
+					float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f, AccelDisp = 0.0f;
 					if (g_bInHyperspace)
-						ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
+						ComputeInertia(g_prevHeadingMatrix, g_LastRsBeforeHyperspace, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex,
+							&XDisp, &YDisp, &ZDisp, &AccelDisp);
 					else
-						ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
+						ComputeInertia(HeadingMatrix, Rs, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex,
+							&XDisp, &YDisp, &ZDisp, &AccelDisp);
 					// Apply the current POVOffset
 					g_headPos.x += g_SharedData.POVOffsetX;
 					g_headPos.y += g_SharedData.POVOffsetY;
@@ -1471,10 +1487,11 @@ int UpdateTrackingData()
 					if (g_bCockpitInertiaEnabled) {
 						g_headPos.x += XDisp;
 						g_headPos.y += YDisp;
-						g_headPos.z += ZDisp;
+						g_headPos.z += AccelDisp;
+						g_rollInertia = ZDisp;
 					}
 
-					yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
+					yawInertia = XDisp; pitchInertia = YDisp; distInertia = AccelDisp;
 				}
 
 				//if (g_bInHyperspace)
@@ -1673,15 +1690,17 @@ int UpdateTrackingData()
 		// Apply External View Inertia when the cockpit is not displayed
 		if (bExternalCamera && *numberOfPlayersInGame == 1) 
 		{
-			float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f;
+			float XDisp = 0.0f, YDisp = 0.0f, ZDisp = 0.0f, AccelDisp = 0.0f;
 			if (g_bInHyperspace)
-				ComputeInertia(g_prevHeadingMatrix, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex, &XDisp, &YDisp, &ZDisp);
+				ComputeInertia(g_prevHeadingMatrix, g_LastRsBeforeHyperspace, g_LastFsBeforeHyperspace, g_fLastSpeedBeforeHyperspace, playerIndex,
+					&XDisp, &YDisp, &ZDisp, &AccelDisp);
 			else {
 				Vector4 Rs, Us, Fs;
 				Matrix4 HeadingMatrix = GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, true);
-				ComputeInertia(HeadingMatrix, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex, &XDisp, &YDisp, &ZDisp);
+				ComputeInertia(HeadingMatrix, Rs, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex,
+					&XDisp, &YDisp, &ZDisp, &AccelDisp);
 			}
-			yawInertia = XDisp; pitchInertia = YDisp; distInertia = ZDisp;
+			yawInertia = XDisp; pitchInertia = YDisp; distInertia = AccelDisp;
 
 			SmoothInertia(&yawInertia, &pitchInertia);
 			// Apply the inertia
@@ -2047,8 +2066,14 @@ int DoRotationPitchHook(int* params)
 			 (float)*g_objectTransformRear_X,   (float)*g_objectTransformRear_Y,   (float)*g_objectTransformRear_Z
 		);
 
+		// Apply the roll inertia
+		Matrix4 R = Matrix4().rotateZ(g_rollInertia);
+		Matrix3 RZ = Matrix3(
+			R[0], R[1], R[2],
+			R[4], R[5], R[6],
+			R[8], R[9], R[10]);
 		// Apply the rotation matrix from headtracking
-		xwaCameraTransform *= g_headRotation;
+		xwaCameraTransform *= RZ * g_headRotation;
 
 		// Rewrite the composed rotation matrix (original+headtracking) into XWA globals
 		*g_objectTransformRight_X = -(int)xwaCameraTransform[0];
