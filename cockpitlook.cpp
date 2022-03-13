@@ -1,6 +1,6 @@
 /*
  * Copyright 2019, Justagai.
- * Extended for VR by Leo Reyes, 2019, 2020.
+ * Extended for VR by Leo Reyes and Marcos Orallo, 2019, 2020, 2021, 2022.
  * Justagai coded the whole mouse hook, I (blue_max) just added support for FreePIE and SteamVR tracking.
  * December 2019: Added support for positional tracking by hijacking the cockpit shake variables.
 
@@ -49,6 +49,16 @@ void quatToEuler(vr::HmdQuaternionf_t q, float *yaw, float *roll, float *pitch);
 
 #ifdef DEBUG_TO_FILE
 FILE *g_DebugFile = NULL;
+#endif
+
+#define DEBUG_INERTIA 0
+#if DEBUG_INERTIA == 1
+#include <vector>
+class Inertia {
+public:
+	float LastSpeed, CurSpeed, RawAccelDisp, ClampedAccelDisp;
+};
+std::vector<Inertia> g_InertiaData;
 #endif
 
 void log_debug(const char *format, ...)
@@ -427,15 +437,28 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 
 /*
  * Computes cockpit inertia
- * Input: The current Heading matrix H, the current forward vector Fs
+ * Input:
+ *		H: The current Heading matrix
+ *		Fs: The forward vector
+ *		Rs: The right vector
  * Output: The X,Y,Z displacement plus the acceleration inertia
  */
-void ComputeInertia(const Matrix4 &H, Vector4 Rs, Vector4 Fs, float fCurSpeed, int playerIndex, float *XDisp, float *YDisp, float *ZDisp, float *AccelDisp) {
+void ComputeInertia(const Matrix4 &H, Vector4 Rs, Vector4 Fs, float fRawCurSpeed, int playerIndex, float *XDisp, float *YDisp, float *ZDisp, float *AccelDisp) {
 	static bool bFirstFrame = true;
+	static float fCurSpeed = 0.0f;
 	static float fLastSpeed = 0.0f;
 	static time_t prevT = 0;
 	time_t curT = time(NULL);
 	bool InertiaEnabled = g_bCockpitInertiaEnabled || g_bExtInertiaEnabled;
+#if DEBUG_INERTIA == 1
+	Inertia inertia;
+#endif
+
+	// Smooth the speed. The speed is stored as an integer by the game so it will
+	// have discreet jumps that will be noticed as jerkiness in the cockpit.
+	// Let's smooth the speed before we use it to compute inertia:
+	fCurSpeed = 0.05f * fRawCurSpeed + 0.95f * fCurSpeed;
+
 	// Reset the first frame if the time between successive queries is too big: this
 	// implies the game was either paused or a new mission was loaded
 	bFirstFrame = curT - prevT > 2; // Reset if +2s have elapsed
@@ -476,14 +499,23 @@ void ComputeInertia(const Matrix4 &H, Vector4 Rs, Vector4 Fs, float fCurSpeed, i
 	*YDisp = g_fCockpitInertia * diffZ.y;
 	*ZDisp = g_fCockpitInertia * 60.0f * diffX.y; // Roll inertia
 	*AccelDisp = -g_fCockpitSpeedInertia * (fCurSpeed - fLastSpeed);
+#if DEBUG_INERTIA == 1
+	inertia.LastSpeed = fLastSpeed;
+	inertia.CurSpeed = fCurSpeed;
+	inertia.RawAccelDisp = *AccelDisp;
+#endif
 	if (*XDisp < -g_fCockpitMaxInertia) *XDisp = -g_fCockpitMaxInertia; else if (*XDisp > g_fCockpitMaxInertia) *XDisp = g_fCockpitMaxInertia;
 	if (*YDisp < -g_fCockpitMaxInertia) *YDisp = -g_fCockpitMaxInertia; else if (*YDisp > g_fCockpitMaxInertia) *YDisp = g_fCockpitMaxInertia;
 	if (*ZDisp < -MaxAngularInertia)		*ZDisp = -MaxAngularInertia;		else if (*ZDisp > MaxAngularInertia)		*ZDisp = MaxAngularInertia;
 	if (*AccelDisp < -g_fCockpitMaxInertia) *AccelDisp = -g_fCockpitMaxInertia; else if (*AccelDisp > g_fCockpitMaxInertia) *AccelDisp = g_fCockpitMaxInertia;
+#if DEBUG_INERTIA == 1
+	inertia.ClampedAccelDisp = *AccelDisp;
+	g_InertiaData.push_back(inertia);
+#endif
 
 	// Update the previous heading smoothly, otherwise the cockpit may shake a bit
-	g_prevRs = 0.1f * Rs + 0.9f * g_prevRs;
-	g_prevFs = 0.1f * Fs + 0.9f * g_prevFs;
+	g_prevRs = 0.05f * Rs + 0.95f * g_prevRs;
+	g_prevFs = 0.05f * Fs + 0.95f * g_prevFs;
 	fLastSpeed = 0.1f * fCurSpeed + 0.9f * fLastSpeed;
 	prevT = curT;
 
@@ -2115,6 +2147,21 @@ int DoRotationYawHook(int* params)
 	return 0;
 }
 
+#if DEBUG_INERTIA == 1
+void WriteInertiaData()
+{
+	FILE *file = NULL;
+	fopen_s(&file, ".\\Inertia.csv", "wt");
+	fprintf(file, "CurSpeed, LastSpeed, RawAccelDisp, ClampedAccelDisp\n");
+	for each (Inertia inertia in g_InertiaData) 	{
+		fprintf(file, "%0.6f, %0.6f, %0.6f, %0.6f\n",
+			inertia.CurSpeed, inertia.LastSpeed, inertia.RawAccelDisp, inertia.ClampedAccelDisp);
+	}
+	fclose(file);
+	log_debug("Dumped %d inertia entries to Inertia.csv", g_InertiaData.size());
+}
+#endif
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 {
 	switch (uReason)
@@ -2155,6 +2202,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 	case DLL_PROCESS_DETACH:
 		log_debug("Unloading Cockpitlook hook");
 		if (g_bUDPEnabled) CloseUDP();
+#if DEBUG_INERTIA == 1
+		WriteInertiaData();
+#endif
 		switch (g_TrackerType) {
 		case TRACKER_FREEPIE:
 			ShutdownFreePIE();
