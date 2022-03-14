@@ -204,16 +204,18 @@ void UpdateHyperspaceState(int playerIndex) {
 void LoadParams();
 
 // cockpitlook.cfg parameter names
-const char *TRACKER_TYPE				= "tracker_type"; // Defines which tracker to use
+const char *TRACKER_TYPE					= "tracker_type"; // Defines which tracker to use
 const char *TRACKER_TYPE_FREEPIE			= "FreePIE"; // Use FreePIE as the tracker
 const char *TRACKER_TYPE_STEAMVR			= "SteamVR"; // Use SteamVR as the tracker
 const char *TRACKER_TYPE_TRACKIR			= "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
-const char *TRACKER_TYPE_NONE			= "None";
-const char *POSE_CORRECTED_HEADTRACKING = "pose_corrected_headtracking";
-const char *YAW_MULTIPLIER				= "yaw_multiplier";
+const char *TRACKER_TYPE_NONE				= "None";
+const char *POSE_CORRECTED_HEADTRACKING		= "pose_corrected_headtracking";
+const char *YAW_MULTIPLIER					= "yaw_multiplier";
 const char *PITCH_MULTIPLIER				= "pitch_multiplier";
-const char *YAW_OFFSET					= "yaw_offset";
+const char *ROLL_MULTIPLIER					= "roll_multiplier";
+const char *YAW_OFFSET						= "yaw_offset";
 const char *PITCH_OFFSET					= "pitch_offset";
+const char *ROLL_OFFSET						= "roll_offset";
 const char *FREEPIE_SLOT					= "freepie_slot";
 
 const char *POS_X_MULTIPLIER_VRPARAM = "positional_x_multiplier";
@@ -231,11 +233,12 @@ const char *MAX_POSITIONAL_Z_VRPARAM = "max_positional_track_z";
 // they usually want to be able to look around the cockpit while still having the screen
 // in front of them, so we need a multiplier for the yaw and pitch. Or, you know, just
 // give users the option to invert the axis if needed.
-const float DEFAULT_YAW_MULTIPLIER = 1.0f;
+const float DEFAULT_YAW_MULTIPLIER   = 1.0f;
 const float DEFAULT_PITCH_MULTIPLIER = 1.0f;
-const float DEFAULT_ROLL_MULTIPLIER = 1.0f;
-const float DEFAULT_YAW_OFFSET = 0.0f;
+const float DEFAULT_ROLL_MULTIPLIER  = 1.0f;
+const float DEFAULT_YAW_OFFSET   = 0.0f;
 const float DEFAULT_PITCH_OFFSET = 0.0f;
+const float DEFAULT_ROLL_OFFSET  = 0.0f;
 const int   DEFAULT_FREEPIE_SLOT = 0;
 // See https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 // for a full list of virtual key codes
@@ -262,7 +265,8 @@ float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
 float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
-float g_fPitchOffset		 = DEFAULT_PITCH_OFFSET;
+float g_fPitchOffset	 = DEFAULT_PITCH_OFFSET;
+float g_fRollOffset		 = DEFAULT_ROLL_OFFSET;
 int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
 bool  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
@@ -1319,7 +1323,7 @@ int UpdateTrackingData()
 					}
 					yaw    = (g_FreePIEData.yaw   - g_headRotationHome.y) * g_fYawMultiplier;
 					pitch  = (g_FreePIEData.pitch - g_headRotationHome.x) * g_fPitchMultiplier;
-					// TODO: what about the roll?
+					roll   = (g_FreePIEData.roll  - g_headRotationHome.z) * g_fRollMultiplier;
 
 					if (g_bYawPitchFromMouseOverride) {
 						// If FreePIE could not be read, then get the yaw/pitch from the mouse:
@@ -1464,8 +1468,10 @@ int UpdateTrackingData()
 		if (dataReady) {
 			yaw   += g_fYawOffset;
 			pitch += g_fPitchOffset;
+			roll  += g_fRollOffset;
 			while (yaw   < 0.0f) yaw   += 360.0f;
 			while (pitch < 0.0f) pitch += 360.0f;
+			while (roll  < 0.0f) roll  += 360.0f;
 
 			//if (!bExternalCamera) {
 				// I think the following two lines will reset the yaw/pitch when using they keypad/POV hat to
@@ -1477,9 +1483,9 @@ int UpdateTrackingData()
 					PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
 
 					// Save rotation values to use later in another hooked function
-					g_headYaw = yaw;
+					g_headYaw   = yaw;
 					g_headPitch = pitch;
-					g_headRoll = roll;
+					g_headRoll  = roll;
 				}
 
 				g_headPos[0] = g_headPos[0] * g_fPosXMultiplier + g_headPosFromKeyboard[0];
@@ -1821,6 +1827,10 @@ void LoadParams() {
 				g_fPitchMultiplier = fValue;
 				log_debug("Pitch multiplier: %0.3f", g_fPitchMultiplier);
 			}
+			else if (_stricmp(param, ROLL_MULTIPLIER) == 0) {
+				g_fRollMultiplier = fValue;
+				log_debug("Roll multiplier: %0.3f", g_fRollMultiplier);
+			}
 			else if (_stricmp(param, YAW_OFFSET) == 0) {
 				g_fYawOffset = fValue;
 				log_debug("Yaw offset: %0.3f", g_fYawOffset);
@@ -1828,6 +1838,10 @@ void LoadParams() {
 			else if (_stricmp(param, PITCH_OFFSET) == 0) {
 				g_fPitchOffset = fValue;
 				log_debug("Pitch offset: %0.3f", g_fPitchOffset);
+			}
+			else if (_stricmp(param, ROLL_OFFSET) == 0) {
+				g_fRollOffset = fValue;
+				log_debug("Roll offset: %0.3f", g_fRollOffset);
 			}
 			else if (_stricmp(param, FREEPIE_SLOT) == 0) {
 				g_iFreePIESlot = (int )fValue;
@@ -2080,11 +2094,14 @@ int DoRotationPitchHook(int* params)
 		if (g_TrackerType == TRACKER_TRACKIR || g_TrackerType == TRACKER_FREEPIE) {
 			// We need to build the rotation matrix from yaw,pitch,roll
 			Matrix4 rX, rY, rZ;
-			rX.rotateX(g_headPitch);
-			rY.rotateY(g_headYaw);
-			rZ.rotateZ(g_headRoll);
-
-			Matrix4 rotMatrix = rZ * rY * rX;
+			// TrackIR may need +g_headPitch and +g_headYaw
+			rX.rotateX(-g_headPitch);
+			rY.rotateY(-g_headYaw);
+			rZ.rotateZ( g_headRoll);
+			// The following transform rule applies roll at the end of the chain. This
+			// make it possible to roll your head no matter where you're looking at. This
+			// matches the old behavior where roll was applied as a hack to the backbuffer
+			Matrix4 rotMatrix = rY * rX * rZ;
 			vr::HmdMatrix34_t poseMatrix;
 			Matrix4toHmdMatrix34(rotMatrix, poseMatrix);
 			g_headRotation = HmdMatrix34toMatrix3(poseMatrix);
