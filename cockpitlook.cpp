@@ -1390,13 +1390,6 @@ int UpdateTrackingData()
 					GetGunnerTurretMatrix(&ViewMatrix);
 					g_headPos = ViewMatrix * g_headPos;
 				}
-
-				g_SharedData.Yaw		= yaw;
-				g_SharedData.Pitch	= pitch;
-				g_SharedData.Roll	= roll;
-				g_SharedData.X		= g_headPos.x;
-				g_SharedData.Y		= g_headPos.y;
-				g_SharedData.Z		= g_headPos.z;
 			}
 			break;
 
@@ -1434,11 +1427,11 @@ int UpdateTrackingData()
 					z		 *=  scale_z;
 					yaw		 *=  g_fYawMultiplier;
 					pitch	 *=  g_fPitchMultiplier;
-					yawSign   =  1.0f;
-					pitchSign = -1.0f;
-					pitch	 *= pitchSign;
-					yaw		 *= yawSign;
-					roll	  = 0;
+					yawSign   = -1.0f;
+					pitchSign =  1.0f;
+					pitch    *= pitchSign;
+					yaw      *= yawSign;
+					roll	      = 0;
 
 					if (g_bFlipYZAxes) {
 						float temp = y; y = z; z = temp;
@@ -1479,8 +1472,14 @@ int UpdateTrackingData()
 				if (enableTrackedYawPitch) {
 					//PlayerDataTable[playerIndex].MousePositionX = (short)(yawSign   * yaw   / 360.0f * 65535.0f);
 					//PlayerDataTable[playerIndex].MousePositionY = (short)(pitchSign * pitch / 360.0f * 65535.0f);
-					// The following line will keep the reticle fixed on the screen:
-					PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
+					if (g_TrackerType != TRACKER_TRACKIR)
+						// The following line will keep the reticle fixed on the screen:
+						PlayerDataTable[playerIndex].MousePositionX = PlayerDataTable[playerIndex].MousePositionY = 0;
+					else {
+						// For TrackIR, it's easier if we restore the old mouse look behavior
+						PlayerDataTable[playerIndex].MousePositionX =  (int)(32768.0f * yaw   / 180.0f);
+						PlayerDataTable[playerIndex].MousePositionY = -(int)(32768.0f * pitch / 180.0f);
+					}
 
 					// Save rotation values to use later in another hooked function
 					g_headYaw   = yaw;
@@ -2070,12 +2069,27 @@ int CockpitPositionTransformHook(int* params)
 	
 	Vector3_float* vec = (Vector3_float*)params[0];
 
-	// Recommended value for g_fXWAUnitsToMetersScale = 25.
-	vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
-	vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
-	vec->y -= (g_fXWAUnitsToMetersScale * g_headPos.z);
+	if (g_TrackerType == TRACKER_TRACKIR && PlayerDataTable[*localPlayerIndex].gunnerTurretActive) {
+		// Do nothing, we won't allow positional tracking when TrackIR is active and we're in the
+		// gunner turret. Why? Well, because enabling tracking in the gunner turret implies a number
+		// of changes in ddraw, and full tracking is not as important in TrackIR mode as it is in VR
+		// mode: no one will get dizzy in the gunner turret if TrackIR isn't working.
+		// TODO: Enable full positional tracking here for TrackIR and fix everything that breaks in
+		// ddraw because of this. Note to self: when doing this, remember to create and clear the reticle
+		// buffers -- they currently are only created/cleared if VR is enabled.
+	}
+	else {
+		// Recommended value for g_fXWAUnitsToMetersScale = 25.
+		vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
+		vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
+		vec->y -= (g_fXWAUnitsToMetersScale * g_headPos.z);
 
-	Vector3Transform( (Vector3_float*)vec, (XwaMatrix3x3*)params[1]);
+		g_SharedData.X = g_fXWAUnitsToMetersScale * g_headPos.x;
+		g_SharedData.Y = g_fXWAUnitsToMetersScale * g_headPos.y;
+		g_SharedData.Z = g_fXWAUnitsToMetersScale * g_headPos.z;
+	}
+
+	Vector3Transform((Vector3_float*)vec, (XwaMatrix3x3*)params[1]);
 	return 0;
 }
 
@@ -2089,9 +2103,9 @@ int DoRotationPitchHook(int* params)
 
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
-	if (g_TrackerType != TRACKER_NONE)	{
+	if (g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) {
 
-		if (g_TrackerType == TRACKER_TRACKIR || g_TrackerType == TRACKER_FREEPIE) {
+		if (g_TrackerType == TRACKER_FREEPIE) {
 			// We need to build the rotation matrix from yaw,pitch,roll
 			Matrix4 rX, rY, rZ;
 			// TrackIR may need +g_headPitch and +g_headYaw
@@ -2124,6 +2138,10 @@ int DoRotationPitchHook(int* params)
 		// Apply the rotation matrix from headtracking
 		xwaCameraTransform *= RZ * g_headRotation;
 
+		g_SharedData.Yaw   = g_headYaw;
+		g_SharedData.Pitch = g_headPitch;
+		g_SharedData.Roll  = g_headRoll + g_rollInertia;
+
 		// Rewrite the composed rotation matrix (original+headtracking) into XWA globals
 		*g_objectTransformRight_X = -(int)xwaCameraTransform[0];
 		*g_objectTransformRight_Y = -(int)xwaCameraTransform[1];
@@ -2137,6 +2155,7 @@ int DoRotationPitchHook(int* params)
 	}
 	else
 	{
+		// TrackIR and no-tracking paths
 		const int playerIndex = *(int *)0x8C1CC8;
 		// TODO: This if disables mouse look while the gunner turret is active. Enabling it is nice
 		// but it breaks the reticle, so more work is needed to fix it.
