@@ -13,6 +13,7 @@ bool g_bCorrectedHeadTracking = true;
 void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
 vr::IVRSystem *g_pHMD = NULL;
+vr::IVRChaperone* g_pChaperone = NULL;
 extern SharedMem g_SharedMem;
 extern vr::TrackedDevicePose_t g_hmdPose;
 
@@ -35,6 +36,7 @@ bool InitSteamVR()
 	vr::TrackedDeviceIndex_t unDevice = vr::k_unTrackedDeviceIndex_Hmd;
 	g_fVsyncToPhotons = g_pHMD->GetFloatTrackedDeviceProperty(unDevice, vr::ETrackedDeviceProperty::Prop_SecondsFromVsyncToPhotons_Float);
 	g_fHMDDisplayFreq = g_pHMD->GetFloatTrackedDeviceProperty(unDevice, vr::ETrackedDeviceProperty::Prop_DisplayFrequency_Float);
+	g_pChaperone = vr::VRChaperone();
 
 	/*
 	// If we ever share any SteamVR data between this hook and ddraw, we should put that here.
@@ -57,6 +59,14 @@ void ShutdownSteamVR() {
 	g_pHMD = NULL;
 	log_debug("SteamVR shut down");
 }
+
+void ResetZeroPose() {
+	if (g_pChaperone == NULL)
+		return;
+	log_debug("***** Resetting SteamVR *****");
+	g_pChaperone->ResetZeroPose(vr::TrackingUniverseSeated);
+}
+
 
 Matrix3 HmdMatrix34toMatrix3(const vr::HmdMatrix34_t& mat) {
 	return Matrix3(

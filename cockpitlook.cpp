@@ -928,6 +928,7 @@ void DumpDebugInfo(int playerIndex) {
 void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	static bool bLastIKeyState = false, bLastJKeyState = false, bLastXKeyState = false, bLastTKeyState = false, bLastUKeyState = false;
 	static bool bCurIKeyState = false, bCurJKeyState = false, bCurXKeyState = false, bCurTKeyState = false, bCurUKeyState = false;
+	static bool bLastPeriodKeyState = false, bCurPeriodKeyState = false;
 
 	//bool bControl = *s_XwaIsControlKeyPressed;
 	//bool bShift = *s_XwaIsShiftKeyPressed;
@@ -947,11 +948,13 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	bLastXKeyState	= bCurXKeyState;
 	bLastTKeyState	= bCurTKeyState;
 	bLastUKeyState	= bCurUKeyState;
+	bLastPeriodKeyState = bCurPeriodKeyState;
 	bCurJKeyState	= GetAsyncKeyState(VK_J_KEY);
 	bCurIKeyState	= GetAsyncKeyState(VK_I_KEY);
 	bCurXKeyState	= GetAsyncKeyState(VK_X_KEY);
 	bCurTKeyState	= GetAsyncKeyState(VK_T_KEY);
 	bCurUKeyState	= GetAsyncKeyState(VK_U_KEY);
+	bCurPeriodKeyState = GetAsyncKeyState(VK_OEM_PERIOD);
 
 	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
 
@@ -961,6 +964,10 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	{
 		log_debug("*********** RELOADING CockpitLookHook.cfg ***********");
 		LoadParams();
+	}
+
+	if (g_TrackerType == TRACKER_STEAMVR && (bLastPeriodKeyState && !bCurPeriodKeyState)) {
+		ResetZeroPose();
 	}
 
 	// Ctrl+X: Dump debug info
