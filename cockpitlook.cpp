@@ -2111,8 +2111,11 @@ int DoRotationPitchHook(int* params)
 	// Prevent tracking in the first few frames of a mission.
 	// If roll is nonzero at the beginning of a mission, then the reticle pips will be slanted.
 	// Inhibiting this hook at the beginning of a mission might help avoid this problem.
-	if (g_SharedData.PresentCounter < 5)
-		return 0;
+	// -- only it only works for skimish missions and doesn't work for missions that load the
+	// hangar first. Plust it breaks tracking in the Tech Room. So, commenting out this code.
+	// We need to find a better solution.
+	//if (g_SharedData.PresentCounter < 5)
+	//	return 0;
 
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
