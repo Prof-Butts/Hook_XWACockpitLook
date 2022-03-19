@@ -17,6 +17,8 @@ struct SharedData {
 	// Joystick's position, written by the joystick hook, or by the joystick emulation code.
 	// These values are normalized in the range -1..1
 	float JoystickYaw, JoystickPitch;
+	// Present() counter, written by ddraw
+	int PresentCounter;
 
 	SharedData() {
 		this->POVOffsetX = 0.0f;
@@ -31,6 +33,7 @@ struct SharedData {
 		this->Z = 0.0f;
 		this->JoystickYaw = 0.0f;
 		this->JoystickPitch = 0.0f;
+		this->PresentCounter = 0;
 	}
 };
 

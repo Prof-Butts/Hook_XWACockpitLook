@@ -2108,6 +2108,12 @@ int DoRotationPitchHook(int* params)
 {
 	//log_debug("DoRotationPitchHook() executed");
 
+	// Prevent tracking in the first few frames of a mission.
+	// If roll is nonzero at the beginning of a mission, then the reticle pips will be slanted.
+	// Inhibiting this hook at the beginning of a mission might help avoid this problem.
+	if (g_SharedData.PresentCounter < 5)
+		return 0;
+
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
 	if (g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) {
