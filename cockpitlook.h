@@ -11,3 +11,4 @@ int MapCameraUpdateHook(int* params);
 int CockpitPositionTransformHook(int* params);
 int DoRotationPitchHook(int* params);
 int DoRotationYawHook(int* params);
+int SetupReticleHook(int* params);
