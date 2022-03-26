@@ -33,6 +33,7 @@ HWND g_hWnd = NULL;
 extern bool g_bSteamVRInitialized;
 bool g_bForceSteamVRShutdown = false;
 bool g_bHeadtrackingApplied = false;
+bool g_bIsReticleSetup = false;
 
 // The hooks are loaded before ddraw, so we can create the shared memory handle here
 SharedMem g_SharedMem(true);
@@ -2085,7 +2086,7 @@ int CockpitPositionTransformHook(int* params)
 		// ddraw because of this. Note to self: when doing this, remember to create and clear the reticle
 		// buffers -- they currently are only created/cleared if VR is enabled.
 	}
-	else {
+	else if (g_bIsReticleSetup) {
 		// Recommended value for g_fXWAUnitsToMetersScale = 25.
 		vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
 		vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
@@ -2119,7 +2120,7 @@ int DoRotationPitchHook(int* params)
 
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
-	if (g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) {
+	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && g_bIsReticleSetup) {
 
 		if (g_TrackerType == TRACKER_FREEPIE) {
 			// We need to build the rotation matrix from yaw,pitch,roll
@@ -2188,7 +2189,7 @@ int DoRotationPitchHook(int* params)
 */
 int DoRotationYawHook(int* params)
 {
-	if (g_TrackerType == TRACKER_STEAMVR) {
+	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && g_bIsReticleSetup) {
 		// Since we applied the full rotation matrix in DoRotationPitchHook(), we don't need to do anything here.		
 		return 0;
 	}
@@ -2197,6 +2198,12 @@ int DoRotationYawHook(int* params)
 		DoRotation(params[0], params[1], params[2], params[3]);
 	}
 	return 0;
+}
+
+int SetupReticleHook(int* params) {
+	log_debug("SetupReticle called. Reticle ready");
+	g_bIsReticleSetup = true;
+	return TransformVector((ObjectEntry*) params[0], params[1], params[2], params[3]);
 }
 
 #if DEBUG_INERTIA == 1

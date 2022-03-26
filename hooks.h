@@ -14,6 +14,7 @@ static const HookFunction g_hookFunctions[] =
 	{ 0x497ABB, CockpitPositionTransformHook },
 	{ 0x43FB57, DoRotationPitchHook}, //DoRotation(Pitch)
 	{ 0x43FB67, DoRotationYawHook }, //DoRotation(Yaw)
+	{ 0x4654A6, SetupReticleHook }, //TransformVector() inside SetupReticle()
 };
 
 static const HookPatchItem g_patch[] =
@@ -49,7 +50,12 @@ static const HookPatchItem g_patch[] =
 	{ 0x43FB52 - 0x400C00, "E8E9120000", "E8C98F1600"},
 
 	// Hook call to DoRotation(Yaw) inside UpdateCameraTransform (0x43FB52)
+	// call((0x5A8B20 - 0x43FB67) = 0x168FB9
 	{ 0x43FB62 - 0x400C00, "E8D9120000", "E8B98F1600"},
+
+	// Hook call to TransformVector() inside SetupReticle () (0x4652F0)
+	// call((0x5A8B20 - 0x4654A6) = 0x168FC9
+	{ 0x4654A1 - 0x400C00, "E80ADB0300", "E87A361400"},
 };
 
 static const HookPatch g_patches[] =
