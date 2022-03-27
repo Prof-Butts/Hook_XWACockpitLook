@@ -17,8 +17,9 @@ struct SharedData {
 	// Joystick's position, written by the joystick hook, or by the joystick emulation code.
 	// These values are normalized in the range -1..1
 	float JoystickYaw, JoystickPitch;
-	// Present() counter, written by ddraw
-	int PresentCounter;
+	// InFlight flag. Set to 1 by ddraw when the game is in the Present 3D path.
+	// Set to 0 when the game is in the Present 2D path.
+	int InFlight;
 
 	SharedData() {
 		this->POVOffsetX = 0.0f;
@@ -33,7 +34,7 @@ struct SharedData {
 		this->Z = 0.0f;
 		this->JoystickYaw = 0.0f;
 		this->JoystickPitch = 0.0f;
-		this->PresentCounter = 0;
+		this->InFlight = 0;
 	}
 };
 

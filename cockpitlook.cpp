@@ -1085,6 +1085,11 @@ int UpdateTrackingData()
 	static short prevCameraYaw = 0, prevCameraPitch = 0; // These are the post-inertia values from the last frame
 	static int prevCameraDist = 1024;
 	float yawInertia = 0.0f, pitchInertia = 0.0f, distInertia = 0.0f;
+
+	// The game is presenting 2D content. Inhibit tracking until the reticle is setup.
+	if (g_SharedData.InFlight == 0)
+		g_bIsReticleSetup = false;
+
 	/*static bool bFirstFrame = true;
 	if (bFirstFrame) {
 		log_debug("External Dist: %d", PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist);
@@ -2086,7 +2091,9 @@ int CockpitPositionTransformHook(int* params)
 		// ddraw because of this. Note to self: when doing this, remember to create and clear the reticle
 		// buffers -- they currently are only created/cleared if VR is enabled.
 	}
-	else if (g_bIsReticleSetup) {
+	// When the player is in the hangar, the Present 3D path is active, but the reticle isn't setup
+	// yet. In this case, we need to allow tracking.
+	else if (g_bIsReticleSetup || *g_playerInHangar) {
 		// Recommended value for g_fXWAUnitsToMetersScale = 25.
 		vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
 		vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
@@ -2120,7 +2127,10 @@ int DoRotationPitchHook(int* params)
 
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
-	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && g_bIsReticleSetup) {
+	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && 
+		// When the player is in the hangar, the Present 3D path is active, but the reticle isn't
+		// setup yet. In this case, we need to allow tracking.
+		(g_bIsReticleSetup || *g_playerInHangar)) {
 
 		if (g_TrackerType == TRACKER_FREEPIE) {
 			// We need to build the rotation matrix from yaw,pitch,roll
