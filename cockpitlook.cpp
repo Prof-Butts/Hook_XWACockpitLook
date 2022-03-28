@@ -2086,7 +2086,8 @@ int CockpitPositionTransformHook(int* params)
 		// ddraw because of this. Note to self: when doing this, remember to create and clear the reticle
 		// buffers -- they currently are only created/cleared if VR is enabled.
 	}
-	else if (g_bIsReticleSetup) {
+	else if (g_SharedData.bIsReticleSetup || *g_playerInHangar) {
+		// Don't apply tracking until the reticle is ready, or in the hangar where there is no reticle
 		// Recommended value for g_fXWAUnitsToMetersScale = 25.
 		vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
 		vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
@@ -2108,20 +2109,16 @@ int CockpitPositionTransformHook(int* params)
 int DoRotationPitchHook(int* params)
 {
 	//log_debug("DoRotationPitchHook() executed");
-
-	// Prevent tracking in the first few frames of a mission.
-	// If roll is nonzero at the beginning of a mission, then the reticle pips will be slanted.
-	// Inhibiting this hook at the beginning of a mission might help avoid this problem.
-	// -- only it only works for skimish missions and doesn't work for missions that load the
-	// hangar first. Plust it breaks tracking in the Tech Room. So, commenting out this code.
-	// We need to find a better solution.
-	//if (g_SharedData.PresentCounter < 5)
-	//	return 0;
-
+	
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
-	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && g_bIsReticleSetup) {
 
+	// If roll is nonzero at the beginning of a mission when the reticle is set up, then the reticle pips will be slanted.
+	// Prevent tracking at the beginning of a mission until the reticle has been correctly set up.
+	// g_SharedData.bIsReticleSetup is set to 1 by SetupReticleHook().
+	// Bypass the check when in the hangar, as there is no reticle so the flag is still 0.
+
+	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && (g_SharedData.bIsReticleSetup || *g_playerInHangar)) {
 		if (g_TrackerType == TRACKER_FREEPIE) {
 			// We need to build the rotation matrix from yaw,pitch,roll
 			Matrix4 rX, rY, rZ;
@@ -2189,8 +2186,8 @@ int DoRotationPitchHook(int* params)
 */
 int DoRotationYawHook(int* params)
 {
-	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && g_bIsReticleSetup) {
-		// Since we applied the full rotation matrix in DoRotationPitchHook(), we don't need to do anything here.		
+	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && (g_SharedData.bIsReticleSetup || *g_playerInHangar)) {
+		// Since we applied the full rotation matrix in DoRotationPitchHook(), we don't need to do anything here.
 		return 0;
 	}
 	else {
@@ -2202,7 +2199,7 @@ int DoRotationYawHook(int* params)
 
 int SetupReticleHook(int* params) {
 	log_debug("SetupReticle called. Reticle ready");
-	g_bIsReticleSetup = true;
+	g_SharedData.bIsReticleSetup = 1;
 	return TransformVector((ObjectEntry*) params[0], params[1], params[2], params[3]);
 }
 
