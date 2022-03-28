@@ -33,7 +33,6 @@ HWND g_hWnd = NULL;
 extern bool g_bSteamVRInitialized;
 bool g_bForceSteamVRShutdown = false;
 bool g_bHeadtrackingApplied = false;
-bool g_bIsReticleSetup = false;
 
 // The hooks are loaded before ddraw, so we can create the shared memory handle here
 SharedMem g_SharedMem(true);
