@@ -283,7 +283,7 @@ const auto XwaGetConnectedJoysticksCount = (int(*)())0x00541030;
 /*********************************************************************/
 /* Cockpit Inertia													 */
 /*********************************************************************/
-bool g_bCockpitInertiaEnabled = false, g_bExtInertiaEnabled = false;
+bool g_bCockpitInertiaEnabled = false, g_bExtInertiaEnabled = false, g_bEnableExternalInertiaInHangar = false;
 float g_fCockpitInertia = 0.35f, g_fCockpitSpeedInertia = 0.005f, g_fExtDistInertia = 0.0f;
 float g_fCockpitMaxInertia = 0.2f, g_fExtInertia = -16384.0f, g_fExtMaxInertia = 0.025f;
 short g_externalTilt = -1820; // -10 degrees
@@ -991,6 +991,7 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 		}
 	}
 
+	// Ctrl+I: Toggle Inertia
 	if (g_bCtrl && bLastIKeyState && !bCurIKeyState) {
 		g_bCockpitInertiaEnabled = !g_bCockpitInertiaEnabled;
 		g_bExtInertiaEnabled = !g_bExtInertiaEnabled;
@@ -1692,6 +1693,7 @@ int UpdateTrackingData()
 		// Apply External View Inertia
 		if (bExternalCamera) 
 		{
+			bool bHangarInertiaEnabled = !*g_playerInHangar || (*g_playerInHangar && g_bEnableExternalInertiaInHangar);
 			// Save the current yaw/pitch before adding external view inertia, we'll restore these values the
 			// next time we enter this hook
 			lastCameraYaw   = PlayerDataTable[playerIndex].Camera.Yaw;
@@ -1701,7 +1703,7 @@ int UpdateTrackingData()
 
 			SmoothInertia(&yawInertia, &pitchInertia);
 			// Apply inertia
-			if (g_bExtInertiaEnabled) {
+			if (g_bExtInertiaEnabled && bHangarInertiaEnabled) {
 				PlayerDataTable[playerIndex].Camera.Yaw = lastCameraYaw + (short)(yawInertia * g_fExtInertia);
 				PlayerDataTable[playerIndex].Camera.Pitch = lastCameraPitch + (short)(pitchInertia * g_fExtInertia);
 				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = lastCameraDist + (int)(distInertia * g_fExtDistInertia);
@@ -1937,6 +1939,9 @@ void LoadParams() {
 			}
 			else if (_stricmp(param, "external_inertia_enabled") == 0) {
 				g_bExtInertiaEnabled = (bool)fValue;
+			}
+			else if (_stricmp(param, "enable_external_inertia_in_hangar") == 0) {
+				g_bEnableExternalInertiaInHangar = (bool)fValue;
 			}
 			else if (_stricmp(param, "external_inertia") == 0) {
 				g_fExtInertia = -fValue * 16384.0f;
