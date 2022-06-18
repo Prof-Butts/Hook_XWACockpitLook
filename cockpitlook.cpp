@@ -31,7 +31,7 @@
 HWND g_hWnd = NULL;
 
 extern bool g_bSteamVRInitialized;
-bool g_bForceSteamVRShutdown = false;
+bool g_bForceSteamVRShutdown = true;
 bool g_bHeadtrackingApplied = false;
 
 // The hooks are loaded before ddraw, so we can create the shared memory handle here
