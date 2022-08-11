@@ -34,9 +34,6 @@ extern bool g_bSteamVRInitialized;
 bool g_bForceSteamVRShutdown = true;
 bool g_bHeadtrackingApplied = false;
 
-// The hooks are loaded before ddraw, so we can create the shared memory handle here
-SharedMem g_SharedMem(true);
-char shared_msg[80] = "message from the CokpitLookHook";
 vr::TrackedDevicePose_t g_hmdPose;
 Matrix3 g_headRotation;
 float g_headYaw = 0.0f, g_headPitch = 0.0f, g_headRoll = 0.0f, g_rollInertia = 0.0f;
@@ -1091,13 +1088,6 @@ int UpdateTrackingData()
 		bFirstFrame = false;
 	}*/
 
-	/*
-	// DEBUG: This wlll update the message on every frame
-	static int index = 0;
-	shared_msg[0] = 'A' + index;
-	index = (index + 1) % 10;
-	*/
-
 	//log_debug("UpdateTrackingData() executed");
 
 	// For some reason, TrackIR won't load if the game is run from the launcher. So, let's
@@ -1223,9 +1213,9 @@ int UpdateTrackingData()
 								&XDisp, &YDisp, &ZDisp, &AccelDisp);
 						}
 						// Apply the current POVOffset
-						g_headPos.x += g_SharedData.POVOffsetX;
-						g_headPos.y += g_SharedData.POVOffsetY;
-						g_headPos.z += g_SharedData.POVOffsetZ;
+						g_headPos.x += g_SharedData->POVOffsetX;
+						g_headPos.y += g_SharedData->POVOffsetY;
+						g_headPos.z += g_SharedData->POVOffsetZ;
 						// Apply inertia:
 						if (g_bCockpitInertiaEnabled) {
 							g_headPos.x += XDisp;
@@ -1269,9 +1259,9 @@ int UpdateTrackingData()
 									&XDisp, &YDisp, &ZDisp, &AccelDisp);
 							}
 							// Apply the current POVOffset
-							g_headPos.x += g_SharedData.POVOffsetX;
-							g_headPos.y += g_SharedData.POVOffsetY;
-							g_headPos.z += g_SharedData.POVOffsetZ;
+							g_headPos.x += g_SharedData->POVOffsetX;
+							g_headPos.y += g_SharedData->POVOffsetY;
+							g_headPos.z += g_SharedData->POVOffsetZ;
 							// Apply inertia:
 							if (g_bCockpitInertiaEnabled) {
 								g_headPos.x += XDisp;
@@ -1525,9 +1515,9 @@ int UpdateTrackingData()
 						ComputeInertia(HeadingMatrix, Rs, Fs, (float)PlayerDataTable[playerIndex].currentSpeed, playerIndex,
 							&XDisp, &YDisp, &ZDisp, &AccelDisp);
 					// Apply the current POVOffset
-					g_headPos.x += g_SharedData.POVOffsetX;
-					g_headPos.y += g_SharedData.POVOffsetY;
-					g_headPos.z += g_SharedData.POVOffsetZ;
+					g_headPos.x += g_SharedData->POVOffsetX;
+					g_headPos.y += g_SharedData->POVOffsetY;
+					g_headPos.z += g_SharedData->POVOffsetZ;
 					// Apply inertia:
 					if (g_bCockpitInertiaEnabled) {
 						g_headPos.x += XDisp;
@@ -2016,16 +2006,6 @@ void InitKeyboard()
 	GetAsyncKeyState(VK_NUMPAD9);
 }
 
-void InitSharedMem() {
-	SharedDataProxy *pSharedData = (SharedDataProxy *)g_SharedMem.GetMemoryPtr();
-	if (pSharedData == nullptr) {
-		log_debug("Could not load shared data ptr");
-		return;
-	}
-	pSharedData->pSharedData = &g_SharedData;
-	pSharedData->bDataReady = true;
-}
-
 /*
   This function runs when UpdateCameraTransform is called from PlayerCameraUpdate() for in-flight and external cameras)
 
@@ -2086,17 +2066,17 @@ int CockpitPositionTransformHook(int* params)
 		// ddraw because of this. Note to self: when doing this, remember to create and clear the reticle
 		// buffers -- they currently are only created/cleared if VR is enabled.
 	}
-	else if (g_SharedData.bIsReticleSetup || *g_playerInHangar) {
+	else if (g_SharedData->bIsReticleSetup || *g_playerInHangar) {
 		// Don't apply tracking until the reticle is ready, or in the hangar where there is no reticle
 		// Recommended value for g_fXWAUnitsToMetersScale = 25.
 		vec->x += (g_fXWAUnitsToMetersScale * g_headPos.x);
 		vec->z += (g_fXWAUnitsToMetersScale * g_headPos.y);
 		vec->y -= (g_fXWAUnitsToMetersScale * g_headPos.z);
-
-		g_SharedData.X = g_fXWAUnitsToMetersScale * g_headPos.x;
-		g_SharedData.Y = g_fXWAUnitsToMetersScale * g_headPos.y;
-		g_SharedData.Z = g_fXWAUnitsToMetersScale * g_headPos.z;
 	}
+
+	g_SharedData->X = g_fXWAUnitsToMetersScale * g_headPos.x;
+	g_SharedData->Y = g_fXWAUnitsToMetersScale * g_headPos.y;
+	g_SharedData->Z = g_fXWAUnitsToMetersScale * g_headPos.z;
 
 	Vector3Transform((Vector3_float*)vec, (XwaMatrix3x3*)params[1]);
 	return 0;
@@ -2115,11 +2095,11 @@ int DoRotationPitchHook(int* params)
 
 	// If roll is nonzero at the beginning of a mission when the reticle is set up, then the reticle pips will be slanted.
 	// Prevent tracking at the beginning of a mission until the reticle has been correctly set up.
-	// g_SharedData.bIsReticleSetup is set to 1 by SetupReticleHook().
+	// g_SharedData->bIsReticleSetup is set to 1 by SetupReticleHook().
 	// Bypass the check when in the hangar, as there is no reticle so the flag is still 0.
 
 	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) &&
-		(g_SharedData.bIsReticleSetup || *g_playerInHangar))
+		(g_SharedData->bIsReticleSetup || *g_playerInHangar))
 	{
 		if (g_TrackerType == TRACKER_FREEPIE) {
 			// We need to build the rotation matrix from yaw,pitch,roll
@@ -2154,10 +2134,6 @@ int DoRotationPitchHook(int* params)
 		// Apply the rotation matrix from headtracking
 		xwaCameraTransform *= RZ * g_headRotation;
 
-		g_SharedData.Yaw   = g_headYaw;
-		g_SharedData.Pitch = g_headPitch;
-		g_SharedData.Roll  = g_headRoll + g_rollInertia;
-
 		// Rewrite the composed rotation matrix (original+headtracking) into XWA globals
 		*g_objectTransformRight_X = -(int)xwaCameraTransform[0];
 		*g_objectTransformRight_Y = -(int)xwaCameraTransform[1];
@@ -2180,6 +2156,10 @@ int DoRotationPitchHook(int* params)
 		// Apply the expected Pitch rotation without injecting anything
 		DoRotation(params[0], params[1], params[2], params[3]);
 	}
+
+	g_SharedData->Yaw = g_headYaw;
+	g_SharedData->Pitch = g_headPitch;
+	g_SharedData->Roll = g_headRoll + g_rollInertia;
 	return 0;
 }
 
@@ -2188,7 +2168,7 @@ int DoRotationPitchHook(int* params)
 */
 int DoRotationYawHook(int* params)
 {
-	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && (g_SharedData.bIsReticleSetup || *g_playerInHangar)) {
+	if ((g_TrackerType == TRACKER_FREEPIE || g_TrackerType == TRACKER_STEAMVR) && (g_SharedData->bIsReticleSetup || *g_playerInHangar)) {
 		// Since we applied the full rotation matrix in DoRotationPitchHook(), we don't need to do anything here.
 		return 0;
 	}
@@ -2201,7 +2181,7 @@ int DoRotationYawHook(int* params)
 
 int SetupReticleHook(int* params) {
 	log_debug("SetupReticle called. Reticle ready");
-	g_SharedData.bIsReticleSetup = 1;
+	g_SharedData->bIsReticleSetup = 1;
 	return TransformVector((ObjectEntry*) params[0], params[1], params[2], params[3]);
 }
 

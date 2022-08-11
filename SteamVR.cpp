@@ -13,7 +13,6 @@ void log_debug(const char *format, ...);
 bool g_bSteamVRInitialized = false;
 vr::IVRSystem *g_pHMD = NULL;
 vr::IVRChaperone* g_pChaperone = NULL;
-extern SharedMem g_SharedMem;
 extern vr::TrackedDevicePose_t g_hmdPose;
 
 bool InitSteamVR()
@@ -37,18 +36,6 @@ bool InitSteamVR()
 	g_fHMDDisplayFreq = g_pHMD->GetFloatTrackedDeviceProperty(unDevice, vr::ETrackedDeviceProperty::Prop_DisplayFrequency_Float);
 	g_pChaperone = vr::VRChaperone();
 
-	/*
-	// If we ever share any SteamVR data between this hook and ddraw, we should put that here.
-
-	// Put the address of g_hmdPose in shared memory. We only need to do this once.
-	// Setting bDataReady to true means that pDataPtr has been initialized to a valid
-	// address.
-	SharedDataProxy* pSharedData = (SharedDataProxy *)g_SharedMem.GetMemoryPtr();
-	if (pSharedData != nullptr) {
-		pSharedData->pSharedData = &(g_hmdPose);
-		pSharedData->bDataReady = true;
-	}
-	*/
 	return true;
 }
 

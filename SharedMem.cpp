@@ -1,68 +1,22 @@
 #include "SharedMem.h"
 
-SharedData g_SharedData;
-
 void log_debug(const char *format, ...);
 
-SharedMem::SharedMem(bool OpenCreate) 
-{
-	InitMemory(OpenCreate);
-}
-
-bool SharedMem::InitMemory(bool OpenCreate) 
-{
-	pSharedMemPtr = NULL;
-
-	if (OpenCreate) {
-		hMapFile = CreateFileMapping(
-			INVALID_HANDLE_VALUE,    // use paging file
-			NULL,                    // default security
-			PAGE_READWRITE,          // read/write access
-			0,                       // maximum object size (high-order DWORD)
-			SHARED_MEM_SIZE,         // maximum object size (low-order DWORD)
-			SHARED_MEM_NAME);        // name of mapping object
-
-		if (hMapFile == NULL)
-		{
-			log_debug("Could not create file mapping object (%d)", GetLastError());
-			return false;
-		}
-	}
-	else {
-		hMapFile = OpenFileMapping(
-			FILE_MAP_ALL_ACCESS,   // read/write access
-			FALSE,                 // do not inherit the name
-			SHARED_MEM_NAME);      // name of mapping object
-
-		if (hMapFile == NULL)
-		{
-			log_debug("Could not open file mapping object (%d).\n", GetLastError());
-			return false;
-		}
+void InitSharedMem() {
+	// Create the shared memory file or open it if it already exists.
+	g_SharedData = (SharedMemDataCockpitLook*)g_SharedMem.GetMemoryPointer();
+	if (g_SharedData == nullptr) {
+		log_debug("Could not get pointer to shared data");
+		return;
 	}
 
-	pSharedMemPtr = (LPTSTR)MapViewOfFile(hMapFile,   // handle to map object
-		FILE_MAP_ALL_ACCESS, // read/write permission
-		0,
-		0,
-		SHARED_MEM_SIZE);
-
-	if (pSharedMemPtr == NULL) {
-		log_debug("Could not map view of file (%d)", GetLastError());
-		return false;
-	}
-
-	return true;
+	// We consider the data is ready as soon as the shared memory is initialized
+	// This works because we don't have actual concurrent threads accessing it.
+	// All DLLs belong to the same thread.
+	g_SharedMem.SetDataReady();
 }
 
-SharedMem::~SharedMem()
-{
-	UnmapViewOfFile(pSharedMemPtr);
+SharedMemDataCockpitLook* g_SharedData = nullptr;
 
-	CloseHandle(hMapFile);
-}
-
-void *SharedMem::GetMemoryPtr()
-{
-	return pSharedMemPtr;
-}
+// Create the shared memory as a global variable
+SharedMem<SharedMemDataCockpitLook> g_SharedMem(SHARED_MEM_NAME_COCKPITLOOK, true, true);
