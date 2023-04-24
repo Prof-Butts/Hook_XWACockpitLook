@@ -1683,7 +1683,8 @@ int UpdateTrackingData()
 		// Apply External View Inertia
 		if (bExternalCamera) 
 		{
-			bool bHangarInertiaEnabled = !*g_playerInHangar || (*g_playerInHangar && g_bEnableExternalInertiaInHangar);
+			const bool bPlayerInHangar = *g_playerInHangar;
+			const bool bHangarInertiaEnabled = !bPlayerInHangar || (bPlayerInHangar && g_bEnableExternalInertiaInHangar);
 			// Save the current yaw/pitch before adding external view inertia, we'll restore these values the
 			// next time we enter this hook
 			lastCameraYaw   = PlayerDataTable[playerIndex].Camera.Yaw;
@@ -1704,8 +1705,9 @@ int UpdateTrackingData()
 				PlayerDataTable[playerIndex].Camera.ExternalCameraZoomDist = lastCameraDist;
 			}
 
-			// Add the tilt even if external inertia is off:
-			PlayerDataTable[playerIndex].Camera.Pitch += g_externalTilt;
+			// Add the tilt even if external inertia is off... but only if we're not in the hangar:
+			if (!bPlayerInHangar)
+				PlayerDataTable[playerIndex].Camera.Pitch += g_externalTilt;
 			// Save the final values for yaw/pitch -- this will help us detect changes performed in other places
 			prevCameraYaw   = PlayerDataTable[playerIndex].Camera.Yaw;
 			prevCameraPitch = PlayerDataTable[playerIndex].Camera.Pitch;
