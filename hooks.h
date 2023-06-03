@@ -1,7 +1,27 @@
 #pragma once
 #include "hook_function.h"
 #include "cockpitlook.h"
+#include "config.h"
 
+class HooksConfig
+{
+public:
+	HooksConfig()
+	{
+		auto lines = GetFileLines("CockpitLook.cfg");
+
+		if (lines.empty())
+		{
+			lines = GetFileLines("hooks.ini", "hook_cockpitlook");
+		}
+
+		this->DisableRandomCamera = GetFileKeyValueInt(lines, DISABLE_HANGAR_RANDOM_CAMERA, 0) != 0;
+	}
+
+	bool DisableRandomCamera;
+};
+
+static HooksConfig g_hooksConfig;
 
 static const HookFunction g_hookFunctions[] =
 {
@@ -56,6 +76,14 @@ static const HookPatchItem g_patch[] =
 	// Hook call to TransformVector() inside SetupReticle () (0x4652F0)
 	// call((0x5A8B20 - 0x4654A6) = 0x168FC9
 	{ 0x4654A1 - 0x400C00, "E80ADB0300", "E87A361400"},
+
+	//Patches for disabling random camera switch in the hangar
+	//Pre-launch
+	{0x05B583,"E8B83A0000", g_hooksConfig.DisableRandomCamera ? "9090909090" : "E8B83A0000"},
+	//Launch
+	{0x05AD61,"E8DA420000", g_hooksConfig.DisableRandomCamera ? "9090909090" : "E8DA420000"},
+	//Re-entry
+	{0x057866,"E8D5770000", g_hooksConfig.DisableRandomCamera ? "9090909090" : "E8D5770000"},
 };
 
 static const HookPatch g_patches[] =
