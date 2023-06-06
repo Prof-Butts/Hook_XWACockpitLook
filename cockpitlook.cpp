@@ -206,7 +206,7 @@ const char *TRACKER_TYPE_FREEPIE			= "FreePIE"; // Use FreePIE as the tracker
 const char *TRACKER_TYPE_STEAMVR			= "SteamVR"; // Use SteamVR as the tracker
 const char *TRACKER_TYPE_TRACKIR			= "TrackIR"; // Use TrackIR (or OpenTrack) as the tracker
 const char *TRACKER_TYPE_NONE				= "None";
-const char *POSE_CORRECTED_HEADTRACKING		= "pose_corrected_headtracking";
+const char *DISABLE_HANGAR_RANDOM_CAMERA	= "disable_hangar_random_camera";
 const char *YAW_MULTIPLIER					= "yaw_multiplier";
 const char *PITCH_MULTIPLIER				= "pitch_multiplier";
 const char *ROLL_MULTIPLIER					= "roll_multiplier";
@@ -258,6 +258,7 @@ typedef enum {
 } TrackerType;
 TrackerType g_TrackerType = TRACKER_NONE;
 
+bool g_bDisableRandomCamera = false;
 float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
@@ -1814,6 +1815,9 @@ void LoadParams() {
 					log_debug("Tracking disabled");
 					g_TrackerType = TRACKER_NONE;
 				}
+			}
+			else if (_stricmp(param, DISABLE_HANGAR_RANDOM_CAMERA) == 0) {
+				g_bDisableRandomCamera = (bool) fValue;
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
 				g_fYawMultiplier = fValue;
