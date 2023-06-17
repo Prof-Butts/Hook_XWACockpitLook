@@ -258,7 +258,6 @@ typedef enum {
 } TrackerType;
 TrackerType g_TrackerType = TRACKER_NONE;
 
-bool g_bDisableRandomCamera = false;
 float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
@@ -1815,9 +1814,6 @@ void LoadParams() {
 					log_debug("Tracking disabled");
 					g_TrackerType = TRACKER_NONE;
 				}
-			}
-			else if (_stricmp(param, DISABLE_HANGAR_RANDOM_CAMERA) == 0) {
-				g_bDisableRandomCamera = (bool) fValue;
 			}
 			else if (_stricmp(param, YAW_MULTIPLIER) == 0) {
 				g_fYawMultiplier = fValue;
