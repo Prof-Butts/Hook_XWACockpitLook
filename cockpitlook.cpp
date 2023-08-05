@@ -2259,7 +2259,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 			if (g_bForceSteamVRShutdown) {
 				if (g_bSteamVRPosFromFreePIE)
 					ShutdownFreePIE();
-				exit(0);
+				ExitProcess(0);
 			}
 			ShutdownSteamVR();
 			if (g_bSteamVRPosFromFreePIE)
