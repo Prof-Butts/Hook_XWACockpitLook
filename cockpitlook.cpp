@@ -24,6 +24,7 @@
 #include "Vectors.h"
 #include "Matrices.h"
 #include "UDP.h"
+#include "YawVR.h"
 #include "Telemetry.h"
 #include "SharedMem.h"
 
@@ -1765,6 +1766,11 @@ int UpdateTrackingData()
 	g_bResetHeadCenter = false;
 	bLastExternalCamera = bExternalCamera;
 
+	if (YawVR::bEnabled)
+	{
+		YawVR::ApplyInertia(yawInertia, pitchInertia, g_rollInertia);
+	}
+
 	//params[-1] = 0x4F9C33;
 	return 0;
 }
@@ -1981,6 +1987,37 @@ void LoadParams() {
 				_snprintf_s(g_sUDPServer, 80, "%s", svalue);
 				log_debug("[UDP] Telemetry Server: %s", g_sUDPServer);
 			}
+
+			// YawVR settings
+			if (_stricmp(param, "yawvr_enable") == 0) {
+				YawVR::bEnabled = (bool)fValue;
+				log_debug("[YVR] YawVR Enabled: %d", YawVR::bEnabled);
+			}
+			else if (_stricmp(param, "yawvr_server") == 0) {
+				_snprintf_s(YawVR::sServerIP, 80, svalue);
+				log_debug("[YVR] YawVR Server: %s", YawVR::sServerIP);
+			}
+			else if (_stricmp(param, "yawvr_udp_port") == 0) {
+				YawVR::udpPort = (int)fValue;
+				log_debug("[YVR] YawVR UDP port: %d", YawVR::udpPort);
+			}
+			else if (_stricmp(param, "yawvr_tcp_port") == 0) {
+				YawVR::tcpPort = (int)fValue;
+				log_debug("[YVR] YawVR TCP port: %d", YawVR::tcpPort);
+			}
+			else if (_stricmp(param, "yawvr_yaw_scale") == 0) {
+				YawVR::yawScale = fValue;
+				log_debug("[YVR] YawVR yaw scale: %d", YawVR::yawScale);
+			}
+			else if (_stricmp(param, "yawvr_pitch_scale") == 0) {
+				YawVR::pitchScale = fValue;
+				log_debug("[YVR] YawVR pitch scale: %d", YawVR::pitchScale);
+			}
+			else if (_stricmp(param, "yawvr_roll_scale") == 0) {
+				YawVR::rollScale = fValue;
+				log_debug("[YVR] YawVR roll scale: %d", YawVR::rollScale);
+			}
+
 		}
 	} // while ... read file
 	fclose(file);
@@ -2219,6 +2256,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 			InitializeUDP();
 			InitializeUDPSocket();
 		}
+
+		if (YawVR::bEnabled) YawVR::Initialize();
+
 		InitSharedMem();
 
 		switch (g_TrackerType)
@@ -2242,6 +2282,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 	case DLL_PROCESS_DETACH:
 		log_debug("Unloading Cockpitlook hook");
 		if (g_bUDPEnabled) CloseUDP();
+		if (YawVR::bEnabled) YawVR::Shutdown();
 #if DEBUG_INERTIA == 1
 		WriteInertiaData();
 #endif
