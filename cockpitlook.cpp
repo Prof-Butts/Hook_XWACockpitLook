@@ -1991,33 +1991,51 @@ void LoadParams() {
 			// YawVR settings
 			if (_stricmp(param, "yawvr_enable") == 0) {
 				YawVR::bEnabled = (bool)fValue;
-				log_debug("[YVR] YawVR Enabled: %d", YawVR::bEnabled);
+				YawVR::debug("[YVR] YawVR Enabled: %d", YawVR::bEnabled);
 			}
 			else if (_stricmp(param, "yawvr_server") == 0) {
 				_snprintf_s(YawVR::sServerIP, 80, svalue);
-				log_debug("[YVR] YawVR Server: %s", YawVR::sServerIP);
+				YawVR::debug("[YVR] YawVR Server: %s", YawVR::sServerIP);
 			}
+
 			else if (_stricmp(param, "yawvr_udp_port") == 0) {
 				YawVR::udpPort = (int)fValue;
-				log_debug("[YVR] YawVR UDP port: %d", YawVR::udpPort);
+				YawVR::debug("[YVR] YawVR UDP port: %d", YawVR::udpPort);
 			}
 			else if (_stricmp(param, "yawvr_tcp_port") == 0) {
 				YawVR::tcpPort = (int)fValue;
-				log_debug("[YVR] YawVR TCP port: %d", YawVR::tcpPort);
+				YawVR::debug("[YVR] YawVR TCP port: %d", YawVR::tcpPort);
 			}
+
 			else if (_stricmp(param, "yawvr_yaw_scale") == 0) {
 				YawVR::yawScale = fValue;
-				log_debug("[YVR] YawVR yaw scale: %d", YawVR::yawScale);
+				YawVR::debug("[YVR] YawVR yaw scale: %0.3f", YawVR::yawScale);
 			}
 			else if (_stricmp(param, "yawvr_pitch_scale") == 0) {
 				YawVR::pitchScale = fValue;
-				log_debug("[YVR] YawVR pitch scale: %d", YawVR::pitchScale);
+				YawVR::debug("[YVR] YawVR pitch scale: %0.3f", YawVR::pitchScale);
 			}
 			else if (_stricmp(param, "yawvr_roll_scale") == 0) {
 				YawVR::rollScale = fValue;
-				log_debug("[YVR] YawVR roll scale: %d", YawVR::rollScale);
+				YawVR::debug("[YVR] YawVR roll scale: %0.3f", YawVR::rollScale);
 			}
 
+			else if (_stricmp(param, "yawvr_yaw_limit") == 0) {
+				YawVR::yawLimit = (int)fValue;
+				YawVR::debug("[YVR] YawVR yaw limit: %d", YawVR::yawLimit);
+			}
+			else if (_stricmp(param, "yawvr_pitch_forward_limit") == 0) {
+				YawVR::pitchForwardLimit = (int)fValue;
+				YawVR::debug("[YVR] YawVR pitch forward limit: %d", YawVR::pitchForwardLimit);
+			}
+			else if (_stricmp(param, "yawvr_pitch_backward_limit") == 0) {
+				YawVR::pitchBackwardLimit = (int)fValue;
+				YawVR::debug("[YVR] YawVR pitch backward limit: %d", YawVR::pitchBackwardLimit);
+			}
+			else if (_stricmp(param, "yawvr_roll_limit") == 0) {
+				YawVR::rollLimit = (int)fValue;
+				YawVR::debug("[YVR] YawVR roll limit: %d", YawVR::rollLimit);
+			}
 		}
 	} // while ... read file
 	fclose(file);
