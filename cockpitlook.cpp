@@ -102,9 +102,9 @@ enum HyperspacePhaseEnum {
 	HS_HYPER_TUNNEL_ST = 2,		// Traveling through the blue Hyperspace tunnel
 	HS_HYPER_EXIT_ST = 3,		// HyperExit streaks are being rendered
 };
-HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST;
+HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST, g_PrevHyperspacePhaseFSM = HS_INIT_ST;
 bool g_bHyperspaceFirstFrame = false, g_bInHyperspace = false, g_bHyperspaceLastFrame = false, g_bHyperspaceTunnelLastFrame = false;
-int g_iHyperspaceFrame = -1;
+int g_iHyperspaceFrame = -1, g_iFramesSinceHyperExit = 60;
 Vector4 g_LastRsBeforeHyperspace;
 Vector4 g_LastFsBeforeHyperspace;
 Matrix4 g_prevHeadingMatrix;
@@ -119,6 +119,8 @@ float g_fLastSpeedBeforeHyperspace = 0.0f;
  * frame.
  */
 void UpdateHyperspaceState(int playerIndex) {
+	g_PrevHyperspacePhaseFSM = g_HyperspacePhaseFSM;
+
 	// Reset the Hyperspace FSM regardless of the previous state. This helps reset the
 	// state if we quit on the middle of a movie that is playing back the hyperspace
 	// effect. If we do reset the FSM, we need to update the control variables too:
@@ -1768,7 +1770,15 @@ int UpdateTrackingData()
 
 	if (YawVR::bEnabled)
 	{
-		YawVR::ApplyInertia(yawInertia, pitchInertia, g_rollInertia);
+		if (g_PrevHyperspacePhaseFSM != HS_INIT_ST && g_HyperspacePhaseFSM == HS_INIT_ST)
+		{
+			// We just exited hyperspace, reset our frame counter
+			g_iFramesSinceHyperExit = 0;
+		}
+		g_iFramesSinceHyperExit++;
+
+		if (g_iFramesSinceHyperExit > 25)
+			YawVR::ApplyInertia(yawInertia, pitchInertia, g_rollInertia);
 	}
 
 	//params[-1] = 0x4F9C33;

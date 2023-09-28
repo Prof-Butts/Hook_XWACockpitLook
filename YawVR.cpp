@@ -5,11 +5,17 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <stdint.h>
+#include <time.h>
 #include "YawVR.h"
+
+extern HWND g_hWnd;
+UINT timerID = 0;
 
 namespace YawVR
 {
-    bool bEnabled     = true;
+    bool bEnabled      = true;
+    bool bRunThread    = false;
+
     char sServerIP[80] = "";
     // Default YawVR ports
     int  udpPort      = 50010;
@@ -42,6 +48,9 @@ namespace YawVR
     int pitchForwardLimit  = -1;
     int pitchBackwardLimit = -1;
     int rollLimit          = -1;
+
+    HANDLE hThread = INVALID_HANDLE_VALUE;
+    time_t timestamp = 0;
 
     static FILE* debugFile = NULL;
     void debug(const char* format, ...)
@@ -264,6 +273,7 @@ namespace YawVR
     {
         sprintf_s(buffer, BUF_SIZE, "Y[%3.2f]P[%3.2f]R[%3.2f]", yaw, pitch, roll);
         SendUDPMessage(buffer);
+        timestamp = time(NULL);
     }
 
     bool CheckIn()
@@ -391,6 +401,24 @@ namespace YawVR
         return true;
     }
 
+    DWORD WINAPI ThreadFun(LPVOID lpParam)
+    {
+        while (bRunThread)
+        {
+            time_t curTime = time(NULL);
+            if (curTime - timestamp > 2)
+            {
+                yaw   = 0.0f;
+                pitch = 0.0f;
+                roll  = 0.0f;
+                SetPosition(0.0f, 0.0f, 0.0f);
+            }
+            Sleep(500);
+        }
+
+        return 0;
+    }
+
     void Initialize()
     {
         if (!InitializeSockets())
@@ -433,11 +461,13 @@ namespace YawVR
             return;
         }
 
-        
+        bRunThread = true;
+        hThread = CreateThread(NULL, 0, ThreadFun, NULL, 0, NULL);
     }
 
     void Shutdown()
     {
+        bRunThread = false;
         SetPosition(0, 0, 0);
         Stop();
         Exit();
