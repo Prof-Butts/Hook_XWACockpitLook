@@ -301,7 +301,7 @@ namespace YawVR
             debug("[YVR] Expected CHECK_IN_ANS, got 0x%x instead", ubuffer[0]);
             return false;
         }
-        if (_stricmp(buffer + 1, "AVAILABLE") != 0) {
+        if (strstr(buffer + 1, "AVAILABLE") == nullptr) {
             debug("[YVR] YawVR is not available. Got %s", buffer + 1);
             return false;
         }
