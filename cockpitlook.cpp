@@ -104,7 +104,7 @@ enum HyperspacePhaseEnum {
 };
 HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST, g_PrevHyperspacePhaseFSM = HS_INIT_ST;
 bool g_bHyperspaceFirstFrame = false, g_bInHyperspace = false, g_bHyperspaceLastFrame = false, g_bHyperspaceTunnelLastFrame = false;
-int g_iHyperspaceFrame = -1, g_iFramesSinceHyperExit = 60;
+int g_iHyperspaceFrame = -1, g_iFramesSinceHyperExit = 60, g_iFramesSinceHyperTunnel = 60;
 Vector4 g_LastRsBeforeHyperspace;
 Vector4 g_LastFsBeforeHyperspace;
 Matrix4 g_prevHeadingMatrix;
@@ -331,6 +331,10 @@ inline float smoothstep(const float min, const float max, float x) {
 	x = clamp((x - min) / (max - min), 0.0f, 1.0f);
 	// Evaluate polynomial
 	return x * x * (3.0f - 2.0f * x);
+}
+
+inline float lerp(const float x, const float y, const float s) {
+	return x + s * (y - x);
 }
 
 void Matrix4toHmdMatrix34(const Matrix4& m4, vr::HmdMatrix34_t& mat) {
@@ -972,7 +976,7 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 
 	// Ctrl+X: Dump debug info
 	if (g_bCtrl && bLastXKeyState && !bCurXKeyState) {
-		DumpDebugInfo(playerIndex);
+		//DumpDebugInfo(playerIndex);
 	}
 
 	// Alt+T: Reload TrackIR
@@ -1775,10 +1779,48 @@ int UpdateTrackingData()
 			// We just exited hyperspace, reset our frame counter
 			g_iFramesSinceHyperExit = 0;
 		}
+		else if (g_PrevHyperspacePhaseFSM == HS_HYPER_ENTER_ST && g_HyperspacePhaseFSM == HS_HYPER_TUNNEL_ST)
+		{
+			// We just jumped, let's kick the seat
+			g_iFramesSinceHyperTunnel = 0;
+		}
 		g_iFramesSinceHyperExit++;
+		g_iFramesSinceHyperTunnel++;
 
-		if (g_iFramesSinceHyperExit > 25)
-			YawVR::ApplyInertia(yawInertia, pitchInertia, g_rollInertia);
+		float hyperPitch = 0.0f;
+		if (g_HyperspacePhaseFSM == HS_HYPER_TUNNEL_ST)
+		{
+			float t = (float)g_iFramesSinceHyperTunnel / 180.0f;
+			// To understand this, use graphtoy and plot both curves below. Use "1" instead of "maxPitchFromAccel"
+			if (t < 0.01f)
+				hyperPitch = lerp(0, YawVR::minPitchFromAccel, t / 0.01f);
+			else
+				hyperPitch = lerp(YawVR::minPitchFromAccel, 0.0f, (t - 0.01f) / 0.99f);
+			hyperPitch = YawVR::enableHyperAccel ? min(0.0f, hyperPitch) : 0.0f;
+			YawVR::ApplyInertia(0.0f, hyperPitch / YawVR::pitchScale, 0.0f, 0.0f);
+		}
+		else
+		{
+			if (g_iFramesSinceHyperExit > 50)
+			{
+				float finalDistInertia = distInertia;
+				if (g_iFramesSinceHyperExit < 300)
+				{
+					if (YawVR::enableHyperAccel)
+					{
+						// When exiting hyperspace, speed decreases rapidly from 999 MGLT down to
+						// a more regular speed. This produces a very hard lunge forward that
+						// is likely to be unpleasant. So let's dampen that effect
+						finalDistInertia *= 0.25f;
+					}
+					else
+					{
+						finalDistInertia = 0.0f;
+					}
+				}
+				YawVR::ApplyInertia(yawInertia, pitchInertia, g_rollInertia, finalDistInertia);
+			}
+		}
 	}
 
 	//params[-1] = 0x4F9C33;
@@ -2029,6 +2071,10 @@ void LoadParams() {
 				YawVR::rollScale = fValue;
 				YawVR::debug("[YVR] YawVR roll scale: %0.3f", YawVR::rollScale);
 			}
+			else if (_stricmp(param, "yawvr_accel_scale") == 0) {
+				YawVR::distScale = fValue;
+				YawVR::debug("[YVR] YawVR dist scale: %0.3f", YawVR::distScale);
+			}
 
 			else if (_stricmp(param, "yawvr_yaw_limit") == 0) {
 				YawVR::yawLimit = (int)fValue;
@@ -2046,6 +2092,20 @@ void LoadParams() {
 				YawVR::rollLimit = (int)fValue;
 				YawVR::debug("[YVR] YawVR roll limit: %d", YawVR::rollLimit);
 			}
+			else if (_stricmp(param, "yawvr_accel_max_pitch") == 0) {
+				YawVR::maxPitchFromAccel = fValue;
+				YawVR::debug("[YVR] YawVR max pitch from accel: %0.3f", YawVR::maxPitchFromAccel);
+			}
+			else if (_stricmp(param, "yawvr_accel_min_pitch") == 0) {
+				YawVR::minPitchFromAccel = fValue;
+				YawVR::debug("[YVR] YawVR min pitch from accel: %0.3f", YawVR::minPitchFromAccel);
+			}
+
+			else if (_stricmp(param, "yawvr_enable_hyper_accel") == 0) {
+				YawVR::enableHyperAccel = (bool)fValue;
+				YawVR::debug("[YVR] YawVR enable hyper accel: %d", YawVR::enableHyperAccel);
+			}
+
 		}
 	} // while ... read file
 	fclose(file);

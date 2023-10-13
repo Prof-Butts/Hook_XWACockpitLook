@@ -43,11 +43,15 @@ namespace YawVR
     float yawScale   =    7.0f;
     float pitchScale = -200.0f;
     float rollScale  =    3.0f;
+    float distScale  =  100.0f;
 
     int yawLimit           = -1;
     int pitchForwardLimit  = -1;
     int pitchBackwardLimit = -1;
     int rollLimit          = -1;
+    float maxPitchFromAccel =  15.0f;
+    float minPitchFromAccel = -15.0f;
+    bool enableHyperAccel  = true;
 
     HANDLE hThread = INVALID_HANDLE_VALUE;
     time_t timestamp = 0;
@@ -474,10 +478,16 @@ namespace YawVR
         ShutdownSockets();
     }
 
-    void ApplyInertia(float yawInertia, float pitchInertia, float rollInertia)
+    void ApplyInertia(float yawInertia, float pitchInertia, float rollInertia, float distInertia)
     {
+        float pitchFromAccel = distScale * distInertia;
+        if (pitchFromAccel < minPitchFromAccel)
+            pitchFromAccel = minPitchFromAccel;
+        else if (pitchFromAccel > maxPitchFromAccel)
+            pitchFromAccel = maxPitchFromAccel;
+
         yaw   += yawScale   * yawInertia;
-        pitch  = pitchScale * pitchInertia;
+        pitch  = pitchScale * pitchInertia + pitchFromAccel;
         roll   = rollScale  * rollInertia;
         while (yaw >= 360.0f)
         {
