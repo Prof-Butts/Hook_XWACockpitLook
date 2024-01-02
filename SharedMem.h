@@ -16,6 +16,8 @@ struct SharedMemDataCockpitLook {
 	// Set to 0 by ddraw when the game starts a mission (in OnSizeChanged())
 	// Set to 1 by a hook in the SetupReticle() XWA function.
 	int bIsReticleSetup;
+	// XWA units to meters conversion factor. Set by CockpitLook. Used to apply POVOffset
+	float povFactor;
 
 	SharedMemDataCockpitLook() {
 		this->POVOffsetX = 0.0f;
@@ -28,6 +30,7 @@ struct SharedMemDataCockpitLook {
 		this->Y = 0.0f;
 		this->Z = 0.0f;
 		this->bIsReticleSetup = 0;
+		this->povFactor = 25.0f;
 	}
 };
 

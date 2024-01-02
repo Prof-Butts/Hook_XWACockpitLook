@@ -2204,6 +2204,7 @@ int CockpitPositionTransformHook(int* params)
 	g_SharedData->X = g_fXWAUnitsToMetersScale * g_headPos.x;
 	g_SharedData->Y = g_fXWAUnitsToMetersScale * g_headPos.y;
 	g_SharedData->Z = g_fXWAUnitsToMetersScale * g_headPos.z;
+	g_SharedData->povFactor = g_fXWAUnitsToMetersScale;
 
 	Vector3Transform((Vector3_float*)vec, (XwaMatrix3x3*)params[1]);
 	return 0;
