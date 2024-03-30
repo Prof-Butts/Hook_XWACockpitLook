@@ -28,6 +28,12 @@
 #include "Telemetry.h"
 #include "SharedMem.h"
 
+// Unfortunately, applying roll inertia modifies the worldview transform in such a way
+// that roll inertia is "inherited" to the lights, causing shadows to "dance" in VR.
+// Not sure how to keep roll inertia and fix the shadows, so, disabling this feature for now
+//#define APPLY_ROLL_INERTIA 1
+#undef APPLY_ROLL_INERTIA
+
 // TrackIR requires an HWND to register, so let's keep track of one.
 HWND g_hWnd = NULL;
 
@@ -2216,8 +2222,10 @@ int CockpitPositionTransformHook(int* params)
 */
 int DoRotationPitchHook(int* params)
 {
+	//Matrix3 headTransNoRollInertia;
+
 	//log_debug("DoRotationPitchHook() executed");
-	
+
 	// We need to apply the rotation matrix obtained from the headtracking + inertia here
 	// To avoid issues with Euler angles (gimbal lock), we apply the rotation by matrix multiplication
 
@@ -2235,7 +2243,7 @@ int DoRotationPitchHook(int* params)
 			// TrackIR may need +g_headPitch and +g_headYaw
 			rX.rotateX(-g_headPitch);
 			rY.rotateY(-g_headYaw);
-			rZ.rotateZ( g_headRoll);
+			rZ.rotateZ(g_headRoll);
 			// The following transform rule applies roll at the end of the chain. This
 			// make it possible to roll your head no matter where you're looking at. This
 			// matches the old behavior where roll was applied as a hack to the backbuffer
@@ -2249,21 +2257,25 @@ int DoRotationPitchHook(int* params)
 		// We follow the same convention as SteamVR (+y is up, +x is to the right, -z is forward)
 		Matrix3 xwaCameraTransform = Matrix3(
 			-(float)*g_objectTransformRight_X, -(float)*g_objectTransformRight_Y, -(float)*g_objectTransformRight_Z,
-			 (float)*g_objectTransformUp_X,     (float)*g_objectTransformUp_Y,     (float)*g_objectTransformUp_Z,
-			 (float)*g_objectTransformRear_X,   (float)*g_objectTransformRear_Y,   (float)*g_objectTransformRear_Z
+			(float)*g_objectTransformUp_X, (float)*g_objectTransformUp_Y, (float)*g_objectTransformUp_Z,
+			(float)*g_objectTransformRear_X, (float)*g_objectTransformRear_Y, (float)*g_objectTransformRear_Z
 		);
 
-		// Apply the roll inertia
+#ifdef APPLY_ROLL_INERTIA
 		Matrix4 R = Matrix4().rotateZ(g_rollInertia);
 		Matrix3 RZ = Matrix3(
 			R[0], R[1], R[2],
 			R[4], R[5], R[6],
 			R[8], R[9], R[10]);
 		// Apply the rotation matrix from headtracking
-		xwaCameraTransform *= RZ * g_headRotation;
+		//headTransNoRollInertia = xwaCameraTransform * g_headRotation;
+		xwaCameraTransform = xwaCameraTransform * RZ * g_headRotation;
+#else
+		xwaCameraTransform *= g_headRotation;
+#endif
 
 		// Rewrite the composed rotation matrix (original+headtracking) into XWA globals
-		*g_objectTransformRight_X = -(int)xwaCameraTransform[0];
+		* g_objectTransformRight_X = -(int)xwaCameraTransform[0];
 		*g_objectTransformRight_Y = -(int)xwaCameraTransform[1];
 		*g_objectTransformRight_Z = -(int)xwaCameraTransform[2];
 		*g_objectTransformUp_X = (int)xwaCameraTransform[3];
@@ -2276,7 +2288,7 @@ int DoRotationPitchHook(int* params)
 	else
 	{
 		// TrackIR and no-tracking paths
-		const int playerIndex = *(int *)0x8C1CC8;
+		const int playerIndex = *(int*)0x8C1CC8;
 		// TODO: This if disables mouse look while the gunner turret is active. Enabling it is nice
 		// but it breaks the reticle, so more work is needed to fix it.
 		if (PlayerDataTable[playerIndex].gunnerTurretActive)
@@ -2287,7 +2299,18 @@ int DoRotationPitchHook(int* params)
 
 	g_SharedData->Yaw = g_headYaw;
 	g_SharedData->Pitch = g_headPitch;
+#ifdef APPLY_ROLL_INERTIA
 	g_SharedData->Roll = g_headRoll + g_rollInertia;
+	g_SharedData->rollInertia = g_rollInertia;
+	/*{
+		const float* m = headTransNoRollInertia.get();
+		for (int i = 0; i < 9; i++)
+			g_SharedData->headRotation[i] = m[i] / 32768.0f;
+	}*/
+#else
+	g_SharedData->Roll = g_headRoll;
+#endif
+
 	return 0;
 }
 
