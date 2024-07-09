@@ -270,10 +270,10 @@ TrackerType g_TrackerType = TRACKER_NONE;
 float g_fYawMultiplier   = DEFAULT_YAW_MULTIPLIER;
 float g_fPitchMultiplier = DEFAULT_PITCH_MULTIPLIER;
 float g_fRollMultiplier  = DEFAULT_ROLL_MULTIPLIER;
-float g_fYawOffset		 = DEFAULT_YAW_OFFSET;
-float g_fPitchOffset	 = DEFAULT_PITCH_OFFSET;
-float g_fRollOffset		 = DEFAULT_ROLL_OFFSET;
-int   g_iFreePIESlot		 = DEFAULT_FREEPIE_SLOT;
+float g_fYawOffset       = DEFAULT_YAW_OFFSET;
+float g_fPitchOffset     = DEFAULT_PITCH_OFFSET;
+float g_fRollOffset      = DEFAULT_ROLL_OFFSET;
+int   g_iFreePIESlot     = DEFAULT_FREEPIE_SLOT;
 bool  g_bYawPitchFromMouseOverride = false;
 bool  g_bKeyboardLean = false, g_bKeyboardLook = false;
 bool  g_bTestJoystick = true;
@@ -283,6 +283,7 @@ Vector4 g_prevRs(1, 0, 0, 0);
 Vector4 g_prevFs(0, 0, 1, 0);
 int g_FreePIEOutputSlot = -1;
 bool g_bTrackIRLoaded = false;
+int g_iNumPadSpeed = -1;
 
 const auto XwaGetConnectedJoysticksCount = (int(*)())0x00541030;
 
@@ -943,27 +944,27 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	//bool bControl = *s_XwaIsControlKeyPressed;
 	//bool bShift = *s_XwaIsShiftKeyPressed;
 	//bool bAlt = *s_XwaIsAltKeyPressed;
-	g_bCtrl			= GetAsyncKeyState(VK_CONTROL);
-	bool bShift		= GetAsyncKeyState(VK_SHIFT);
-	g_bAlt			= GetAsyncKeyState(VK_MENU);
-	bool bRightAlt	= GetAsyncKeyState(VK_RMENU);
-	bool bLeftAlt	= GetAsyncKeyState(VK_LMENU);
-	g_bNumPadAdd		= GetAsyncKeyState(VK_ADD);
-	g_bNumPadSub		= GetAsyncKeyState(VK_SUBTRACT);
-	g_bNumPad7		= GetAsyncKeyState(VK_NUMPAD7);
-	g_bNumPad9		= GetAsyncKeyState(VK_NUMPAD9);
+	g_bCtrl        = GetAsyncKeyState(VK_CONTROL);
+	bool bShift    = GetAsyncKeyState(VK_SHIFT);
+	g_bAlt         = GetAsyncKeyState(VK_MENU);
+	bool bRightAlt = GetAsyncKeyState(VK_RMENU);
+	bool bLeftAlt  = GetAsyncKeyState(VK_LMENU);
+	g_bNumPadAdd   = GetAsyncKeyState(VK_ADD);
+	g_bNumPadSub   = GetAsyncKeyState(VK_SUBTRACT);
+	g_bNumPad7     = GetAsyncKeyState(VK_NUMPAD7);
+	g_bNumPad9     = GetAsyncKeyState(VK_NUMPAD9);
 	// I,J,X,T key states:
-	bLastIKeyState	= bCurIKeyState;
-	bLastJKeyState	= bCurJKeyState;
-	bLastXKeyState	= bCurXKeyState;
-	bLastTKeyState	= bCurTKeyState;
-	bLastUKeyState	= bCurUKeyState;
+	bLastIKeyState = bCurIKeyState;
+	bLastJKeyState = bCurJKeyState;
+	bLastXKeyState = bCurXKeyState;
+	bLastTKeyState = bCurTKeyState;
+	bLastUKeyState = bCurUKeyState;
 	bLastPeriodKeyState = bCurPeriodKeyState;
-	bCurJKeyState	= GetAsyncKeyState(VK_J_KEY);
-	bCurIKeyState	= GetAsyncKeyState(VK_I_KEY);
-	bCurXKeyState	= GetAsyncKeyState(VK_X_KEY);
-	bCurTKeyState	= GetAsyncKeyState(VK_T_KEY);
-	bCurUKeyState	= GetAsyncKeyState(VK_U_KEY);
+	bCurJKeyState = GetAsyncKeyState(VK_J_KEY);
+	bCurIKeyState = GetAsyncKeyState(VK_I_KEY);
+	bCurXKeyState = GetAsyncKeyState(VK_X_KEY);
+	bCurTKeyState = GetAsyncKeyState(VK_T_KEY);
+	bCurUKeyState = GetAsyncKeyState(VK_U_KEY);
 	bCurPeriodKeyState = GetAsyncKeyState(VK_OEM_PERIOD);
 
 	//log_debug("L: %d, ACS: %d,%d,%d", bLKey, bAlt, bCtrl, bShift);
@@ -1561,7 +1562,7 @@ int UpdateTrackingData()
 			}*/
 		}
 
-		int moveDelta = *(int *)0x005AA000 >> 1;
+		int moveDelta = (g_iNumPadSpeed != -1) ? g_iNumPadSpeed : *(int *)0x005AA000 >> 1;
 		if (g_bTestJoystick && XwaGetConnectedJoysticksCount() == 0)
 		{
 			switch (keycodePressed)
@@ -1850,6 +1851,9 @@ void LoadParams() {
 		return;
 	}
 
+	// Reset to defaults
+	g_iNumPadSpeed = -1;
+
 	char buf[160], param[80], svalue[80];
 	float fValue;
 	while (fgets(buf, 160, file) != NULL) {
@@ -2110,6 +2114,10 @@ void LoadParams() {
 			else if (_stricmp(param, "yawvr_enable_hyper_accel") == 0) {
 				YawVR::enableHyperAccel = (bool)fValue;
 				YawVR::debug("[YVR] YawVR enable hyper accel: %d", YawVR::enableHyperAccel);
+			}
+
+			else if (_stricmp(param, "numpad_pov_speed") == 0) {
+				g_iNumPadSpeed = (int)fValue;
 			}
 
 		}
