@@ -291,10 +291,21 @@ const auto XwaGetConnectedJoysticksCount = (int(*)())0x00541030;
 /* Cockpit Inertia													 */
 /*********************************************************************/
 bool g_bCockpitInertiaEnabled = false, g_bExtInertiaEnabled = false, g_bEnableExternalInertiaInHangar = false;
+// External inertia does not work when the map is active. However, in previous versions,it was still applied
+// anyway. This caused the distance and orientation from the map to be applied to the external view
+// once the map is turned off. Some people may be using this as a "feature" to set up external
+// shots from a distance; but I think most people don't expect this behavior. The following flag
+// will control whether external inertia is still applied when the map is displayed so that people can
+// decide if they want the map to affect the external view.
+bool g_bEnableExternalInertiaInMap = false;
+// The following flag is set when the MapCameraUpdateHook() is running, so that the external inertia
+// can be disabled while the map is displayed.
+bool g_bInsideMapCameraUpdateHook = false;
 float g_fCockpitInertia = 0.35f, g_fCockpitSpeedInertia = 0.005f, g_fExtDistInertia = 0.0f;
 float g_fCockpitMaxInertia = 0.2f, g_fExtInertia = -16384.0f, g_fExtMaxInertia = 0.025f;
 short g_externalTilt = -1820; // -10 degrees
 // tilt = degrees * 32768 / 180
+
 
 /*********************************************************************/
 /*	Code used to enable leaning in the cockpit with the arrow keys   */
@@ -1089,7 +1100,7 @@ int UpdateTrackingData()
 	float yaw = 0.0f, pitch = 0.0f, roll = 0.0f;
 	float yawSign = 1.0f, pitchSign = 1.0f;
 	bool dataReady = false, enableTrackedYawPitch = true;
-	bool bExternalCamera = PlayerDataTable[playerIndex].Camera.ExternalCamera;
+	const bool bExternalCamera = PlayerDataTable[playerIndex].Camera.ExternalCamera;
 	static bool bLastExternalCamera = bExternalCamera;
 	static short lastCameraYaw = 0, lastCameraPitch = 0; // These are the pre-inertia values from the last frame
 	static int lastCameraDist = 1024;
@@ -1118,7 +1129,7 @@ int UpdateTrackingData()
 	if (g_bUDPEnabled) SendXWADataOverUDP();
 
 	// Restore the position of the external camera if external inertia is enabled.
-	if (bExternalCamera) 
+	if (bExternalCamera && !g_bInsideMapCameraUpdateHook)
 	{
 		//log_debug("------------------");
 		//log_debug("yaw,pitch: %d, %d", PlayerDataTable[playerIndex].Camera.Yaw, PlayerDataTable[playerIndex].Camera.Pitch);
@@ -1139,7 +1150,7 @@ int UpdateTrackingData()
 		//log_debug("lastCamera (1): %d, %d", lastCameraYaw, lastCameraPitch);
 
 		// Restore the position of the camera before adding external view inertia
-		//if (g_bExtInertiaEnabled) 
+		//if (g_bExtInertiaEnabled)
 		{
 			PlayerDataTable[playerIndex].Camera.Yaw = lastCameraYaw;
 			PlayerDataTable[playerIndex].Camera.Pitch = lastCameraPitch;
@@ -1695,7 +1706,7 @@ int UpdateTrackingData()
 		}
 
 		// Apply External View Inertia
-		if (bExternalCamera) 
+		if (bExternalCamera && !g_bInsideMapCameraUpdateHook)
 		{
 			const bool bPlayerInHangar = *g_playerInHangar;
 			const bool bHangarInertiaEnabled = !bPlayerInHangar || (bPlayerInHangar && g_bEnableExternalInertiaInHangar);
@@ -2006,6 +2017,9 @@ void LoadParams() {
 			else if (_stricmp(param, "external_inertia") == 0) {
 				g_fExtInertia = -fValue * 16384.0f;
 			}
+			else if (_stricmp(param, "enable_external_inertia_in_map") == 0) {
+				g_bEnableExternalInertiaInMap = (bool)fValue;
+			}
 			else if (_stricmp(param, "external_max_inertia") == 0) {
 				g_fExtMaxInertia = fValue;
 			}
@@ -2180,7 +2194,10 @@ int UpdateCameraTransformHook(int* params)
 */
 int MapCameraUpdateHook(int* params)
 {
+	if (!g_bEnableExternalInertiaInMap)
+		g_bInsideMapCameraUpdateHook = true;
 	UpdateTrackingData();
+	g_bInsideMapCameraUpdateHook = false;
 	int (*MapCameraUpdate)(int, int) = (int(*)(int a1, int a2)) 0x49EE90;
 	return MapCameraUpdate(params[0], params[1]);
 
