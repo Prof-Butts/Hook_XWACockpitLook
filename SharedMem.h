@@ -34,9 +34,25 @@ struct SharedMemDataCockpitLook {
 	}
 };
 
+struct SharedMemDataTelemetry
+{
+	int counter;
+	int shieldsFwd, shieldsBck;
+
+	SharedMemDataTelemetry()
+	{
+		counter = 0;
+		shieldsFwd = shieldsBck = -1;
+	};
+};
+
 void InitSharedMem();
 
 constexpr auto SHARED_MEM_NAME_COCKPITLOOK = L"Local\\CockpitLookHook";
+constexpr auto SHARED_MEM_NAME_TELEMETRY   = L"Local\\XWATelemetry";
 
 extern SharedMem<SharedMemDataCockpitLook> g_SharedMem;
 extern SharedMemDataCockpitLook* g_SharedData;
+
+extern SharedMem<SharedMemDataTelemetry> g_SharedMemTelemetry;
+extern SharedMemDataTelemetry* g_pSharedDataTelemetry;

@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <string>
 #include "XWAObject.h"
+#include "SharedMem.h"
 #include "Telemetry.h"
 #include "UDP.h"
 
@@ -142,9 +143,28 @@ status_section:
 #endif
 
 #ifdef TELEMETRY_SIMPLIFIED
+std::string ShieldDirectionStr(int x)
+{
+	switch (x)
+	{
+		case 0: return "front";
+		case 1: return "even";
+		case 2: return "back";
+	}
+}
+
 void SendXWADataOverUDP()
 {
 	std::string msg = "";
+
+	int shields_front = 0;
+	int shields_back  = 0;
+
+	if (g_pSharedDataTelemetry != nullptr)
+	{
+		shields_front = g_pSharedDataTelemetry->shieldsFwd;
+		shields_back  = g_pSharedDataTelemetry->shieldsBck;
+	}
 
 	// PLAYER SECTION
 	{
@@ -164,11 +184,11 @@ void SendXWADataOverUDP()
 		char *short_name = (char *)craftDefinition->pCraftShortName;
 		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
 		hull = max(0, hull);
-		float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
-		int shields_front = (int)(100.0 * (float)craftInstance->ShieldPointsFront / total_shield_points);
-		int shields_back = (int)(100.0 * (float)craftInstance->ShieldPointsBack / total_shield_points);
-		shields_front = max(0, shields_front);
-		shields_back = max(0, shields_back);
+		//float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
+		//int shields_front = (int)(100.0 * (float)craftInstance->ShieldPointsFront / total_shield_points);
+		//int shields_back = (int)(100.0 * (float)craftInstance->ShieldPointsBack / total_shield_points);
+		//shields_front = max(0, shields_front);
+		//shields_back = max(0, shields_back);
 
 		if (name != g_PrevPlayerTelemetry.name)
 			msg += "player|crafttypename:" + std::string(name) + "\n";
@@ -186,7 +206,7 @@ void SendXWADataOverUDP()
 		if (craftInstance->SfoilsState != g_PrevPlayerTelemetry.SfoilsState)
 			msg += "player|sfoils:" + std::to_string(craftInstance->SfoilsState) + "\n";
 		if (craftInstance->ShieldDirection != g_PrevPlayerTelemetry.ShieldDirection)
-			msg += "player|shielddirection:" + std::to_string(craftInstance->ShieldDirection) + "\n";
+			msg += "player|shielddirection:" + ShieldDirectionStr(craftInstance->ShieldDirection) + "\n";
 		if (shields_front != g_PrevPlayerTelemetry.shields_front)
 			msg += "player|shieldfront:" + std::to_string(shields_front) + "\n";
 		if (shields_back != g_PrevPlayerTelemetry.shields_back)
