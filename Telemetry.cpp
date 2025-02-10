@@ -2,6 +2,8 @@
 #include <Stdio.h>
 #include <stdarg.h>
 #include <string>
+#include <sstream>
+#include <iomanip>
 #include "XWAObject.h"
 #include "SharedMem.h"
 #include "Telemetry.h"
@@ -160,10 +162,24 @@ void SendXWADataOverUDP()
 	int shields_front = 0;
 	int shields_back  = 0;
 
+	int tgtShds = 0, tgtHull = 0, tgtSys = 0;
+	float tgtDist = 0;
+	char *tgtName   = nullptr;
+	char *tgtCargo  = nullptr;
+	char *tgtSubCmp = nullptr;
+
 	if (g_pSharedDataTelemetry != nullptr)
 	{
 		shields_front = g_pSharedDataTelemetry->shieldsFwd;
 		shields_back  = g_pSharedDataTelemetry->shieldsBck;
+
+		tgtShds   = g_pSharedDataTelemetry->tgtShds;
+		tgtHull   = g_pSharedDataTelemetry->tgtHull;
+		tgtSys    = g_pSharedDataTelemetry->tgtSys;
+		tgtDist   = g_pSharedDataTelemetry->tgtDist;
+		tgtName   = g_pSharedDataTelemetry->tgtName;
+		tgtCargo  = g_pSharedDataTelemetry->tgtCargo;
+		tgtSubCmp = g_pSharedDataTelemetry->tgtSubCmp;
 	}
 
 	// PLAYER SECTION
@@ -257,41 +273,57 @@ target_section:
 		char *name = (char *)craftDefinition->pCraftName;
 		char *short_name = (char *)craftDefinition->pCraftShortName;
 		int IFF = object->MobileObjectPtr->IFF;
-		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
-		hull = max(0, hull);
-		float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
-		int shields = (int)(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
-		shields = max(0, shields);
+		//int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
+		//hull = max(0, hull);
+		//float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
+		//int shields = (int)(100.0f * (craftInstance->ShieldPointsFront + craftInstance->ShieldPointsBack) / total_shield_points);
+		//shields = max(0, shields);
 
-		if (name != g_TargetTelemetry.name)
+		/*if (name != g_TargetTelemetry.name)
 			msg += "target|crafttypename:" + std::string(name) + "\n";
 		if (short_name != g_TargetTelemetry.short_name)
-			msg += "target|shortcrafttypename:" + std::string(short_name) + "\n";
+			msg += "target|shortcrafttypename:" + std::string(short_name) + "\n";*/
+		if (tgtName != nullptr && strcmp(tgtName, g_TargetTelemetry.name) != 0)
+			msg += "target}name:" + std::string(tgtName) + "\n";
 		if (IFF != g_TargetTelemetry.IFF)
 			msg += "target|IFF:" + std::to_string(IFF) + "\n";
-		if (strcmp(craftInstance->Cargo, g_TargetTelemetry.Cargo) != 0)
-			msg += "target|cargo:" + std::string(craftInstance->Cargo) + "\n";
-		if (shields != g_TargetTelemetry.shields)
-			msg += "target|shields:" + std::to_string(shields) + "\n";
-		if (hull != g_TargetTelemetry.hull)
-			msg += "target|hull:" + std::to_string(hull) + "\n";
+		if (tgtShds != g_TargetTelemetry.shields)
+			msg += "target|shields:" + std::to_string(tgtShds) + "\n";
+		if (tgtHull != g_TargetTelemetry.hull)
+			msg += "target|hull:" + std::to_string(tgtHull) + "\n";
+		if (tgtSys != g_TargetTelemetry.sys)
+			msg += "target|sys:" + std::to_string(tgtSys) + "\n";
+		if (tgtDist != g_TargetTelemetry.dist)
+		{
+			std::stringstream stream;
+			stream << std::fixed << std::setprecision(2) << tgtDist;
+			msg += "target|dist:" + stream.str() + "\n";
+		}
+		if (tgtCargo != nullptr && strcmp(tgtCargo, g_TargetTelemetry.Cargo) != 0)
+			msg += "target|cargo:" + std::string(tgtCargo) + "\n";
+		if (tgtSubCmp != nullptr && strcmp(tgtSubCmp, g_TargetTelemetry.SubCmp) != 0)
+			msg += "target|subcmp:" + std::string(tgtSubCmp) + "\n";
 		// state is 0 when the craft is static
 		// state is 3 when the craft is destroyed
-		if (craftInstance->CraftState != g_TargetTelemetry.CraftState)
-			msg += "target|state:" + std::to_string(craftInstance->CraftState) + "\n";
+		/*if (craftInstance->CraftState != g_TargetTelemetry.CraftState)
+			msg += "target|state:" + std::to_string(craftInstance->CraftState) + "\n";*/
 
 		// CycleTime is always 236, CycleTimer counts down from CycleTime to -1 and starts over
 		//msg += "\t\t\"cycle time\" : " + std::to_string(craftInstance->CycleTime) + "\n";
 		//msg += "\t\t\"cycle timer\" : " + std::to_string(craftInstance->CycleTimer) + "\n";
 
 		// Store the data for the next frame
-		g_TargetTelemetry.name = name;
-		g_TargetTelemetry.short_name = short_name;
+		//g_TargetTelemetry.name = name;
+		//g_TargetTelemetry.short_name = short_name;
 		g_TargetTelemetry.IFF = IFF;
-		memcpy(g_TargetTelemetry.Cargo, craftInstance->Cargo, 16);
-		g_TargetTelemetry.shields = shields;
-		g_TargetTelemetry.hull = hull;
-		g_TargetTelemetry.CraftState = craftInstance->CraftState;
+		if (tgtName)   memcpy(g_TargetTelemetry.name,   tgtName,   TLM_MAX_NAME);
+		if (tgtCargo)  memcpy(g_TargetTelemetry.Cargo,  tgtCargo,  TLM_MAX_CARGO);
+		if (tgtSubCmp) memcpy(g_TargetTelemetry.SubCmp, tgtSubCmp, TLM_MAX_SUBCMP);
+		g_TargetTelemetry.shields = tgtShds;
+		g_TargetTelemetry.hull    = tgtHull;
+		g_TargetTelemetry.sys     = tgtSys;
+		g_TargetTelemetry.dist    = tgtDist;
+		//g_TargetTelemetry.CraftState = craftInstance->CraftState;
 	}
 	
 	// STATUS SECTION

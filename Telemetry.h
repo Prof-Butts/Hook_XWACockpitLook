@@ -2,6 +2,8 @@
 //#define TELEMETRY_JSON
 #define TELEMETRY_SIMPLIFIED
 
+#include "SharedMem.h"
+
 class PlayerTelemetry {
 public:
 	char *name;
@@ -32,20 +34,26 @@ public:
 
 class TargetTelemetry {
 public:
-	char *name;
+	char name[TLM_MAX_NAME];
 	char *short_name;
 	int IFF;
-	char Cargo[16];
 	int shields;
 	int hull;
-	BYTE CraftState;
+	int sys;
+	float dist;
+	//BYTE CraftState;
+	char Cargo[TLM_MAX_CARGO];
+	char SubCmp[TLM_MAX_SUBCMP];
 
 	TargetTelemetry() {
-		name = short_name = NULL;
+		short_name = NULL;
 		IFF = -1;
-		ZeroMemory(Cargo, 16);
-		shields = hull = -1;
-		CraftState = 255;
+		shields = hull = sys = -1;
+		dist = -1;
+		//CraftState = 255;
+		ZeroMemory(name,   TLM_MAX_NAME);
+		ZeroMemory(Cargo,  TLM_MAX_CARGO);
+		ZeroMemory(SubCmp, TLM_MAX_SUBCMP);
 	}
 };
 
