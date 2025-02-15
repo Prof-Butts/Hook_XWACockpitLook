@@ -16,6 +16,8 @@ extern const __int8 *provingGrounds;
 extern ObjectEntry **objects;
 extern PlayerDataEntry *PlayerDataTable;
 extern CraftDefinitionEntry *CraftDefinitionTable;
+enum HyperspacePhaseEnum;
+extern HyperspacePhaseEnum g_HyperspacePhaseFSM, g_PrevHyperspacePhaseFSM;
 
 PlayerTelemetry g_PrevPlayerTelemetry;
 TargetTelemetry g_TargetTelemetry;
@@ -309,7 +311,7 @@ target_section:
 		if (short_name != g_TargetTelemetry.short_name)
 			msg += "target|shortcrafttypename:" + std::string(short_name) + "\n";*/
 		if (tgtName != nullptr && strcmp(tgtName, g_TargetTelemetry.name) != 0)
-			msg += "target}name:" + std::string(tgtName) + "\n";
+			msg += "target|name:" + std::string(tgtName) + "\n";
 		if (IFF != g_TargetTelemetry.IFF)
 			msg += "target|IFF:" + std::to_string(IFF) + "\n";
 		if (tgtShds != g_TargetTelemetry.shields)
@@ -354,16 +356,36 @@ target_section:
 	// STATUS SECTION
 status_section:
 	{
-		if ((bool)(*g_playerInHangar) != g_LocationTelemetry.playerInHangar) {
+		if (*g_playerInHangar != g_LocationTelemetry.playerInHangar)
+		{
 			msg += "status|location:";
 			if ((*g_playerInHangar))
-				msg += "hangar";
+				msg += "hangar\n";
 			else
-				msg += "space";
-			msg += "\n";
+				msg += "space\n";
 		}
 
-		g_LocationTelemetry.playerInHangar = (bool)(*g_playerInHangar);
+		if (g_HyperspacePhaseFSM != g_PrevHyperspacePhaseFSM)
+		{
+			msg += "status|location:";
+			switch (g_HyperspacePhaseFSM)
+			{
+			case HS_INIT_ST:
+				msg += "space\n";
+				break;
+			case HS_HYPER_ENTER_ST:
+				msg += "hyperentry\n";
+				break;
+			case HS_HYPER_TUNNEL_ST:
+				msg += "hyperspace\n";
+				break;
+			case HS_HYPER_EXIT_ST:
+				msg += "hyperexit\n";
+				break;
+			}
+		}
+
+		g_LocationTelemetry.playerInHangar = *g_playerInHangar;
 	}
 
 	int len = msg.length();

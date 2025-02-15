@@ -1182,3 +1182,10 @@ struct CraftDefinitionEntry {
 static_assert(sizeof(CraftDefinitionEntry) == 0x3DB, "size of CraftDefinition must be 0x3DB");
 
 #pragma pack(pop)
+
+enum HyperspacePhaseEnum {
+	HS_INIT_ST = 0,				// Initial state, we're not even in Hyperspace
+	HS_HYPER_ENTER_ST = 1,		// We're entering hyperspace
+	HS_HYPER_TUNNEL_ST = 2,		// Traveling through the blue Hyperspace tunnel
+	HS_HYPER_EXIT_ST = 3,		// HyperExit streaks are being rendered
+};

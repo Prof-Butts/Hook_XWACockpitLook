@@ -64,10 +64,10 @@ public:
 
 class LocationTelemetry {
 public:
-	bool playerInHangar;
+	int playerInHangar;
 
 	LocationTelemetry() {
-		playerInHangar = true;
+		playerInHangar = -1;
 	}
 };
 

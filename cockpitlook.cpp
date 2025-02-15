@@ -102,12 +102,6 @@ bool g_bGlobalDebug = false;
 /*
  * HYPERSPACE variables
  */
-enum HyperspacePhaseEnum {
-	HS_INIT_ST = 0,				// Initial state, we're not even in Hyperspace
-	HS_HYPER_ENTER_ST = 1,		// We're entering hyperspace
-	HS_HYPER_TUNNEL_ST = 2,		// Traveling through the blue Hyperspace tunnel
-	HS_HYPER_EXIT_ST = 3,		// HyperExit streaks are being rendered
-};
 HyperspacePhaseEnum g_HyperspacePhaseFSM = HS_INIT_ST, g_PrevHyperspacePhaseFSM = HS_INIT_ST;
 bool g_bHyperspaceFirstFrame = false, g_bInHyperspace = false, g_bHyperspaceLastFrame = false, g_bHyperspaceTunnelLastFrame = false;
 int g_iHyperspaceFrame = -1, g_iFramesSinceHyperExit = 60, g_iFramesSinceHyperTunnel = 60;
