@@ -8,7 +8,9 @@ class PlayerTelemetry {
 public:
 	char *name;
 	char *short_name;
+	char shipName[TLM_MAX_SHIP_NAME];
 	int speed;
+	int throttle;
 	BYTE ElsLasers;
 	BYTE ElsShields;
 	BYTE ElsBeam;
@@ -22,6 +24,7 @@ public:
 	PlayerTelemetry() {
 		name = NULL;
 		short_name = NULL;
+		shipName[0] = 0;
 		speed = -1;
 		ElsLasers = ElsShields = ElsBeam = 255;
 		SfoilsState = 255;

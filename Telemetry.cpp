@@ -161,17 +161,20 @@ void SendXWADataOverUDP()
 
 	int shields_front = 0;
 	int shields_back  = 0;
+	char shipName[TLM_MAX_SHIP_NAME];
 
 	int tgtShds = 0, tgtHull = 0, tgtSys = 0;
 	float tgtDist = 0;
 	char *tgtName   = nullptr;
 	char *tgtCargo  = nullptr;
 	char *tgtSubCmp = nullptr;
+	shipName[0] = 0;
 
 	if (g_pSharedDataTelemetry != nullptr)
 	{
 		shields_front = g_pSharedDataTelemetry->shieldsFwd;
 		shields_back  = g_pSharedDataTelemetry->shieldsBck;
+		strncpy_s(shipName, g_pSharedDataTelemetry->shipName, TLM_MAX_SHIP_NAME);
 
 		tgtShds   = g_pSharedDataTelemetry->tgtShds;
 		tgtHull   = g_pSharedDataTelemetry->tgtHull;
@@ -185,7 +188,7 @@ void SendXWADataOverUDP()
 	// PLAYER SECTION
 	{
 		int16_t objectIndex = (int16_t)PlayerDataTable[*localPlayerIndex].objectIndex;
-		if (objectIndex <= 0) goto target_section;
+		if (objectIndex < 0 || objects == nullptr) goto target_section;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
 		//log_debug("[DBG] objectIndex: %d, *localPlayerIndex: %d, localPlayerIndex: 0x%x", objectIndex, *localPlayerIndex, localPlayerIndex);
 		ObjectEntry *object = &((*objects)[objectIndex]);
@@ -200,18 +203,25 @@ void SendXWADataOverUDP()
 		char *short_name = (char *)craftDefinition->pCraftShortName;
 		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
 		hull = max(0, hull);
+		if (hull < g_PrevPlayerTelemetry.hull)
+			msg += "player|hulldamage:" + std::to_string(g_PrevPlayerTelemetry.hull - hull) + "\n";
 		//float total_shield_points = 2.0f * (float)craftDefinition->ShieldHitPoints;
 		//int shields_front = (int)(100.0 * (float)craftInstance->ShieldPointsFront / total_shield_points);
 		//int shields_back = (int)(100.0 * (float)craftInstance->ShieldPointsBack / total_shield_points);
 		//shields_front = max(0, shields_front);
 		//shields_back = max(0, shields_back);
+		const int throttle = (int)(100.0f * craftInstance->EngineThrottleInput / 65535.0f);
 
+		if (strncmp(shipName, g_PrevPlayerTelemetry.shipName, TLM_MAX_SHIP_NAME) != 0)
+			msg += "player|name:" + std::string(shipName) + "\n";
 		if (name != g_PrevPlayerTelemetry.name)
 			msg += "player|crafttypename:" + std::string(name) + "\n";
 		if (short_name != g_PrevPlayerTelemetry.short_name)
 			msg += "player|shortcrafttypename:" + std::string(short_name) + "\n";
 		if (speed != g_PrevPlayerTelemetry.speed)
 			msg += "player|speed:" + std::to_string(speed) + "\n";
+		if (throttle != g_PrevPlayerTelemetry.throttle)
+			msg += "player|throttle:" + std::to_string(throttle) + "\n";
 		//msg += "\t\t\"current speed\" : " + std::to_string(mobileObject->currentSpeed) + "\n"; // Redundant
 		if (craftInstance->ElsLasers != g_PrevPlayerTelemetry.ElsLasers)
 			msg += "player|elslasers:" + std::to_string(craftInstance->ElsLasers) + "\n";
@@ -244,7 +254,9 @@ void SendXWADataOverUDP()
 		// Store the data for the next frame
 		g_PrevPlayerTelemetry.name = name;
 		g_PrevPlayerTelemetry.short_name = short_name;
+		strncpy_s(g_PrevPlayerTelemetry.shipName, shipName, TLM_MAX_SHIP_NAME);
 		g_PrevPlayerTelemetry.speed = speed;
+		g_PrevPlayerTelemetry.throttle = throttle;
 		g_PrevPlayerTelemetry.ElsLasers = craftInstance->ElsLasers;
 		g_PrevPlayerTelemetry.ElsShields = craftInstance->ElsShields;
 		g_PrevPlayerTelemetry.ElsBeam = craftInstance->ElsBeam;
@@ -270,8 +282,8 @@ target_section:
 		if (craftInstance == NULL) goto status_section;
 		CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
 		if (craftDefinition == NULL) goto status_section;
-		char *name = (char *)craftDefinition->pCraftName;
-		char *short_name = (char *)craftDefinition->pCraftShortName;
+		//char *name = (char *)craftDefinition->pCraftName;
+		//char *short_name = (char *)craftDefinition->pCraftShortName;
 		int IFF = object->MobileObjectPtr->IFF;
 		//int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
 		//hull = max(0, hull);

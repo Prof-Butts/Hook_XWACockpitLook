@@ -34,20 +34,23 @@ struct SharedMemDataCockpitLook {
 	}
 };
 
-constexpr int TLM_MAX_CARGO  =  80;
-constexpr int TLM_MAX_SUBCMP =  80;
-constexpr int TLM_MAX_NAME   = 120;
+constexpr int TLM_MAX_NAME      = 120;
+constexpr int TLM_MAX_CARGO     =  80;
+constexpr int TLM_MAX_SUBCMP    =  80;
+constexpr int TLM_MAX_SHIP_NAME =  40;
 struct SharedMemDataTelemetry
 {
 	int counter;
 	// Player stats
 	int shieldsFwd, shieldsBck;
+
 	// Target stats
 	int tgtShds, tgtSys, tgtHull;
 	float tgtDist;
 	char tgtName[TLM_MAX_NAME];
 	char tgtCargo[TLM_MAX_CARGO];
 	char tgtSubCmp[TLM_MAX_SUBCMP];
+	char shipName[TLM_MAX_SHIP_NAME];
 
 	SharedMemDataTelemetry()
 	{
@@ -59,6 +62,7 @@ struct SharedMemDataTelemetry
 		tgtName[0] = 0;
 		tgtCargo[0] = 0;
 		tgtSubCmp[0] = 0;
+		shipName[0] = 0;
 	};
 };
 
