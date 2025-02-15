@@ -34,6 +34,8 @@ struct CraftInstance {
 	WORD AiSkill;
 	WORD field_F; // Ofs 0x0F
 	WORD unknown2;
+	// Index 1: Tractor Beam (value goes from 0 to 0xFFFF when activated)
+	// Index 2: Jamming Beam (value goes from 0 to 0xFFFF when activated)
 	DWORD IsUnderBeamEffect[5];
 	BYTE SfoilsState; // Ofs 0x27
 	BYTE XwaAIData_m00;

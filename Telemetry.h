@@ -21,12 +21,15 @@ public:
 	int hull;
 	int shake;
 	BYTE BeamActive;
+	bool underTractorBeam;
+	bool underJammingBeam;
 
 	PlayerTelemetry() {
 		name = NULL;
 		short_name = NULL;
 		shipName[0] = 0;
 		speed = -1;
+		throttle = -1;
 		ElsLasers = ElsShields = ElsBeam = 255;
 		SfoilsState = 255;
 		ShieldDirection = 255;
@@ -34,6 +37,8 @@ public:
 		hull = -1;
 		shake = 0;
 		BeamActive = 255;
+		underTractorBeam = false;
+		underJammingBeam = false;
 	}
 };
 

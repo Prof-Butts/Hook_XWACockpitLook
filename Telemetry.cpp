@@ -218,6 +218,8 @@ void SendXWADataOverUDP()
 		//shields_front = max(0, shields_front);
 		//shields_back = max(0, shields_back);
 		const int throttle = (int)(100.0f * craftInstance->EngineThrottleInput / 65535.0f);
+		const bool underTractorBeam = (craftInstance->IsUnderBeamEffect[1] != 0);
+		const bool underJammingBeam = (craftInstance->IsUnderBeamEffect[2] != 0);
 
 		if (strncmp(shipName, g_PrevPlayerTelemetry.shipName, TLM_MAX_SHIP_NAME) != 0)
 			msg += "player|name:" + std::string(shipName) + "\n";
@@ -251,12 +253,17 @@ void SendXWADataOverUDP()
 			msg += "player|beamactive:" + std::to_string(craftInstance->BeamActive) + "\n";
 		//craftInstance->BeamEnergy
 		if (shake != g_PrevPlayerTelemetry.shake)
-		{
-			//std::stringstream stream;
-			//stream << std::fixed << std::setprecision(2) << shakeSize;
-			//msg += "player|shake:" + stream.str() + "\n";
 			msg += "player|shake:" + std::to_string(shake) + "\n";
-		}
+
+		if (underTractorBeam && !g_PrevPlayerTelemetry.underTractorBeam)
+			msg += "player|undertractorbeam:on\n";
+		else if (!underTractorBeam && g_PrevPlayerTelemetry.underTractorBeam)
+			msg += "player|undertractorbeam:off\n";
+
+		if (underJammingBeam && !g_PrevPlayerTelemetry.underJammingBeam)
+			msg += "player|underjammingbeam:on\n";
+		else if (!underJammingBeam && g_PrevPlayerTelemetry.underJammingBeam)
+			msg += "player|underjammingbeam:off\n";
 
 		//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
 		//log_debug("[UDP] Throttle: %s", CraftDefinitionTable[objectIndex].CockpitFileName);
@@ -281,6 +288,8 @@ void SendXWADataOverUDP()
 		g_PrevPlayerTelemetry.hull = hull;
 		g_PrevPlayerTelemetry.shake = shake;
 		g_PrevPlayerTelemetry.BeamActive = craftInstance->BeamActive;
+		g_PrevPlayerTelemetry.underTractorBeam = underTractorBeam;
+		g_PrevPlayerTelemetry.underJammingBeam = underJammingBeam;
 	}
 
 	// TARGET SECTION
