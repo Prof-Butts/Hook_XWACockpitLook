@@ -8,6 +8,7 @@
 #include "SharedMem.h"
 #include "Telemetry.h"
 #include "UDP.h"
+#include "Vectors.h"
 
 extern const int *localPlayerIndex;
 extern const unsigned int *g_playerInHangar;
@@ -170,6 +171,10 @@ void SendXWADataOverUDP()
 	char *tgtSubCmp = nullptr;
 	shipName[0] = 0;
 
+	const int shake = abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeX) +
+		abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeY) +
+		abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeZ);
+
 	if (g_pSharedDataTelemetry != nullptr)
 	{
 		shields_front = g_pSharedDataTelemetry->shieldsFwd;
@@ -243,6 +248,13 @@ void SendXWADataOverUDP()
 		if (craftInstance->BeamActive != g_PrevPlayerTelemetry.BeamActive)
 			msg += "player|beamactive:" + std::to_string(craftInstance->BeamActive) + "\n";
 		//craftInstance->BeamEnergy
+		if (shake != g_PrevPlayerTelemetry.shake)
+		{
+			//std::stringstream stream;
+			//stream << std::fixed << std::setprecision(2) << shakeSize;
+			//msg += "player|shake:" + stream.str() + "\n";
+			msg += "player|shake:" + std::to_string(shake) + "\n";
+		}
 
 		//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
 		//log_debug("[UDP] Throttle: %s", CraftDefinitionTable[objectIndex].CockpitFileName);
@@ -265,6 +277,7 @@ void SendXWADataOverUDP()
 		g_PrevPlayerTelemetry.shields_front = shields_front;
 		g_PrevPlayerTelemetry.shields_back = shields_back;
 		g_PrevPlayerTelemetry.hull = hull;
+		g_PrevPlayerTelemetry.shake = shake;
 		g_PrevPlayerTelemetry.BeamActive = craftInstance->BeamActive;
 	}
 

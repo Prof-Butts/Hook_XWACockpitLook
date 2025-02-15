@@ -19,6 +19,7 @@ public:
 	int shields_front;
 	int shields_back;
 	int hull;
+	int shake;
 	BYTE BeamActive;
 
 	PlayerTelemetry() {
@@ -31,6 +32,7 @@ public:
 		ShieldDirection = 255;
 		shields_front = shields_back = -1;
 		hull = -1;
+		shake = 0;
 		BeamActive = 255;
 	}
 };
