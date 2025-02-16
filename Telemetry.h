@@ -4,6 +4,15 @@
 
 #include "SharedMem.h"
 
+enum class ActiveWeapon
+{
+	NONE,
+	LASERS,
+	IONS,
+	WARHEADS,
+	SEC_WARHEADS,
+};
+
 class PlayerTelemetry {
 public:
 	char *name;
@@ -23,6 +32,7 @@ public:
 	BYTE BeamActive;
 	bool underTractorBeam;
 	bool underJammingBeam;
+	ActiveWeapon activeWeapon;
 
 	PlayerTelemetry() {
 		name = NULL;
@@ -39,6 +49,7 @@ public:
 		BeamActive = 255;
 		underTractorBeam = false;
 		underJammingBeam = false;
+		activeWeapon = ActiveWeapon::NONE;
 	}
 };
 

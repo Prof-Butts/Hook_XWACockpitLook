@@ -147,17 +147,50 @@ status_section:
 }
 #endif
 
-#ifdef TELEMETRY_SIMPLIFIED
 std::string ShieldDirectionStr(int x)
 {
 	switch (x)
 	{
-		case 0: return "front";
-		case 1: return "even";
-		case 2: return "back";
+	case 0: return "front";
+	case 1: return "even";
+	case 2: return "back";
 	}
 }
 
+ActiveWeapon GetCurrentActiveWeapon()
+{
+	// primarySec,   warHead,	Meaning:
+	//		0			0		Lasers Armed
+	//		0			1		Primary Warheads Armed
+	//		1			0		Ion Cannons Armed
+	//		1			1		Secondary Warheads Armed
+	const char primArmed    = PlayerDataTable[*localPlayerIndex].primarySecondaryArmed;
+	const char warheadArmed = PlayerDataTable[*localPlayerIndex].warheadArmed;
+
+	if (primArmed == 0)
+		return warheadArmed ? ActiveWeapon::WARHEADS : ActiveWeapon::LASERS;
+	else
+		return warheadArmed ? ActiveWeapon::SEC_WARHEADS : ActiveWeapon::IONS;
+}
+
+std::string ActiveWeaponToString(ActiveWeapon x)
+{
+	switch (x)
+	{
+	case ActiveWeapon::LASERS:
+		return "lasers";
+	case ActiveWeapon::IONS:
+		return "ions";
+	case ActiveWeapon::WARHEADS:
+		return "warheads";
+	case ActiveWeapon::SEC_WARHEADS:
+		return "secwarheads";
+	default:
+		return "none";
+	}
+}
+
+#ifdef TELEMETRY_SIMPLIFIED
 void SendXWADataOverUDP()
 {
 	std::string msg = "";
@@ -198,16 +231,16 @@ void SendXWADataOverUDP()
 		if (objectIndex < 0 || objects == nullptr) goto target_section;
 		int speed = (int)(PlayerDataTable[*localPlayerIndex].currentSpeed / 2.25f);
 		//log_debug("[DBG] objectIndex: %d, *localPlayerIndex: %d, localPlayerIndex: 0x%x", objectIndex, *localPlayerIndex, localPlayerIndex);
-		ObjectEntry *object = &((*objects)[objectIndex]);
+		ObjectEntry* object = &((*objects)[objectIndex]);
 		if (object == NULL) goto target_section;
-		MobileObjectEntry *mobileObject = object->MobileObjectPtr;
+		MobileObjectEntry* mobileObject = object->MobileObjectPtr;
 		if (mobileObject == NULL) goto target_section;
-		CraftInstance *craftInstance = mobileObject->craftInstancePtr;
+		CraftInstance* craftInstance = mobileObject->craftInstancePtr;
 		if (craftInstance == NULL) goto target_section;
-		CraftDefinitionEntry *craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
+		CraftDefinitionEntry* craftDefinition = &(CraftDefinitionTable[craftInstance->CraftType]);
 		if (craftDefinition == NULL) goto target_section;
-		char *name = (char *)craftDefinition->pCraftName;
-		char *short_name = (char *)craftDefinition->pCraftShortName;
+		char* name = (char*)craftDefinition->pCraftName;
+		char* short_name = (char*)craftDefinition->pCraftShortName;
 		int hull = (int)(100.0f * (1.0f - (float)craftInstance->HullDamageReceived / (float)craftInstance->HullStrength));
 		hull = max(0, hull);
 		if (hull < g_PrevPlayerTelemetry.hull)
@@ -220,6 +253,7 @@ void SendXWADataOverUDP()
 		const int throttle = (int)(100.0f * craftInstance->EngineThrottleInput / 65535.0f);
 		const bool underTractorBeam = (craftInstance->IsUnderBeamEffect[1] != 0);
 		const bool underJammingBeam = (craftInstance->IsUnderBeamEffect[2] != 0);
+		const ActiveWeapon activeWeapon = GetCurrentActiveWeapon();
 
 		if (strncmp(shipName, g_PrevPlayerTelemetry.shipName, TLM_MAX_SHIP_NAME) != 0)
 			msg += "player|name:" + std::string(shipName) + "\n";
@@ -265,6 +299,9 @@ void SendXWADataOverUDP()
 		else if (!underJammingBeam && g_PrevPlayerTelemetry.underJammingBeam)
 			msg += "player|underjammingbeam:off\n";
 
+		if (activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
+			msg += "player|activeweapon:" + ActiveWeaponToString(activeWeapon) + "\n";
+
 		//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
 		//log_debug("[UDP] Throttle: %s", CraftDefinitionTable[objectIndex].CockpitFileName);
 		//log_debug("[UDP] localPlayerIndex: %d, Index: %d", *localPlayerIndex, PlayerDataTable[*localPlayerIndex].objectIndex);
@@ -290,6 +327,7 @@ void SendXWADataOverUDP()
 		g_PrevPlayerTelemetry.BeamActive = craftInstance->BeamActive;
 		g_PrevPlayerTelemetry.underTractorBeam = underTractorBeam;
 		g_PrevPlayerTelemetry.underJammingBeam = underJammingBeam;
+		g_PrevPlayerTelemetry.activeWeapon = activeWeapon;
 	}
 
 	// TARGET SECTION

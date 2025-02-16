@@ -393,6 +393,11 @@ struct PlayerDataEntry
 	__int16 craftMemory4;
 	char primarySecondaryArmed; // Bit attr: 0 primary weapon armed, 1: secondary weapon armed.
 	char warheadArmed; // Bit: 0 lasers, 1 warheads. If primarySecArmed is 1 and this is 1, then the secondary warhead is armed.
+	// primarySec,   warHead,	Meaning:
+	//		0			0		Lasers Armed
+	//		1			0		Ion Cannons Armed
+	//		0			1		Primary Warheads Armed
+	//		1			1		Secondary Warheads Armed
 	__int16 componentTargetIndex;
 	__int16 field_37;
 	__int16 engineWashCraftIndex;
