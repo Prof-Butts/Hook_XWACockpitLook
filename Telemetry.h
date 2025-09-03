@@ -33,6 +33,9 @@ public:
 	bool underTractorBeam;
 	bool underJammingBeam;
 	ActiveWeapon activeWeapon;
+	float yawInertia;
+	float pitchInertia;
+	float rollInertia;
 
 	PlayerTelemetry() {
 		name = NULL;
@@ -50,6 +53,9 @@ public:
 		underTractorBeam = false;
 		underJammingBeam = false;
 		activeWeapon = ActiveWeapon::NONE;
+		yawInertia = 0;
+		pitchInertia = 0;
+		rollInertia = 0;
 	}
 };
 

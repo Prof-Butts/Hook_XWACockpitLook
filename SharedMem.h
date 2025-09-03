@@ -51,6 +51,9 @@ struct SharedMemDataTelemetry
 	char tgtCargo[TLM_MAX_CARGO];
 	char tgtSubCmp[TLM_MAX_SUBCMP];
 	char shipName[TLM_MAX_SHIP_NAME];
+	float yawInertia;
+	float pitchInertia;
+	float rollInertia;
 
 	SharedMemDataTelemetry()
 	{
@@ -63,6 +66,10 @@ struct SharedMemDataTelemetry
 		tgtCargo[0] = 0;
 		tgtSubCmp[0] = 0;
 		shipName[0] = 0;
+
+		yawInertia = 0;
+		pitchInertia = 0;
+		rollInertia = 0;
 	};
 };
 

@@ -1784,6 +1784,14 @@ int UpdateTrackingData()
 	g_bResetHeadCenter = false;
 	bLastExternalCamera = bExternalCamera;
 
+	// Update yaw, pitch, roll inertia for UDP Telemetry:
+	if (g_bUDPEnabled && g_pSharedDataTelemetry)
+	{
+		g_pSharedDataTelemetry->yawInertia   = yawInertia;
+		g_pSharedDataTelemetry->pitchInertia = pitchInertia;
+		g_pSharedDataTelemetry->rollInertia  = g_rollInertia;
+	}
+
 	if (YawVR::bEnabled)
 	{
 		if (g_PrevHyperspacePhaseFSM != HS_INIT_ST && g_HyperspacePhaseFSM == HS_INIT_ST)

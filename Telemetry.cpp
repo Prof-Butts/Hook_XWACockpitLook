@@ -302,6 +302,13 @@ void SendXWADataOverUDP()
 		if (activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
 			msg += "player|activeweapon:" + ActiveWeaponToString(activeWeapon) + "\n";
 
+		if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->yawInertia - g_PrevPlayerTelemetry.yawInertia) > 0.00001f)
+			msg += "player|yaw_inertia:" + std::to_string(g_pSharedDataTelemetry->yawInertia) + "\n";
+		if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->pitchInertia - g_PrevPlayerTelemetry.pitchInertia) > 0.00001f)
+			msg += "player|pitch_inertia:" + std::to_string(g_pSharedDataTelemetry->pitchInertia) + "\n";
+		if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->rollInertia - g_PrevPlayerTelemetry.rollInertia) > 0.00001f)
+			msg += "player|roll_inertia:" + std::to_string(g_pSharedDataTelemetry->rollInertia) + "\n";
+
 		//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
 		//log_debug("[UDP] Throttle: %s", CraftDefinitionTable[objectIndex].CockpitFileName);
 		//log_debug("[UDP] localPlayerIndex: %d, Index: %d", *localPlayerIndex, PlayerDataTable[*localPlayerIndex].objectIndex);
@@ -328,6 +335,12 @@ void SendXWADataOverUDP()
 		g_PrevPlayerTelemetry.underTractorBeam = underTractorBeam;
 		g_PrevPlayerTelemetry.underJammingBeam = underJammingBeam;
 		g_PrevPlayerTelemetry.activeWeapon = activeWeapon;
+		if (g_pSharedDataTelemetry)
+		{
+			g_PrevPlayerTelemetry.yawInertia   = g_pSharedDataTelemetry->yawInertia;
+			g_PrevPlayerTelemetry.pitchInertia = g_pSharedDataTelemetry->pitchInertia;
+			g_PrevPlayerTelemetry.rollInertia  = g_pSharedDataTelemetry->rollInertia;
+		}
 	}
 
 	// TARGET SECTION
