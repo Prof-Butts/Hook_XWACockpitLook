@@ -677,6 +677,10 @@ float MAX_LEAN_X = 25.0f, MAX_LEAN_Y = 25.0f, MAX_LEAN_Z = 25.0f;
 const float RESET_ANIM_INCR = 2.0f * ANIM_INCR;
 // The MAX_LEAN values will be clamped by the limits from vrparams.cfg
 
+float g_fYawInertiaMultiplier   = 100.0f;
+float g_fPitchInertiaMultiplier = 100.0f;
+float g_fRollInertiaMultiplier  = 1.0f;
+
 void animTickX(Vector3 *headPos) {
 	if (g_bRightKeyDown)
 		g_HeadPosAnim.x -= ANIM_INCR;
@@ -1787,9 +1791,9 @@ int UpdateTrackingData()
 	// Update yaw, pitch, roll inertia for UDP Telemetry:
 	if (g_bUDPEnabled && g_pSharedDataTelemetry)
 	{
-		g_pSharedDataTelemetry->yawInertia   = yawInertia;
-		g_pSharedDataTelemetry->pitchInertia = pitchInertia;
-		g_pSharedDataTelemetry->rollInertia  = g_rollInertia;
+		g_pSharedDataTelemetry->yawInertia   = g_fYawInertiaMultiplier   * yawInertia;
+		g_pSharedDataTelemetry->pitchInertia = g_fPitchInertiaMultiplier * pitchInertia;
+		g_pSharedDataTelemetry->rollInertia  = g_fRollInertiaMultiplier  * g_rollInertia;
 	}
 
 	if (YawVR::bEnabled)
@@ -2053,7 +2057,7 @@ void LoadParams() {
 			*/
 
 			// UDP settings
-			else if (_stricmp(param, "UDP_telemetry_enabled") == 0) {
+			if (_stricmp(param, "UDP_telemetry_enabled") == 0) {
 				g_bUDPEnabled = (bool)fValue;
 				log_debug("[UDP] Telemetry Enabled: %d", g_bUDPEnabled);
 			}
@@ -2064,6 +2068,15 @@ void LoadParams() {
 			else if (_stricmp(param, "UDP_telemetry_server") == 0) {
 				_snprintf_s(g_sUDPServer, 80, "%s", svalue);
 				log_debug("[UDP] Telemetry Server: %s", g_sUDPServer);
+			}
+			else if (_stricmp(param, "UDP_yaw_inertia_multiplier") == 0) {
+				g_fYawInertiaMultiplier = fValue;
+			}
+			else if (_stricmp(param, "UDP_pitch_inertia_multiplier") == 0) {
+				g_fPitchInertiaMultiplier = fValue;
+			}
+			else if (_stricmp(param, "UDP_roll_inertia_multiplier") == 0) {
+				g_fRollInertiaMultiplier = fValue;
 			}
 
 			// YawVR settings
