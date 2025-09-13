@@ -2078,6 +2078,16 @@ void LoadParams() {
 			else if (_stricmp(param, "UDP_roll_inertia_multiplier") == 0) {
 				g_fRollInertiaMultiplier = fValue;
 			}
+			else if (_stricmp(param, "UDP_telemetry_format") == 0) {
+				if (_stricmp(svalue, "JSON") == 0) {
+					g_UDPFormat = TELEMETRY_FORMAT_JSON;
+					log_debug("[UDP] Telemetry Format: JSON");
+				}
+				else {
+					g_UDPFormat = TELEMETRY_FORMAT_SIMPLIFIED;
+					log_debug("[UDP] Telemetry Format: Simplified");
+				}
+			}
 
 			// YawVR settings
 			if (_stricmp(param, "yawvr_enable") == 0) {
