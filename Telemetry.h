@@ -1,8 +1,7 @@
 #pragma once
-//#define TELEMETRY_JSON
-#define TELEMETRY_SIMPLIFIED
 
 #include "SharedMem.h"
+#include "UDP.h"
 
 enum class ActiveWeapon
 {
@@ -15,7 +14,7 @@ enum class ActiveWeapon
 
 class PlayerTelemetry {
 public:
-	char *name;
+	char *craft_name;
 	char *short_name;
 	char shipName[TLM_MAX_SHIP_NAME];
 	int speed;
@@ -38,7 +37,7 @@ public:
 	float rollInertia;
 
 	PlayerTelemetry() {
-		name = NULL;
+		craft_name = NULL;
 		short_name = NULL;
 		shipName[0] = 0;
 		speed = -1;

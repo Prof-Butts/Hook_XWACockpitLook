@@ -31,6 +31,7 @@ bool g_bUDPEnabled = false;
 //#define SERVER "127.0.0.1"	// IP address of the UDP server
 char g_sUDPServer[80] = { 0 };
 int g_iUDPPort = 1138;		// The port on which to listen for incoming data
+int g_UDPFormat = TELEMETRY_FORMAT_JSON;
 
 // Local parameters:
 WSADATA g_wsa;
