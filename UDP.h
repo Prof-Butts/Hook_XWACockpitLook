@@ -5,6 +5,7 @@
 
 // UDP Telemetry
 extern bool g_bUDPEnabled;
+extern bool g_bContinuousTelemetry;
 extern int g_iUDPPort;
 extern char g_sUDPServer[80];
 extern int g_UDPFormat;

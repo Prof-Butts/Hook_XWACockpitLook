@@ -28,6 +28,7 @@ void log_debug(const char *format, ...);
 
 // Global parameters:
 bool g_bUDPEnabled = false;
+bool g_bContinuousTelemetry = false;
 //#define SERVER "127.0.0.1"	// IP address of the UDP server
 char g_sUDPServer[80] = { 0 };
 int g_iUDPPort = 1138;		// The port on which to listen for incoming data

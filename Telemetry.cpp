@@ -29,9 +29,11 @@ std::string ShieldDirectionStr(int x)
 {
 	switch (x)
 	{
-	case 0: return "front";
-	case 1: return "even";
-	case 2: return "back";
+		case 0: return "front";
+		case 1: return "even";
+		case 2: return "back";
+		default:
+			return "none";
 	}
 }
 
@@ -134,51 +136,48 @@ void SendXWADataOverUDP()
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
 			//msg = "{\n" + msg;
-			if (strncmp(shipName, g_PrevPlayerTelemetry.shipName, TLM_MAX_SHIP_NAME) != 0)
+			if (g_bContinuousTelemetry || strncmp(shipName, g_PrevPlayerTelemetry.shipName, TLM_MAX_SHIP_NAME) != 0)
 				msg += "\t\"XWA.player.shipName\" : \"" + std::string(shipName) + "\",\n";
-			if (craft_name != g_PrevPlayerTelemetry.craft_name)
+			if (g_bContinuousTelemetry || craft_name != g_PrevPlayerTelemetry.craft_name)
 				msg += "\t\"XWA.player.crafttypename\" : \"" + std::string(craft_name) + "\",\n";
-			if (short_name != g_PrevPlayerTelemetry.short_name)
+			if (g_bContinuousTelemetry || short_name != g_PrevPlayerTelemetry.short_name)
 				msg += "\t\"XWA.player.shortcrafttypename\" : \"" + std::string(short_name) + "\",\n";
-			if (speed != g_PrevPlayerTelemetry.speed)
+			if (g_bContinuousTelemetry || speed != g_PrevPlayerTelemetry.speed)
 				msg += "\t\"XWA.player.speed\" : " + std::to_string(speed) + ",\n";
-			if (throttle != g_PrevPlayerTelemetry.throttle)
+			if (g_bContinuousTelemetry || throttle != g_PrevPlayerTelemetry.throttle)
 				msg += "\t\"XWA.player.throttle\" : " + std::to_string(throttle) + ",\n";			
-			if (craftInstance->ElsLasers != g_PrevPlayerTelemetry.ElsLasers)
+			if (g_bContinuousTelemetry || craftInstance->ElsLasers != g_PrevPlayerTelemetry.ElsLasers)
 				msg += "\t\"XWA.player.ELSlasers\" : " + std::to_string(craftInstance->ElsLasers) + ",\n";
-			if (craftInstance->ElsShields != g_PrevPlayerTelemetry.ElsShields)
+			if (g_bContinuousTelemetry || craftInstance->ElsShields != g_PrevPlayerTelemetry.ElsShields)
 				msg += "\t\"XWA.player.ELSshields\" : " + std::to_string(craftInstance->ElsShields) + ",\n";
-			if (craftInstance->ElsBeam != g_PrevPlayerTelemetry.ElsBeam)
+			if (g_bContinuousTelemetry || craftInstance->ElsBeam != g_PrevPlayerTelemetry.ElsBeam)
 				msg += "\t\"XWA.player.ELSbeam\" : " + std::to_string(craftInstance->ElsBeam) + ",\n";
-			if (craftInstance->SfoilsState != g_PrevPlayerTelemetry.SfoilsState)
+			if (g_bContinuousTelemetry || craftInstance->SfoilsState != g_PrevPlayerTelemetry.SfoilsState)
 				msg += "\t\"XWA.player.s-foils\" : " + std::to_string(craftInstance->SfoilsState) + ",\n";
-			if (craftInstance->ShieldDirection != g_PrevPlayerTelemetry.ShieldDirection)
+			if (g_bContinuousTelemetry || craftInstance->ShieldDirection != g_PrevPlayerTelemetry.ShieldDirection)
 				msg += "\t\"XWA.player.shielddirection\" : " + std::to_string(craftInstance->ShieldDirection) + ",\n";
-			if (shields_front != g_PrevPlayerTelemetry.shields_front)
+			if (g_bContinuousTelemetry || shields_front != g_PrevPlayerTelemetry.shields_front)
 				msg += "\t\"XWA.player.shieldfront\" : " + std::to_string(shields_front) + ",\n";
-			if (shields_back != g_PrevPlayerTelemetry.shields_back)
+			if (g_bContinuousTelemetry || shields_back != g_PrevPlayerTelemetry.shields_back)
 				msg += "\t\"XWA.player.shieldback\" : " + std::to_string(shields_back) + ",\n";
-			if (hull != g_PrevPlayerTelemetry.hull)
+			if (g_bContinuousTelemetry || hull != g_PrevPlayerTelemetry.hull)
 				msg += "\t\"XWA.player.hull\" : " + std::to_string(hull) + ",\n";
-			if (hull < g_PrevPlayerTelemetry.hull)
+			if (g_bContinuousTelemetry || hull < g_PrevPlayerTelemetry.hull)
 				msg += "\t\"XWA.player.hulldamage\" : " + std::to_string(g_PrevPlayerTelemetry.hull - hull) + ",\n";
 			//msg = "player|system:" + std::to_string(craftInstance->SystemStrength);
-			if (craftInstance->BeamActive != g_PrevPlayerTelemetry.BeamActive)
+			if (g_bContinuousTelemetry || craftInstance->BeamActive != g_PrevPlayerTelemetry.BeamActive)
 				msg += "\t\"XWA.player.beamactive\" : " + std::to_string(craftInstance->BeamActive) + ",\n";
 			//craftInstance->BeamEnergy
-			if (shake != g_PrevPlayerTelemetry.shake)
+			if (g_bContinuousTelemetry || shake != g_PrevPlayerTelemetry.shake)
 				msg += "\t\"XWA.player.shake\" : " + std::to_string(shake) + ",\n";
-			if (underTractorBeam && !g_PrevPlayerTelemetry.underTractorBeam)
-				msg += "\t\"XWA.player.undertractorbeam\" : 1,\n";
-			else if (!underTractorBeam && g_PrevPlayerTelemetry.underTractorBeam)
-				msg += "\t\"XWA.player.undertractorbeam\" : 0,\n";
-			if (underJammingBeam && !g_PrevPlayerTelemetry.underJammingBeam)
-				msg += "\t\"XWA.player.underjammingbeam\" : 1,\n";
-			else if (!underJammingBeam && g_PrevPlayerTelemetry.underJammingBeam)
-				msg += "\t\"XWA.player.underjammingbeam\" : 0,'\n";
 
-			if (activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
-				msg += "\t\"XWA.player.activeweapon\" : " + ActiveWeaponToString(activeWeapon) + ",\n";
+			if (g_bContinuousTelemetry || underTractorBeam != g_PrevPlayerTelemetry.underTractorBeam)
+				msg += "\t\"XWA.player.undertractorbeam\" : " + std::to_string(underTractorBeam) + ",\n";
+			if (g_bContinuousTelemetry || underJammingBeam != g_PrevPlayerTelemetry.underJammingBeam)
+				msg += "\t\"XWA.player.underjammingbeam\" : " + std::to_string(underJammingBeam) + ",\n";
+
+			if (g_bContinuousTelemetry || activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
+				msg += "\t\"XWA.player.activeweapon\" : \"" + ActiveWeaponToString(activeWeapon) + "\",\n";
 
 			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->yawInertia - g_PrevPlayerTelemetry.yawInertia) > 0.00001f)
 				msg += "\t\"XWA.player.yaw_inertia\" : " + std::to_string(g_pSharedDataTelemetry->yawInertia) + ",\n";
@@ -306,27 +305,27 @@ target_section:
 		//shields = max(0, shields);
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
-			if (tgtName != nullptr && strcmp(tgtName, g_TargetTelemetry.name) != 0)
+			if (tgtName != nullptr && (g_bContinuousTelemetry || strcmp(tgtName, g_TargetTelemetry.name) != 0))
 				msg += "\t\"XWA.target.name\" : \"" + std::string(tgtName) + "\",\n";
-			if (IFF != g_TargetTelemetry.IFF)
+			if (g_bContinuousTelemetry || IFF != g_TargetTelemetry.IFF)
 				msg += "\t\"XWA.target.IFF\" : \"" + std::to_string(IFF) + "\",\n";
-			if (tgtShds != g_TargetTelemetry.shields)
+			if (g_bContinuousTelemetry || tgtShds != g_TargetTelemetry.shields)
 				msg += "\t\"XWA.target.shields\" : \"" + std::to_string(tgtShds) + "\",\n";
-			if (tgtHull != g_TargetTelemetry.hull)
+			if (g_bContinuousTelemetry || tgtHull != g_TargetTelemetry.hull)
 				msg += "\t\"XWA.target.hull\" : \"" + std::to_string(tgtHull) + "\",\n";
-			if (tgtSys != g_TargetTelemetry.sys)
+			if (g_bContinuousTelemetry || tgtSys != g_TargetTelemetry.sys)
 				msg += "\t\"XWA.target.sys\" : \"" + std::to_string(tgtSys) + "\",\n";
-			if (tgtDist != g_TargetTelemetry.dist)
+			if (g_bContinuousTelemetry || tgtDist != g_TargetTelemetry.dist)
 			{
 				std::stringstream stream;
 				stream << std::fixed << std::setprecision(2) << tgtDist;
 				msg += "\t\"XWA.target.dist\" : " + stream.str() + ",\n";
 			}
-			if (tgtCargo != nullptr && strcmp(tgtCargo, g_TargetTelemetry.Cargo) != 0)
+			if (g_bContinuousTelemetry || tgtCargo != nullptr && strcmp(tgtCargo, g_TargetTelemetry.Cargo) != 0)
 				msg += "\t\"XWA.target.cargo\" : \"" + std::string(tgtCargo) + "\",\n";
-			if (tgtSubCmp != nullptr && strcmp(tgtSubCmp, g_TargetTelemetry.SubCmp) != 0)
+			if (g_bContinuousTelemetry || tgtSubCmp != nullptr && strcmp(tgtSubCmp, g_TargetTelemetry.SubCmp) != 0)
 				msg += "\t\"XWA.target.subcmp\" : \"" + std::string(tgtSubCmp) + "\",\n";
-		}		
+		}
 		else { // TELEMETRY_FORMAT_SIMPLIFIED
 			/*if (name != g_TargetTelemetry.name)
 				msg += "target|crafttypename:" + std::string(name) + "\n";
@@ -381,7 +380,7 @@ status_section:
 	{
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
-			if (*g_playerInHangar != g_LocationTelemetry.playerInHangar)
+			if (g_bContinuousTelemetry || *g_playerInHangar != g_LocationTelemetry.playerInHangar)
 			{
 				msg += "\t\"XWA.status.location\" : ";
 				if ((*g_playerInHangar))
@@ -390,7 +389,7 @@ status_section:
 					msg += "\"space\",\n";
 			}
 
-			if (g_HyperspacePhaseFSM != g_PrevHyperspacePhaseFSM)
+			if (g_bContinuousTelemetry || g_HyperspacePhaseFSM != g_PrevHyperspacePhaseFSM)
 			{
 				msg += "\t\"XWA.status.location\" : ";
 				switch (g_HyperspacePhaseFSM)
