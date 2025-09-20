@@ -2088,7 +2088,8 @@ void LoadParams() {
 					log_debug("[UDP] Telemetry Format: Simplified");
 				}
 			}
-			else if (_stricmp(param, "UDP_sparse_telemetry") == 0) {
+			else if (_stricmp(param, "UDP_sparse_telemetry") == 0 ||
+				     _stricmp(param, "UDP_telemetry_sparse") == 0) {
 				g_bContinuousTelemetry = !((bool)fValue);
 				log_debug("[UDP] Sparse Telemetry: %d", !g_bContinuousTelemetry);
 			}
