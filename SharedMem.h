@@ -54,6 +54,7 @@ struct SharedMemDataTelemetry
 	float yawInertia;
 	float pitchInertia;
 	float rollInertia;
+	float accelInertia;
 
 	SharedMemDataTelemetry()
 	{
@@ -70,6 +71,7 @@ struct SharedMemDataTelemetry
 		yawInertia = 0;
 		pitchInertia = 0;
 		rollInertia = 0;
+		accelInertia = 0;
 	};
 };
 
