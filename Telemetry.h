@@ -35,6 +35,7 @@ public:
 	float yawInertia;
 	float pitchInertia;
 	float rollInertia;
+	float accelInertia;
 
 	PlayerTelemetry() {
 		craft_name = NULL;
@@ -55,6 +56,7 @@ public:
 		yawInertia = 0;
 		pitchInertia = 0;
 		rollInertia = 0;
+		accelInertia = 0;
 	}
 };
 

@@ -680,6 +680,7 @@ const float RESET_ANIM_INCR = 2.0f * ANIM_INCR;
 float g_fYawInertiaMultiplier   = 100.0f;
 float g_fPitchInertiaMultiplier = 100.0f;
 float g_fRollInertiaMultiplier  = 1.0f;
+float g_fAccelInertiaMultiplier = 100.0f;
 
 void animTickX(Vector3 *headPos) {
 	if (g_bRightKeyDown)
@@ -1788,12 +1789,13 @@ int UpdateTrackingData()
 	g_bResetHeadCenter = false;
 	bLastExternalCamera = bExternalCamera;
 
-	// Update yaw, pitch, roll inertia for UDP Telemetry:
+	// Update yaw, pitch, roll, linear inertia for UDP Telemetry:
 	if (g_bUDPEnabled && g_pSharedDataTelemetry)
 	{
 		g_pSharedDataTelemetry->yawInertia   = g_fYawInertiaMultiplier   * yawInertia;
 		g_pSharedDataTelemetry->pitchInertia = g_fPitchInertiaMultiplier * pitchInertia;
 		g_pSharedDataTelemetry->rollInertia  = g_fRollInertiaMultiplier  * g_rollInertia;
+		g_pSharedDataTelemetry->accelInertia = g_fAccelInertiaMultiplier * distInertia;
 	}
 
 	if (YawVR::bEnabled)
@@ -2077,6 +2079,9 @@ void LoadParams() {
 			}
 			else if (_stricmp(param, "UDP_roll_inertia_multiplier") == 0) {
 				g_fRollInertiaMultiplier = fValue;
+			}
+			else if (_stricmp(param, "UDP_accel_inertia_multiplier") == 0) {
+				g_fAccelInertiaMultiplier = fValue;
 			}
 			else if (_stricmp(param, "UDP_telemetry_format") == 0) {
 				if (_stricmp(svalue, "JSON") == 0) {

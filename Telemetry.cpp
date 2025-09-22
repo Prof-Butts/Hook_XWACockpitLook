@@ -185,6 +185,8 @@ void SendXWADataOverUDP()
 				msg += "\t\"XWA.player.pitch_inertia\" : " + std::to_string(g_pSharedDataTelemetry->pitchInertia) + ",\n";
 			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->rollInertia - g_PrevPlayerTelemetry.rollInertia) > 0.00001f)
 				msg += "\t\"XWA.player.roll_inertia\" : " + std::to_string(g_pSharedDataTelemetry->rollInertia) + ",\n";
+			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->accelInertia - g_PrevPlayerTelemetry.accelInertia) > 0.00001f)
+				msg += "\t\"XWA.player.accel_inertia\" : " + std::to_string(g_pSharedDataTelemetry->accelInertia) + ",\n";
 		}
 		else // TELEMETRY_FORMAT_SIMPLIFIED
 		{
@@ -244,6 +246,8 @@ void SendXWADataOverUDP()
 				msg += "player|pitch_inertia:" + std::to_string(g_pSharedDataTelemetry->pitchInertia) + "\n";
 			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->rollInertia - g_PrevPlayerTelemetry.rollInertia) > 0.00001f)
 				msg += "player|roll_inertia:" + std::to_string(g_pSharedDataTelemetry->rollInertia) + "\n";
+			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->accelInertia - g_PrevPlayerTelemetry.accelInertia) > 0.00001f)
+				msg += "player|accel_inertia:" + std::to_string(g_pSharedDataTelemetry->accelInertia) + "\n";
 
 		}
 
@@ -278,6 +282,7 @@ void SendXWADataOverUDP()
 			g_PrevPlayerTelemetry.yawInertia   = g_pSharedDataTelemetry->yawInertia;
 			g_PrevPlayerTelemetry.pitchInertia = g_pSharedDataTelemetry->pitchInertia;
 			g_PrevPlayerTelemetry.rollInertia  = g_pSharedDataTelemetry->rollInertia;
+			g_PrevPlayerTelemetry.accelInertia = g_pSharedDataTelemetry->accelInertia;
 		}
 	}
 
