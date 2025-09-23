@@ -387,11 +387,7 @@ status_section:
 		{
 			if (g_bContinuousTelemetry || *g_playerInHangar != g_LocationTelemetry.playerInHangar)
 			{
-				msg += "\t\"XWA.status.location\" : ";
-				if ((*g_playerInHangar))
-					msg += "\"hangar\",\n";
-				else
-					msg += "\"space\",\n";
+				msg += "\t\"XWA.status.hangar\" : " + std::to_string(*g_playerInHangar) + ",\n";
 			}
 
 			if (g_bContinuousTelemetry || g_HyperspacePhaseFSM != g_PrevHyperspacePhaseFSM)
@@ -417,11 +413,7 @@ status_section:
 		else { // TELEMETRY_FORMAT_SIMPLIFIED
 			if (*g_playerInHangar != g_LocationTelemetry.playerInHangar)
 			{
-				msg += "status|location\" : ";
-				if ((*g_playerInHangar))
-					msg += "hangar\n";
-				else
-					msg += "space\n";
+				msg += "status|hangar\" : " + std::to_string(*g_playerInHangar) + "\n";
 			}
 
 			if (g_HyperspacePhaseFSM != g_PrevHyperspacePhaseFSM)
