@@ -32,6 +32,8 @@ public:
 	bool underTractorBeam;
 	bool underJammingBeam;
 	ActiveWeapon activeWeapon;
+	bool laserFired;
+	bool warheadFired;
 	float yawInertia;
 	float pitchInertia;
 	float rollInertia;
@@ -53,6 +55,8 @@ public:
 		underTractorBeam = false;
 		underJammingBeam = false;
 		activeWeapon = ActiveWeapon::NONE;
+		laserFired = false;
+		warheadFired = false;
 		yawInertia = 0;
 		pitchInertia = 0;
 		rollInertia = 0;

@@ -35,6 +35,8 @@ static const HookFunction g_hookFunctions[] =
 	{ 0x43FB57, DoRotationPitchHook}, //DoRotation(Pitch)
 	{ 0x43FB67, DoRotationYawHook }, //DoRotation(Yaw)
 	{ 0x4654A6, SetupReticleHook }, //TransformVector() inside SetupReticle()
+	{ 0x491614, LaserEffectHook}, //Capture Laser fire for telemetry
+	{ 0x491B41, WarheadEffectHook},
 };
 
 static const HookPatchItem g_patch[] =
@@ -86,7 +88,20 @@ static const HookPatchItem g_patch[] =
 	{0x057866,"E8D5770000", g_hooksConfig.DisableRandomCamera ? "9090909090" : "E8D5770000"},
 };
 
+static const HookPatchItem g_patchTelemetry[] =
+{
+	//Hooks to capture events for telemetry
+
+	// Hook calls to LaserEffect inside FireLaserCannon()
+	// call (0x5A8B20 - 0x491614) = 0x11750C
+	{0x49160F - 0x400C00, "E86C5CFAFF", "E80C751100"},
+	// Hook call to WarheadEffect inside FireWarhead()
+	// call (0x5A8B20 - 0x491B41) = 0x116FDF
+	{0x491B3C - 0x400C00, "E8AF57FAFF", "E8DF6F1100" },
+};
+
 static const HookPatch g_patches[] =
 {
 	MAKE_HOOK_PATCH("XWA Cockpit Look", g_patch),
+	MAKE_HOOK_PATCH("XWA Telemetry", g_patchTelemetry),
 };

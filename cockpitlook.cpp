@@ -2411,6 +2411,20 @@ void WriteInertiaData()
 }
 #endif
 
+int LaserEffectHook(int* params)
+{
+	//log_debug("LaserEffectHook() executed");
+	g_pSharedDataTelemetry->laserFired = true;
+	return LaserEffect();
+}
+
+int WarheadEffectHook(int* params)
+{
+	//log_debug("WarheadEffectHook() executed");
+	g_pSharedDataTelemetry->warheadFired = true;
+	return WarheadEffect();
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 {
 	switch (uReason)

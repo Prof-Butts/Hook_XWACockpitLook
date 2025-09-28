@@ -89,11 +89,29 @@ void SendXWADataOverUDP()
 		abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeY) +
 		abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeZ);
 
+	bool laserFired = false;
+	bool warheadFired = false;
+	static int firecounter = 10;
+
 	if (g_pSharedDataTelemetry != nullptr)
 	{
 		shields_front = g_pSharedDataTelemetry->shieldsFwd;
 		shields_back  = g_pSharedDataTelemetry->shieldsBck;
 		strncpy_s(shipName, g_pSharedDataTelemetry->shipName, TLM_MAX_SHIP_NAME);
+		laserFired = g_pSharedDataTelemetry->laserFired;
+		warheadFired = g_pSharedDataTelemetry->warheadFired;
+		//Reset the weapon fired flags for next frame
+		if (laserFired || warheadFired)
+		{
+			if (firecounter <= 0)
+			{
+				firecounter = 10;
+				g_pSharedDataTelemetry->laserFired = false;
+				g_pSharedDataTelemetry->warheadFired = false;
+			}
+			else
+				firecounter--;
+		}
 
 		tgtShds   = g_pSharedDataTelemetry->tgtShds;
 		tgtHull   = g_pSharedDataTelemetry->tgtHull;
@@ -175,10 +193,14 @@ void SendXWADataOverUDP()
 				msg += "\t\"XWA.player.undertractorbeam\" : " + std::to_string(underTractorBeam) + ",\n";
 			if (g_bContinuousTelemetry || underJammingBeam != g_PrevPlayerTelemetry.underJammingBeam)
 				msg += "\t\"XWA.player.underjammingbeam\" : " + std::to_string(underJammingBeam) + ",\n";
-
+			
 			if (g_bContinuousTelemetry || activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
 				msg += "\t\"XWA.player.activeweapon\" : \"" + ActiveWeaponToString(activeWeapon) + "\",\n";
-
+			if (g_bContinuousTelemetry || laserFired != g_PrevPlayerTelemetry.laserFired)
+				msg += "\t\"XWA.player.laserfired\" : " + std::to_string(laserFired) + ",\n";
+			if (g_bContinuousTelemetry || warheadFired != g_PrevPlayerTelemetry.warheadFired)
+				msg += "\t\"XWA.player.warheadfired\" : " + std::to_string(warheadFired) + ",\n";
+			
 			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->yawInertia - g_PrevPlayerTelemetry.yawInertia) > 0.00001f)
 				msg += "\t\"XWA.player.yaw_inertia\" : " + std::to_string(g_pSharedDataTelemetry->yawInertia) + ",\n";
 			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->pitchInertia - g_PrevPlayerTelemetry.pitchInertia) > 0.00001f)
@@ -239,6 +261,10 @@ void SendXWADataOverUDP()
 
 			if (activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
 				msg += "player|activeweapon:" + ActiveWeaponToString(activeWeapon) + "\n";
+			if (laserFired && !g_PrevPlayerTelemetry.laserFired)
+				msg += "player|laserfired:1\n";
+			if (warheadFired && !g_PrevPlayerTelemetry.warheadFired)
+				msg += "player|warheadfired:1\n";
 
 			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->yawInertia - g_PrevPlayerTelemetry.yawInertia) > 0.00001f)
 				msg += "player|yaw_inertia:" + std::to_string(g_pSharedDataTelemetry->yawInertia) + "\n";
@@ -277,6 +303,8 @@ void SendXWADataOverUDP()
 		g_PrevPlayerTelemetry.underTractorBeam = underTractorBeam;
 		g_PrevPlayerTelemetry.underJammingBeam = underJammingBeam;
 		g_PrevPlayerTelemetry.activeWeapon = activeWeapon;
+		g_PrevPlayerTelemetry.laserFired = laserFired;
+		g_PrevPlayerTelemetry.warheadFired = warheadFired;
 		if (g_pSharedDataTelemetry)
 		{
 			g_PrevPlayerTelemetry.yawInertia   = g_pSharedDataTelemetry->yawInertia;

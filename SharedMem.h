@@ -55,6 +55,8 @@ struct SharedMemDataTelemetry
 	float pitchInertia;
 	float rollInertia;
 	float accelInertia;
+	bool laserFired;
+	bool warheadFired;
 
 	SharedMemDataTelemetry()
 	{
@@ -67,6 +69,8 @@ struct SharedMemDataTelemetry
 		tgtCargo[0] = 0;
 		tgtSubCmp[0] = 0;
 		shipName[0] = 0;
+		laserFired = false;
+		warheadFired = false;
 
 		yawInertia = 0;
 		pitchInertia = 0;

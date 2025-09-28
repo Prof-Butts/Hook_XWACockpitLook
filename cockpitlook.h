@@ -36,3 +36,6 @@ int CockpitPositionTransformHook(int* params);
 int DoRotationPitchHook(int* params);
 int DoRotationYawHook(int* params);
 int SetupReticleHook(int* params);
+
+int LaserEffectHook(int* params);
+int WarheadEffectHook(int* params);
