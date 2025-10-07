@@ -52,6 +52,8 @@ const auto DirectInputKeyboardReaquire = (char(*)())0x42B920;
 const auto Vector3Transform = (void* (*)(Vector3_float* vec, XwaMatrix3x3* mat)) 0x439B30;
 const auto DoRotation = (void (*)(int, int, int, __int16)) 0x440E40;
 const auto TransformVector = (int (*)(ObjectEntry*, int, int, int)) 0x4A2FB0;
+const auto LaserEffect = (int(*)()) 0x437280;
+const auto WarheadEffect = (int(*)()) 0x4372F0;
 
 
 // Globals from XWA

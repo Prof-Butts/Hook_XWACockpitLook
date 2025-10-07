@@ -1126,6 +1126,7 @@ int UpdateTrackingData()
 	}
 
 	if (g_bUDPEnabled) SendXWADataOverUDP();
+	// TODO: fix shared memory telemetry. Currently it won't work unless UDP is also enabled
 
 	// Restore the position of the external camera if external inertia is enabled.
 	if (bExternalCamera && !g_bInsideMapCameraUpdateHook)
@@ -1790,12 +1791,17 @@ int UpdateTrackingData()
 	bLastExternalCamera = bExternalCamera;
 
 	// Update yaw, pitch, roll, linear inertia for UDP Telemetry:
-	if (g_bUDPEnabled && g_pSharedDataTelemetry)
+	//if (g_bUDPEnabled && g_pSharedDataTelemetry)
+	if (g_bUDPEnabled)
 	{
-		g_pSharedDataTelemetry->yawInertia   = g_fYawInertiaMultiplier   * yawInertia;
+		/*g_pSharedDataTelemetry->yawInertia   = g_fYawInertiaMultiplier   * yawInertia;
 		g_pSharedDataTelemetry->pitchInertia = g_fPitchInertiaMultiplier * pitchInertia;
 		g_pSharedDataTelemetry->rollInertia  = g_fRollInertiaMultiplier  * g_rollInertia;
-		g_pSharedDataTelemetry->accelInertia = g_fAccelInertiaMultiplier * distInertia;
+		g_pSharedDataTelemetry->accelInertia = g_fAccelInertiaMultiplier * distInertia;*/
+		g_PlayerTelemetry.yawInertia = g_fYawInertiaMultiplier * yawInertia;
+		g_PlayerTelemetry.pitchInertia = g_fPitchInertiaMultiplier * pitchInertia;
+		g_PlayerTelemetry.rollInertia = g_fRollInertiaMultiplier * g_rollInertia;
+		g_PlayerTelemetry.accelInertia = g_fAccelInertiaMultiplier * distInertia;
 	}
 
 	if (YawVR::bEnabled)
@@ -2410,6 +2416,20 @@ void WriteInertiaData()
 	log_debug("Dumped %d inertia entries to Inertia.csv", g_InertiaData.size());
 }
 #endif
+
+int LaserEffectHook(int* params)
+{
+	//log_debug("LaserEffectHook() executed");
+	g_PlayerTelemetry.laserFired = true;
+	return LaserEffect();
+}
+
+int WarheadEffectHook(int* params)
+{
+	//log_debug("WarheadEffectHook() executed");
+	g_PlayerTelemetry.warheadFired = true;	
+	return WarheadEffect();
+}
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 {
