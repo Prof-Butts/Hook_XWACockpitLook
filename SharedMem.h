@@ -50,7 +50,7 @@ struct SharedMemDataTelemetry
 	char tgtName[TLM_MAX_NAME];
 	char tgtCargo[TLM_MAX_CARGO];
 	char tgtSubCmp[TLM_MAX_SUBCMP];
-	char shipName[TLM_MAX_SHIP_NAME];
+	char shipName[TLM_MAX_SHIP_NAME];	
 	float yawInertia;
 	float pitchInertia;
 	float rollInertia;

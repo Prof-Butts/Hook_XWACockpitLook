@@ -19,6 +19,7 @@ extern CraftDefinitionEntry *CraftDefinitionTable;
 enum HyperspacePhaseEnum;
 extern HyperspacePhaseEnum g_HyperspacePhaseFSM, g_PrevHyperspacePhaseFSM;
 
+PlayerTelemetry g_PlayerTelemetry;
 PlayerTelemetry g_PrevPlayerTelemetry;
 TargetTelemetry g_TargetTelemetry;
 LocationTelemetry g_LocationTelemetry;
@@ -53,20 +54,25 @@ ActiveWeapon GetCurrentActiveWeapon()
 		return warheadArmed ? ActiveWeapon::SEC_WARHEADS : ActiveWeapon::IONS;
 }
 
-std::string ActiveWeaponToString(ActiveWeapon x)
-{
-	switch (x)
-	{
-	case ActiveWeapon::LASERS:
-		return "lasers";
-	case ActiveWeapon::IONS:
-		return "ions";
-	case ActiveWeapon::WARHEADS:
-		return "warheads";
-	case ActiveWeapon::SEC_WARHEADS:
-		return "secwarheads";
-	default:
-		return "none";
+namespace std {
+    // Overload std::to_string for ActiveWeapon
+    std::string to_string(ActiveWeapon x) {
+        switch (x) {
+        case ActiveWeapon::LASERS:
+            return "lasers";
+        case ActiveWeapon::IONS:
+            return "ions";
+        case ActiveWeapon::WARHEADS:
+            return "warheads";
+        case ActiveWeapon::SEC_WARHEADS:
+            return "secwarheads";
+        default:
+            return "none";
+        }
+    }
+	// Overload std::to_string for std::string to reuse the same macro
+	std::string to_string(std::string x) {
+		return x;
 	}
 }
 
@@ -79,47 +85,22 @@ void SendXWADataOverUDP()
 	char shipName[TLM_MAX_SHIP_NAME];
 
 	int tgtShds = 0, tgtHull = 0, tgtSys = 0;
-	float tgtDist = 0;
-	char *tgtName   = nullptr;
-	char *tgtCargo  = nullptr;
-	char *tgtSubCmp = nullptr;
-	shipName[0] = 0;
+	float tgtDist = 0;	
+	std::string tgtName;
+	std::string tgtCargo;
+	std::string tgtSubCmp;
+
 
 	const int shake = abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeX) +
 		abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeY) +
 		abs(PlayerDataTable[*localPlayerIndex].Camera.ShakeZ);
 
-	bool laserFired = false;
-	bool warheadFired = false;
-	static int firecounter = 10;
 
 	if (g_pSharedDataTelemetry != nullptr)
 	{
 		shields_front = g_pSharedDataTelemetry->shieldsFwd;
 		shields_back  = g_pSharedDataTelemetry->shieldsBck;
 		strncpy_s(shipName, g_pSharedDataTelemetry->shipName, TLM_MAX_SHIP_NAME);
-		laserFired = g_pSharedDataTelemetry->laserFired;
-		warheadFired = g_pSharedDataTelemetry->warheadFired;
-		//Reset the weapon fired flags for next frame
-		if (laserFired || warheadFired)
-		{
-			if (firecounter <= 0)
-			{
-				firecounter = 10;
-				g_pSharedDataTelemetry->laserFired = false;
-				g_pSharedDataTelemetry->warheadFired = false;
-			}
-			else
-				firecounter--;
-		}
-
-		tgtShds   = g_pSharedDataTelemetry->tgtShds;
-		tgtHull   = g_pSharedDataTelemetry->tgtHull;
-		tgtSys    = g_pSharedDataTelemetry->tgtSys;
-		tgtDist   = g_pSharedDataTelemetry->tgtDist;
-		tgtName   = g_pSharedDataTelemetry->tgtName;
-		tgtCargo  = g_pSharedDataTelemetry->tgtCargo;
-		tgtSubCmp = g_pSharedDataTelemetry->tgtSubCmp;
 	}
 
 	// PLAYER SECTION
@@ -153,128 +134,57 @@ void SendXWADataOverUDP()
 
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
-			//msg = "{\n" + msg;
-			if (g_bContinuousTelemetry || strncmp(shipName, g_PrevPlayerTelemetry.shipName, TLM_MAX_SHIP_NAME) != 0)
-				msg += "\t\"XWA.player.shipName\" : \"" + std::string(shipName) + "\",\n";
-			if (g_bContinuousTelemetry || craft_name != g_PrevPlayerTelemetry.craft_name)
-				msg += "\t\"XWA.player.crafttypename\" : \"" + std::string(craft_name) + "\",\n";
-			if (g_bContinuousTelemetry || short_name != g_PrevPlayerTelemetry.short_name)
-				msg += "\t\"XWA.player.shortcrafttypename\" : \"" + std::string(short_name) + "\",\n";
-			if (g_bContinuousTelemetry || speed != g_PrevPlayerTelemetry.speed)
-				msg += "\t\"XWA.player.speed\" : " + std::to_string(speed) + ",\n";
-			if (g_bContinuousTelemetry || throttle != g_PrevPlayerTelemetry.throttle)
-				msg += "\t\"XWA.player.throttle\" : " + std::to_string(throttle) + ",\n";			
-			if (g_bContinuousTelemetry || craftInstance->ElsLasers != g_PrevPlayerTelemetry.ElsLasers)
-				msg += "\t\"XWA.player.ELSlasers\" : " + std::to_string(craftInstance->ElsLasers) + ",\n";
-			if (g_bContinuousTelemetry || craftInstance->ElsShields != g_PrevPlayerTelemetry.ElsShields)
-				msg += "\t\"XWA.player.ELSshields\" : " + std::to_string(craftInstance->ElsShields) + ",\n";
-			if (g_bContinuousTelemetry || craftInstance->ElsBeam != g_PrevPlayerTelemetry.ElsBeam)
-				msg += "\t\"XWA.player.ELSbeam\" : " + std::to_string(craftInstance->ElsBeam) + ",\n";
-			if (g_bContinuousTelemetry || craftInstance->SfoilsState != g_PrevPlayerTelemetry.SfoilsState)
-				msg += "\t\"XWA.player.s-foils\" : " + std::to_string(craftInstance->SfoilsState) + ",\n";
-			if (g_bContinuousTelemetry || craftInstance->ShieldDirection != g_PrevPlayerTelemetry.ShieldDirection)
-				msg += "\t\"XWA.player.shielddirection\" : " + std::to_string(craftInstance->ShieldDirection) + ",\n";
-			if (g_bContinuousTelemetry || shields_front != g_PrevPlayerTelemetry.shields_front)
-				msg += "\t\"XWA.player.shieldfront\" : " + std::to_string(shields_front) + ",\n";
-			if (g_bContinuousTelemetry || shields_back != g_PrevPlayerTelemetry.shields_back)
-				msg += "\t\"XWA.player.shieldback\" : " + std::to_string(shields_back) + ",\n";
-			if (g_bContinuousTelemetry || hull != g_PrevPlayerTelemetry.hull)
-				msg += "\t\"XWA.player.hull\" : " + std::to_string(hull) + ",\n";
-			if (g_bContinuousTelemetry || hull < g_PrevPlayerTelemetry.hull)
-				msg += "\t\"XWA.player.hulldamage\" : " + std::to_string(g_PrevPlayerTelemetry.hull - hull) + ",\n";
-			//msg = "player|system:" + std::to_string(craftInstance->SystemStrength);
-			if (g_bContinuousTelemetry || craftInstance->BeamActive != g_PrevPlayerTelemetry.BeamActive)
-				msg += "\t\"XWA.player.beamactive\" : " + std::to_string(craftInstance->BeamActive) + ",\n";
-			//craftInstance->BeamEnergy
-			if (g_bContinuousTelemetry || shake != g_PrevPlayerTelemetry.shake)
-				msg += "\t\"XWA.player.shake\" : " + std::to_string(shake) + ",\n";
-
-			if (g_bContinuousTelemetry || underTractorBeam != g_PrevPlayerTelemetry.underTractorBeam)
-				msg += "\t\"XWA.player.undertractorbeam\" : " + std::to_string(underTractorBeam) + ",\n";
-			if (g_bContinuousTelemetry || underJammingBeam != g_PrevPlayerTelemetry.underJammingBeam)
-				msg += "\t\"XWA.player.underjammingbeam\" : " + std::to_string(underJammingBeam) + ",\n";
-			
-			if (g_bContinuousTelemetry || activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
-				msg += "\t\"XWA.player.activeweapon\" : \"" + ActiveWeaponToString(activeWeapon) + "\",\n";
-			if (g_bContinuousTelemetry || laserFired != g_PrevPlayerTelemetry.laserFired)
-				msg += "\t\"XWA.player.laserfired\" : " + std::to_string(laserFired) + ",\n";
-			if (g_bContinuousTelemetry || warheadFired != g_PrevPlayerTelemetry.warheadFired)
-				msg += "\t\"XWA.player.warheadfired\" : " + std::to_string(warheadFired) + ",\n";
-			
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->yawInertia - g_PrevPlayerTelemetry.yawInertia) > 0.00001f)
-				msg += "\t\"XWA.player.yaw_inertia\" : " + std::to_string(g_pSharedDataTelemetry->yawInertia) + ",\n";
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->pitchInertia - g_PrevPlayerTelemetry.pitchInertia) > 0.00001f)
-				msg += "\t\"XWA.player.pitch_inertia\" : " + std::to_string(g_pSharedDataTelemetry->pitchInertia) + ",\n";
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->rollInertia - g_PrevPlayerTelemetry.rollInertia) > 0.00001f)
-				msg += "\t\"XWA.player.roll_inertia\" : " + std::to_string(g_pSharedDataTelemetry->rollInertia) + ",\n";
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->accelInertia - g_PrevPlayerTelemetry.accelInertia) > 0.00001f)
-				msg += "\t\"XWA.player.accel_inertia\" : " + std::to_string(g_pSharedDataTelemetry->accelInertia) + ",\n";
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, shipName, shipName, "XWA.player", "shipname");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, craft_name, std::string(craft_name), "XWA.player", "crafttypename");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, short_name, std::string(short_name), "XWA.player", "shortcrafttypename");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, speed, speed, "XWA.player", "speed");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, throttle, throttle, "XWA.player", "throttle");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, ElsLasers, craftInstance->ElsLasers, "XWA.player", "ELSlasers");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, ElsShields, craftInstance->ElsShields, "XWA.player", "ELSshields");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, ElsBeam, craftInstance->ElsBeam, "XWA.player", "ELSbeam");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, SfoilsState, craftInstance->SfoilsState, "XWA.player", "s-foils");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, ShieldDirection, craftInstance->ShieldDirection, "XWA.player", "shielddirection");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, shields_front, shields_front, "XWA.player", "shieldfront");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, shields_back, shields_back, "XWA.player", "shieldback");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, hull, hull, "XWA.player", "hull");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, shake, shake, "XWA.player", "shake");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, BeamActive, craftInstance->BeamActive, "XWA.player", "beamactive");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, underTractorBeam, underTractorBeam, "XWA.player", "undertractorbeam");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, underJammingBeam, underJammingBeam, "XWA.player", "underjammingbeam");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, activeWeapon, activeWeapon, "XWA.player", "activeweapon");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, laserFired, g_PlayerTelemetry.laserFired, "XWA.player", "laserfired");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, warheadFired, g_PlayerTelemetry.warheadFired, "XWA.player", "warheadfired");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, yawInertia, g_PlayerTelemetry.yawInertia, "XWA.player", "yaw_inertia");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, pitchInertia, g_PlayerTelemetry.pitchInertia, "XWA.player", "pitch_inertia");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, rollInertia, g_PlayerTelemetry.rollInertia, "XWA.player", "roll_inertia");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, accelInertia, g_PlayerTelemetry.accelInertia, "XWA.player", "accel_inertia");
 		}
 		else // TELEMETRY_FORMAT_SIMPLIFIED
 		{
-
-			if (strncmp(shipName, g_PrevPlayerTelemetry.shipName, TLM_MAX_SHIP_NAME) != 0)
-				msg += "player|name:" + std::string(shipName) + "\n";
-			if (craft_name != g_PrevPlayerTelemetry.craft_name)
-				msg += "player|crafttypename:" + std::string(craft_name) + "\n";
-			if (short_name != g_PrevPlayerTelemetry.short_name)
-				msg += "player|shortcrafttypename:" + std::string(short_name) + "\n";
-			if (speed != g_PrevPlayerTelemetry.speed)
-				msg += "player|speed:" + std::to_string(speed) + "\n";
-			if (throttle != g_PrevPlayerTelemetry.throttle)
-				msg += "player|throttle:" + std::to_string(throttle) + "\n";
-			//msg += "\t\"current speed\" : " + std::to_string(mobileObject->currentSpeed) + "\n"; // Redundant
-			if (craftInstance->ElsLasers != g_PrevPlayerTelemetry.ElsLasers)
-				msg += "player|elslasers:" + std::to_string(craftInstance->ElsLasers) + "\n";
-			if (craftInstance->ElsShields != g_PrevPlayerTelemetry.ElsShields)
-				msg += "player|elsshields:" + std::to_string(craftInstance->ElsShields) + "\n";
-			if (craftInstance->ElsBeam != g_PrevPlayerTelemetry.ElsBeam)
-				msg += "player|elsbeam:" + std::to_string(craftInstance->ElsBeam) + "\n";
-			if (craftInstance->SfoilsState != g_PrevPlayerTelemetry.SfoilsState)
-				msg += "player|sfoils:" + std::to_string(craftInstance->SfoilsState) + "\n";
-			if (craftInstance->ShieldDirection != g_PrevPlayerTelemetry.ShieldDirection)
-				msg += "player|shielddirection:" + ShieldDirectionStr(craftInstance->ShieldDirection) + "\n";
-			if (shields_front != g_PrevPlayerTelemetry.shields_front)
-				msg += "player|shieldfront:" + std::to_string(shields_front) + "\n";
-			if (shields_back != g_PrevPlayerTelemetry.shields_back)
-				msg += "player|shieldback:" + std::to_string(shields_back) + "\n";
-			if (hull != g_PrevPlayerTelemetry.hull)
-				msg += "player|hull:" + std::to_string(hull) + "\n";
-			if (hull < g_PrevPlayerTelemetry.hull)
-				msg += "player|hulldamage:" + std::to_string(g_PrevPlayerTelemetry.hull - hull) + "\n";
-			//msg = "player|system:" + std::to_string(craftInstance->SystemStrength);
-			if (craftInstance->BeamActive != g_PrevPlayerTelemetry.BeamActive)
-				msg += "player|beamactive:" + std::to_string(craftInstance->BeamActive) + "\n";
-			//craftInstance->BeamEnergy
-			if (shake != g_PrevPlayerTelemetry.shake)
-				msg += "player|shake:" + std::to_string(shake) + "\n";
-
-			if (underTractorBeam && !g_PrevPlayerTelemetry.underTractorBeam)
-				msg += "player|undertractorbeam:on\n";
-			else if (!underTractorBeam && g_PrevPlayerTelemetry.underTractorBeam)
-				msg += "player|undertractorbeam:off\n";
-
-			if (underJammingBeam && !g_PrevPlayerTelemetry.underJammingBeam)
-				msg += "player|underjammingbeam:on\n";
-			else if (!underJammingBeam && g_PrevPlayerTelemetry.underJammingBeam)
-				msg += "player|underjammingbeam:off\n";
-
-			if (activeWeapon != g_PrevPlayerTelemetry.activeWeapon)
-				msg += "player|activeweapon:" + ActiveWeaponToString(activeWeapon) + "\n";
-			if (laserFired && !g_PrevPlayerTelemetry.laserFired)
-				msg += "player|laserfired:1\n";
-			if (warheadFired && !g_PrevPlayerTelemetry.warheadFired)
-				msg += "player|warheadfired:1\n";
-
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->yawInertia - g_PrevPlayerTelemetry.yawInertia) > 0.00001f)
-				msg += "player|yaw_inertia:" + std::to_string(g_pSharedDataTelemetry->yawInertia) + "\n";
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->pitchInertia - g_PrevPlayerTelemetry.pitchInertia) > 0.00001f)
-				msg += "player|pitch_inertia:" + std::to_string(g_pSharedDataTelemetry->pitchInertia) + "\n";
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->rollInertia - g_PrevPlayerTelemetry.rollInertia) > 0.00001f)
-				msg += "player|roll_inertia:" + std::to_string(g_pSharedDataTelemetry->rollInertia) + "\n";
-			if (g_pSharedDataTelemetry && fabs(g_pSharedDataTelemetry->accelInertia - g_PrevPlayerTelemetry.accelInertia) > 0.00001f)
-				msg += "player|accel_inertia:" + std::to_string(g_pSharedDataTelemetry->accelInertia) + "\n";
-
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, shipName, shipName, "player", "name");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, craft_name, std::string(craft_name), "player", "crafttypename");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, short_name, std::string(short_name), "player", "shortcrafttypename");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, speed, speed, "player", "speed");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, throttle, throttle, "player", "throttle");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, ElsLasers, craftInstance->ElsLasers, "player", "elslasers");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, ElsShields, craftInstance->ElsShields, "player", "elsshields");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, ElsBeam, craftInstance->ElsBeam, "player", "elsbeam");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, SfoilsState, craftInstance->SfoilsState, "player", "sfoils");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, ShieldDirection, craftInstance->ShieldDirection, "player", "shielddirection");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, shields_front, shields_front, "player", "shieldfront");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, shields_back, shields_back, "player", "shieldback");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, hull, hull, "player", "hull");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, shake, shake, "player", "shake");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, BeamActive, craftInstance->BeamActive, "player", "beamactive");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, underTractorBeam, underTractorBeam, "player", "undertractorbeam");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, underJammingBeam, underJammingBeam, "player", "underjammingbeam");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, activeWeapon, activeWeapon, "player", "activeweapon");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, laserFired, g_PlayerTelemetry.laserFired, "player", "laserfired");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, warheadFired, g_PlayerTelemetry.warheadFired, "player", "warheadfired");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, yawInertia, g_PlayerTelemetry.yawInertia, "player", "yaw_inertia");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, pitchInertia, g_PlayerTelemetry.pitchInertia, "player", "pitch_inertia");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, rollInertia, g_PlayerTelemetry.rollInertia, "player", "roll_inertia");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, accelInertia, g_PlayerTelemetry.accelInertia, "player", "accel_inertia");
 		}
 
 		//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
@@ -287,7 +197,8 @@ void SendXWADataOverUDP()
 		// Store the data for the next frame
 		g_PrevPlayerTelemetry.craft_name = craft_name;
 		g_PrevPlayerTelemetry.short_name = short_name;
-		strncpy_s(g_PrevPlayerTelemetry.shipName, shipName, TLM_MAX_SHIP_NAME);
+		//strncpy_s(g_PrevPlayerTelemetry.shipName, shipName, TLM_MAX_SHIP_NAME);
+		g_PrevPlayerTelemetry.shipName = shipName;
 		g_PrevPlayerTelemetry.speed = speed;
 		g_PrevPlayerTelemetry.throttle = throttle;
 		g_PrevPlayerTelemetry.ElsLasers = craftInstance->ElsLasers;
@@ -303,20 +214,31 @@ void SendXWADataOverUDP()
 		g_PrevPlayerTelemetry.underTractorBeam = underTractorBeam;
 		g_PrevPlayerTelemetry.underJammingBeam = underJammingBeam;
 		g_PrevPlayerTelemetry.activeWeapon = activeWeapon;
-		g_PrevPlayerTelemetry.laserFired = laserFired;
-		g_PrevPlayerTelemetry.warheadFired = warheadFired;
-		if (g_pSharedDataTelemetry)
-		{
-			g_PrevPlayerTelemetry.yawInertia   = g_pSharedDataTelemetry->yawInertia;
-			g_PrevPlayerTelemetry.pitchInertia = g_pSharedDataTelemetry->pitchInertia;
-			g_PrevPlayerTelemetry.rollInertia  = g_pSharedDataTelemetry->rollInertia;
-			g_PrevPlayerTelemetry.accelInertia = g_pSharedDataTelemetry->accelInertia;
-		}
+		g_PrevPlayerTelemetry.laserFired = g_PlayerTelemetry.laserFired;
+		g_PrevPlayerTelemetry.warheadFired = g_PlayerTelemetry.warheadFired;
+		g_PrevPlayerTelemetry.yawInertia   = g_PlayerTelemetry.yawInertia;
+		g_PrevPlayerTelemetry.pitchInertia = g_PlayerTelemetry.pitchInertia;
+		g_PrevPlayerTelemetry.rollInertia  = g_PlayerTelemetry.rollInertia;
+		g_PrevPlayerTelemetry.accelInertia = g_PlayerTelemetry.accelInertia;
+
+		//Reset the telemetry ephemeral flags
+		g_PlayerTelemetry.laserFired = false;
+		g_PlayerTelemetry.warheadFired = false;
 	}
 
 	// TARGET SECTION
 target_section:
 	{
+		if (g_pSharedDataTelemetry != nullptr)
+		{
+			tgtShds = g_pSharedDataTelemetry->tgtShds;
+			tgtHull = g_pSharedDataTelemetry->tgtHull;
+			tgtSys = g_pSharedDataTelemetry->tgtSys;
+			tgtDist = g_pSharedDataTelemetry->tgtDist;
+			tgtName = g_pSharedDataTelemetry->tgtName;
+			tgtCargo = g_pSharedDataTelemetry->tgtCargo;
+			tgtSubCmp = g_pSharedDataTelemetry->tgtSubCmp;
+		}
 		short currentTargetIndex = PlayerDataTable[*localPlayerIndex].currentTargetIndex;
 		// currentTargetIndex can apparently be 0. I remember the game crashing, but it doesn't anymore!
 		if (currentTargetIndex < 0) goto status_section;
@@ -338,52 +260,24 @@ target_section:
 		//shields = max(0, shields);
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
-			if (tgtName != nullptr && (g_bContinuousTelemetry || strcmp(tgtName, g_TargetTelemetry.name) != 0))
-				msg += "\t\"XWA.target.name\" : \"" + std::string(tgtName) + "\",\n";
-			if (g_bContinuousTelemetry || IFF != g_TargetTelemetry.IFF)
-				msg += "\t\"XWA.target.IFF\" : \"" + std::to_string(IFF) + "\",\n";
-			if (g_bContinuousTelemetry || tgtShds != g_TargetTelemetry.shields)
-				msg += "\t\"XWA.target.shields\" : \"" + std::to_string(tgtShds) + "\",\n";
-			if (g_bContinuousTelemetry || tgtHull != g_TargetTelemetry.hull)
-				msg += "\t\"XWA.target.hull\" : \"" + std::to_string(tgtHull) + "\",\n";
-			if (g_bContinuousTelemetry || tgtSys != g_TargetTelemetry.sys)
-				msg += "\t\"XWA.target.sys\" : \"" + std::to_string(tgtSys) + "\",\n";
-			if (g_bContinuousTelemetry || tgtDist != g_TargetTelemetry.dist)
-			{
-				std::stringstream stream;
-				stream << std::fixed << std::setprecision(2) << tgtDist;
-				msg += "\t\"XWA.target.dist\" : " + stream.str() + ",\n";
-			}
-			if (g_bContinuousTelemetry || tgtCargo != nullptr && strcmp(tgtCargo, g_TargetTelemetry.Cargo) != 0)
-				msg += "\t\"XWA.target.cargo\" : \"" + std::string(tgtCargo) + "\",\n";
-			if (g_bContinuousTelemetry || tgtSubCmp != nullptr && strcmp(tgtSubCmp, g_TargetTelemetry.SubCmp) != 0)
-				msg += "\t\"XWA.target.subcmp\" : \"" + std::string(tgtSubCmp) + "\",\n";
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, name, tgtName, "XWA.target", "name");
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, IFF, IFF, "XWA.target", "IFF");
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, shields, tgtShds, "XWA.target", "shields");
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, hull, tgtHull, "XWA.target", "hull");
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, sys, tgtSys, "XWA.target", "sys");
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, dist, tgtDist, "XWA.target", "dist");
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, Cargo, tgtCargo, "XWA.target", "cargo");
+			SEND_TELEMETRY_VALUE_JSON(g_TargetTelemetry, SubCmp, tgtSubCmp, "XWA.target", "subcmp");
 		}
 		else { // TELEMETRY_FORMAT_SIMPLIFIED
-			/*if (name != g_TargetTelemetry.name)
-				msg += "target|crafttypename:" + std::string(name) + "\n";
-			if (short_name != g_TargetTelemetry.short_name)
-				msg += "target|shortcrafttypename:" + std::string(short_name) + "\n";*/
-			if (tgtName != nullptr && strcmp(tgtName, g_TargetTelemetry.name) != 0)
-				msg += "target|name:" + std::string(tgtName) + "\n";
-			if (IFF != g_TargetTelemetry.IFF)
-				msg += "target|IFF:" + std::to_string(IFF) + "\n";
-			if (tgtShds != g_TargetTelemetry.shields)
-				msg += "target|shields:" + std::to_string(tgtShds) + "\n";
-			if (tgtHull != g_TargetTelemetry.hull)
-				msg += "target|hull:" + std::to_string(tgtHull) + "\n";
-			if (tgtSys != g_TargetTelemetry.sys)
-				msg += "target|sys:" + std::to_string(tgtSys) + "\n";
-			if (tgtDist != g_TargetTelemetry.dist)
-			{
-				std::stringstream stream;
-				stream << std::fixed << std::setprecision(2) << tgtDist;
-				msg += "target|dist:" + stream.str() + "\n";
-			}
-			if (tgtCargo != nullptr && strcmp(tgtCargo, g_TargetTelemetry.Cargo) != 0)
-				msg += "target|cargo:" + std::string(tgtCargo) + "\n";
-			if (tgtSubCmp != nullptr && strcmp(tgtSubCmp, g_TargetTelemetry.SubCmp) != 0)
-				msg += "target|subcmp:" + std::string(tgtSubCmp) + "\n";
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, name, tgtName, "target", "name");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, IFF, IFF, "target", "IFF");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, shields, tgtShds, "target", "shields");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, hull, tgtHull, "target", "hull");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, sys, tgtSys, "target", "sys");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, dist, tgtDist, "target", "dist");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, Cargo, tgtCargo, "target", "cargo");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_TargetTelemetry, SubCmp, tgtSubCmp, "target", "subcmp");
 		}
 		// state is 0 when the craft is static
 		// state is 3 when the craft is destroyed
@@ -397,10 +291,13 @@ target_section:
 		// Store the data for the next frame
 		//g_TargetTelemetry.name = name;
 		//g_TargetTelemetry.short_name = short_name;
-		g_TargetTelemetry.IFF = IFF;
-		if (tgtName)   memcpy(g_TargetTelemetry.name,   tgtName,   TLM_MAX_NAME);
-		if (tgtCargo)  memcpy(g_TargetTelemetry.Cargo,  tgtCargo,  TLM_MAX_CARGO);
-		if (tgtSubCmp) memcpy(g_TargetTelemetry.SubCmp, tgtSubCmp, TLM_MAX_SUBCMP);
+		//if (tgtName)   memcpy(g_TargetTelemetry.name,   tgtName,   TLM_MAX_NAME);
+		//if (tgtCargo)  memcpy(g_TargetTelemetry.Cargo,  tgtCargo,  TLM_MAX_CARGO);
+		//if (tgtSubCmp) memcpy(g_TargetTelemetry.SubCmp, tgtSubCmp, TLM_MAX_SUBCMP);
+		g_TargetTelemetry.IFF     = IFF;
+		g_TargetTelemetry.name    = tgtName;
+		g_TargetTelemetry.Cargo   = tgtCargo;
+		g_TargetTelemetry.SubCmp  = tgtSubCmp;
 		g_TargetTelemetry.shields = tgtShds;
 		g_TargetTelemetry.hull    = tgtHull;
 		g_TargetTelemetry.sys     = tgtSys;
@@ -411,58 +308,32 @@ target_section:
 	// STATUS SECTION
 status_section:
 	{
+		//g_LocationTelemetry.playerInHangar = *g_playerInHangar;
+		std::string location;
+		switch (g_HyperspacePhaseFSM)
+		{
+		case HS_INIT_ST:
+			location = "space";
+			break;
+		case HS_HYPER_ENTER_ST:
+			location = "hyperentry";
+			break;
+		case HS_HYPER_TUNNEL_ST:
+			location = "hyperspace";			
+			break;
+		case HS_HYPER_EXIT_ST:
+			location = "hyperexit";
+			break;
+		}
+		
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
-			if (g_bContinuousTelemetry || *g_playerInHangar != g_LocationTelemetry.playerInHangar)
-			{
-				msg += "\t\"XWA.status.hangar\" : " + std::to_string(*g_playerInHangar) + ",\n";
-			}
-
-			if (g_bContinuousTelemetry || g_HyperspacePhaseFSM != g_PrevHyperspacePhaseFSM)
-			{
-				msg += "\t\"XWA.status.location\" : ";
-				switch (g_HyperspacePhaseFSM)
-				{
-				case HS_INIT_ST:
-					msg += "\"space\",\n";
-					break;
-				case HS_HYPER_ENTER_ST:
-					msg += "\"hyperentry\",\n";
-					break;
-				case HS_HYPER_TUNNEL_ST:
-					msg += "\"hyperspace\",\n";
-					break;
-				case HS_HYPER_EXIT_ST:
-					msg += "\"hyperexit\",\n";
-					break;
-				}
-			}
+			SEND_TELEMETRY_VALUE_JSON(g_LocationTelemetry, playerInHangar, *g_playerInHangar, "XWA.status", "location");
+			SEND_TELEMETRY_VALUE_JSON(g_LocationTelemetry, location, location, "XWA.status", "location");
 		}
 		else { // TELEMETRY_FORMAT_SIMPLIFIED
-			if (*g_playerInHangar != g_LocationTelemetry.playerInHangar)
-			{
-				msg += "status|hangar\" : " + std::to_string(*g_playerInHangar) + "\n";
-			}
-
-			if (g_HyperspacePhaseFSM != g_PrevHyperspacePhaseFSM)
-			{
-				msg += "status|location\" : ";
-				switch (g_HyperspacePhaseFSM)
-				{
-				case HS_INIT_ST:
-					msg += "space\n";
-					break;
-				case HS_HYPER_ENTER_ST:
-					msg += "hyperentry\n";
-					break;
-				case HS_HYPER_TUNNEL_ST:
-					msg += "hyperspace\n";
-					break;
-				case HS_HYPER_EXIT_ST:
-					msg += "hyperexit\n";
-					break;
-				}
-			}
+			SEND_TELEMETRY_VALUE_SIMPLE(g_LocationTelemetry, playerInHangar, *g_playerInHangar, "status", "hangar");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_LocationTelemetry, location, location, "status", "location");
 		}
 
 		g_LocationTelemetry.playerInHangar = *g_playerInHangar;
