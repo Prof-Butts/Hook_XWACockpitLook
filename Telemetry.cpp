@@ -17,7 +17,6 @@ extern ObjectEntry **objects;
 extern PlayerDataEntry *PlayerDataTable;
 extern CraftDefinitionEntry *CraftDefinitionTable;
 enum HyperspacePhaseEnum;
-extern HyperspacePhaseEnum g_HyperspacePhaseFSM, g_PrevHyperspacePhaseFSM;
 
 PlayerTelemetry g_PlayerTelemetry;
 PlayerTelemetry g_PrevPlayerTelemetry;
@@ -73,6 +72,25 @@ namespace std {
 	// Overload std::to_string for std::string to reuse the same macro
 	std::string to_string(std::string x) {
 		return x;
+	}
+}
+
+std::string UpdateHyperspaceState()
+{
+	const  int playerIndex = *(int *)0x8C1CC8;
+
+	switch (PlayerDataTable[playerIndex].hyperspacePhase)
+	{
+		case 0:
+			return "space";
+		case 2:
+			return "hyperentry";
+		case 4:
+			return "hyperspace";
+		case 3:
+			return "hyperexit";
+		default:
+			return "space";
 	}
 }
 
@@ -309,23 +327,8 @@ target_section:
 status_section:
 	{
 		//g_LocationTelemetry.playerInHangar = *g_playerInHangar;
-		std::string location;
-		switch (g_HyperspacePhaseFSM)
-		{
-		case HS_INIT_ST:
-			location = "space";
-			break;
-		case HS_HYPER_ENTER_ST:
-			location = "hyperentry";
-			break;
-		case HS_HYPER_TUNNEL_ST:
-			location = "hyperspace";			
-			break;
-		case HS_HYPER_EXIT_ST:
-			location = "hyperexit";
-			break;
-		}
-		
+		std::string location = UpdateHyperspaceState();
+
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
 			SEND_TELEMETRY_VALUE_JSON(g_LocationTelemetry, playerInHangar, *g_playerInHangar, "XWA.status", "location");
