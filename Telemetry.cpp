@@ -331,7 +331,7 @@ status_section:
 
 		if (g_UDPFormat == TELEMETRY_FORMAT_JSON)
 		{
-			SEND_TELEMETRY_VALUE_JSON(g_LocationTelemetry, playerInHangar, *g_playerInHangar, "XWA.status", "location");
+			SEND_TELEMETRY_VALUE_JSON(g_LocationTelemetry, playerInHangar, *g_playerInHangar, "XWA.status", "hangar");
 			SEND_TELEMETRY_VALUE_JSON(g_LocationTelemetry, location, location, "XWA.status", "location");
 		}
 		else { // TELEMETRY_FORMAT_SIMPLIFIED
@@ -360,3 +360,4 @@ status_section:
 			SendUDPMessage((char *)msg.c_str());
 	}
 }
+
