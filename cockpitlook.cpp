@@ -1790,21 +1790,8 @@ int UpdateTrackingData()
 	g_bResetHeadCenter = false;
 	bLastExternalCamera = bExternalCamera;
 
-	// Update yaw, pitch, roll, linear inertia for UDP Telemetry:
-	//if (g_bUDPEnabled && g_pSharedDataTelemetry)
-	if (g_bUDPEnabled)
-	{
-		/*g_pSharedDataTelemetry->yawInertia   = g_fYawInertiaMultiplier   * yawInertia;
-		g_pSharedDataTelemetry->pitchInertia = g_fPitchInertiaMultiplier * pitchInertia;
-		g_pSharedDataTelemetry->rollInertia  = g_fRollInertiaMultiplier  * g_rollInertia;
-		g_pSharedDataTelemetry->accelInertia = g_fAccelInertiaMultiplier * distInertia;*/
-		g_PlayerTelemetry.yawInertia = g_fYawInertiaMultiplier * yawInertia;
-		g_PlayerTelemetry.pitchInertia = g_fPitchInertiaMultiplier * pitchInertia;
-		g_PlayerTelemetry.rollInertia = g_fRollInertiaMultiplier * g_rollInertia;
-		g_PlayerTelemetry.accelInertia = g_fAccelInertiaMultiplier * distInertia;
-	}
-
-	if (YawVR::bEnabled)
+	float hyperPitch = 0.0f;
+	float finalDistInertia = distInertia;
 	{
 		if (g_PrevHyperspacePhaseFSM != HS_INIT_ST && g_HyperspacePhaseFSM == HS_INIT_ST)
 		{
@@ -1819,23 +1806,29 @@ int UpdateTrackingData()
 		g_iFramesSinceHyperExit++;
 		g_iFramesSinceHyperTunnel++;
 
-		float hyperPitch = 0.0f;
 		if (g_HyperspacePhaseFSM == HS_HYPER_TUNNEL_ST)
 		{
-			float t = (float)g_iFramesSinceHyperTunnel / 180.0f;
+			constexpr float MAX_TUNNEL_FRAMES = 180.0f;
+			// t is normalized in the range [0..1]. 0 meaning the start of the tunnel, and
+			// 1 is at the end of the tunnel. In reality, the hyper tunnel lasts a few more
+			// frames but I want the inertia to fade before we exit hyperspace.
+			const float t = (float)g_iFramesSinceHyperTunnel / MAX_TUNNEL_FRAMES;
+			const float peakPosition = 0.25f;
 			// To understand this, use graphtoy and plot both curves below. Use "1" instead of "maxPitchFromAccel"
-			if (t < 0.01f)
-				hyperPitch = lerp(0, YawVR::minPitchFromAccel, t / 0.01f);
+			// and replace "t" with "x". The gist is that these are a couple of lines that make an inverted "V" and
+			// intersect at t = peakPosition. The first line is the "kick back" and the second line gradually resets
+			// the hyperPitch.
+			if (t < peakPosition)
+				hyperPitch = lerp(0, YawVR::minPitchFromAccel, t / peakPosition);
 			else
-				hyperPitch = lerp(YawVR::minPitchFromAccel, 0.0f, (t - 0.01f) / 0.99f);
-			hyperPitch = YawVR::enableHyperAccel ? min(0.0f, hyperPitch) : 0.0f;
-			YawVR::ApplyInertia(0.0f, hyperPitch / YawVR::pitchScale, 0.0f, 0.0f);
+				hyperPitch = lerp(YawVR::minPitchFromAccel, 0.0f, (t - peakPosition) / 0.99f);
+			constexpr float dampen = 0.3f;
+			hyperPitch = min(0.0f, dampen * hyperPitch);
 		}
 		else
 		{
 			if (g_iFramesSinceHyperExit > 50)
 			{
-				float finalDistInertia = distInertia;
 				if (g_iFramesSinceHyperExit < 300)
 				{
 					if (YawVR::enableHyperAccel)
@@ -1850,6 +1843,49 @@ int UpdateTrackingData()
 						finalDistInertia = 0.0f;
 					}
 				}
+			}
+		}
+	}
+
+	// Update yaw, pitch, roll, linear inertia for UDP Telemetry:
+	//if (g_bUDPEnabled && g_pSharedDataTelemetry)
+	if (g_bUDPEnabled)
+	{
+		if (g_HyperspacePhaseFSM == HS_HYPER_TUNNEL_ST)
+		{
+			float yawVRHyperPitch = YawVR::enableHyperAccel ? hyperPitch : 0.0f;
+			YawVR::ApplyInertia(0.0f, yawVRHyperPitch / YawVR::pitchScale, 0.0f, 0.0f);
+		}
+		else
+		{
+			if (g_iFramesSinceHyperExit > 50)
+			{
+				YawVR::ApplyInertia(yawInertia, pitchInertia, g_rollInertia, finalDistInertia);
+			}
+		}
+		//log_debug("absYPR: %0.3f, %0.3f, %0.3f", YawVR::yaw, YawVR::pitch, YawVR::roll);
+
+		g_PlayerTelemetry.yawInertia   = g_fYawInertiaMultiplier   * yawInertia;
+		g_PlayerTelemetry.pitchInertia = g_fPitchInertiaMultiplier * pitchInertia;
+		g_PlayerTelemetry.rollInertia  = g_fRollInertiaMultiplier  * g_rollInertia;
+		g_PlayerTelemetry.accelInertia = g_fAccelInertiaMultiplier * distInertia;
+
+		g_PlayerTelemetry.absYaw   = YawVR::yaw;
+		g_PlayerTelemetry.absPitch = YawVR::pitch;
+		g_PlayerTelemetry.absRoll  = YawVR::roll;
+	}
+
+	if (YawVR::bEnabled)
+	{
+		if (g_HyperspacePhaseFSM == HS_HYPER_TUNNEL_ST)
+		{
+			float yawVRHyperPitch = YawVR::enableHyperAccel ? hyperPitch : 0.0f;
+			YawVR::ApplyInertia(0.0f, yawVRHyperPitch / YawVR::pitchScale, 0.0f, 0.0f);
+		}
+		else
+		{
+			if (g_iFramesSinceHyperExit > 50)
+			{
 				YawVR::ApplyInertia(yawInertia, pitchInertia, g_rollInertia, finalDistInertia);
 			}
 		}

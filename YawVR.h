@@ -7,6 +7,9 @@ namespace YawVR
 	extern int   udpPort;
 	extern int   tcpPort;
 
+	extern float yaw;
+	extern float pitch;
+	extern float roll;
 	extern float yawScale;
 	extern float pitchScale;
 	extern float rollScale;

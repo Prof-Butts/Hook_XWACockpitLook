@@ -13,7 +13,7 @@ UINT timerID = 0;
 
 namespace YawVR
 {
-    bool bEnabled      = true;
+    bool bEnabled      = false;
     bool bRunThread    = false;
 
     char sServerIP[80] = "";
@@ -498,7 +498,7 @@ namespace YawVR
             yaw += 360.0f;
         }
 
-        SetPosition(yaw, pitch, roll);
+        if (bEnabled) SetPosition(yaw, pitch, roll);
     }
 
 }

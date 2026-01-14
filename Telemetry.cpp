@@ -176,6 +176,9 @@ void SendXWADataOverUDP()
 			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, pitchInertia, g_PlayerTelemetry.pitchInertia, "XWA.player", "pitch_inertia");
 			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, rollInertia, g_PlayerTelemetry.rollInertia, "XWA.player", "roll_inertia");
 			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, accelInertia, g_PlayerTelemetry.accelInertia, "XWA.player", "accel_inertia");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, absYaw, g_PlayerTelemetry.absYaw, "XWA.player", "abs_yaw");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, absPitch, g_PlayerTelemetry.absPitch, "XWA.player", "abs_pitch");
+			SEND_TELEMETRY_VALUE_JSON(g_PrevPlayerTelemetry, absRoll, g_PlayerTelemetry.absRoll, "XWA.player", "abs_roll");
 		}
 		else // TELEMETRY_FORMAT_SIMPLIFIED
 		{
@@ -203,6 +206,9 @@ void SendXWADataOverUDP()
 			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, pitchInertia, g_PlayerTelemetry.pitchInertia, "player", "pitch_inertia");
 			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, rollInertia, g_PlayerTelemetry.rollInertia, "player", "roll_inertia");
 			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, accelInertia, g_PlayerTelemetry.accelInertia, "player", "accel_inertia");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, absYaw, g_PlayerTelemetry.absYaw, "XWA.player", "abs_yaw");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, absPitch, g_PlayerTelemetry.absPitch, "XWA.player", "abs_pitch");
+			SEND_TELEMETRY_VALUE_SIMPLE(g_PrevPlayerTelemetry, absRoll, g_PlayerTelemetry.absRoll, "XWA.player", "abs_roll");
 		}
 
 		//log_debug("[UDP] Throttle: %d", CraftDefinitionTable[objectIndex].EngineThrottle);
@@ -238,6 +244,9 @@ void SendXWADataOverUDP()
 		g_PrevPlayerTelemetry.pitchInertia = g_PlayerTelemetry.pitchInertia;
 		g_PrevPlayerTelemetry.rollInertia  = g_PlayerTelemetry.rollInertia;
 		g_PrevPlayerTelemetry.accelInertia = g_PlayerTelemetry.accelInertia;
+		g_PrevPlayerTelemetry.absYaw   = g_PlayerTelemetry.absYaw;
+		g_PrevPlayerTelemetry.absPitch = g_PlayerTelemetry.absPitch;
+		g_PrevPlayerTelemetry.absRoll  = g_PlayerTelemetry.absRoll;
 
 		//Reset the telemetry ephemeral flags
 		g_PlayerTelemetry.laserFired = false;

@@ -93,6 +93,14 @@ public:
 	TelemetryValue<float> pitchInertia{200};
 	TelemetryValue<float> rollInertia{200};
 	TelemetryValue<float> accelInertia{200};
+	// Absolute yaw, pitch and roll. Effectively copied from YawVR (even when disabled).
+	// absYaw is the absolute yaw, goes from 0 to 360 degrees.
+	// absPitch and absRoll are also in degrees, but they gradually fade back to 0
+	// because it would be uncomfortable to sit on a rotating platform that is tilted
+	// for extended periods of time.
+	TelemetryValue<float> absYaw{200};
+	TelemetryValue<float> absPitch{200};
+	TelemetryValue<float> absRoll{200};
 
 	PlayerTelemetry() {
 		craft_name = NULL;
@@ -116,6 +124,9 @@ public:
 		pitchInertia = 0;
 		rollInertia = 0;
 		accelInertia = 0;
+		absYaw = 0;
+		absPitch = 0;
+		absRoll = 0;
 	}
 };
 
