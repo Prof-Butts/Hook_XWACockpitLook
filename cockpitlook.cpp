@@ -1013,7 +1013,7 @@ void ProcessKeyboard(int playerIndex, __int16 keycodePressed) {
 	}
 
 	// Ctrl+I: Toggle Inertia
-	if (g_bCtrl && bLastIKeyState && !bCurIKeyState) {
+	if (g_bCtrl && !g_bAlt && bLastIKeyState && !bCurIKeyState) {
 		g_bCockpitInertiaEnabled = !g_bCockpitInertiaEnabled;
 		g_bExtInertiaEnabled = !g_bExtInertiaEnabled;
 	}
