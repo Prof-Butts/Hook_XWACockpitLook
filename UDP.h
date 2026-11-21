@@ -2,6 +2,7 @@
 
 #define TELEMETRY_FORMAT_JSON 1
 #define TELEMETRY_FORMAT_SIMPLIFIED 0
+#define TELEMETRY_FORMAT_OGS 2
 
 // UDP Telemetry
 extern bool g_bUDPEnabled;
