@@ -1643,7 +1643,13 @@ int UpdateTrackingData()
 		// Mouse look code
 		if (*mouseLook && !*inMissionFilmState && !*viewingFilmState)
 		{
-			DirectInputKeyboardReaquire();
+			// hook_windowed releases DirectInput while the game isn't the foreground window, so the
+			// mouse device can be NULL here. Clear the mouse state first so a stale delta doesn't keep
+			// moving the view, and only poll when the device exists (like hook_windowed's wrapper does).
+			*mouseLook_X = 0;
+			*mouseLook_Y = 0;
+			if (*DirectInputMouseDevice != nullptr)
+				DirectInputKeyboardReaquire();
 
 			if (!*mouseLookWasNotEnabled)
 			{

@@ -48,7 +48,12 @@ const auto AllocateImage = (void**(*)(char* image, char* overlay))0x531D70;
 const auto PositionImage = (int(*)(char* image, int height, int width))0x534A60;
 const auto DisplayMessage = (int(*)(int messageIndex, int playerIndex))0x497D40;
 const auto GetKeyboardDeviceState = (int(*)())0x42B900;
+// Polls the DirectInput mouse into mouseLook_X/Y (a DIMOUSESTATE at 0x9E9620). It doesn't check
+// DirectInputMouseDevice for NULL, so callers must.
 const auto DirectInputKeyboardReaquire = (char(*)())0x42B920;
+// XWA's DirectInput mouse device. hook_windowed releases DirectInput (and sets this to NULL) while the
+// game window isn't the foreground window, and recreates it when the window comes back.
+const auto DirectInputMouseDevice = (void**)0x6343D0;
 const auto Vector3Transform = (void* (*)(Vector3_float* vec, XwaMatrix3x3* mat)) 0x439B30;
 const auto DoRotation = (void (*)(int, int, int, __int16)) 0x440E40;
 const auto TransformVector = (int (*)(ObjectEntry*, int, int, int)) 0x4A2FB0;
