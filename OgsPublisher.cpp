@@ -38,6 +38,7 @@ namespace OgsPublisher
 		const double ENGAGE_SECONDS = 1.5;         // ramp-in after (re)gaining a live sample
 		const double STALE_SECONDS = 1.0;          // no simulation step for this long: treat as paused
 		const double DISCOVERY_SECONDS = 2.0;
+		const double MOTION_EARLY_SHARE = 0.25;    // of an interval a motion frame may go early
 
 		struct PendingEvent { EventInput ev; double at; bool sent; };
 
@@ -447,9 +448,11 @@ namespace OgsPublisher
 		g_values[CH_SHIELD_B] = clamp01(s.shieldBack);
 
 		// Motion, scheduled by accumulation so the long-run rate holds at any frame rate.
+		// A frame slightly early is sent: waiting for the next one would skip a slot when
+		// the game runs close to the motion rate.
 		const double interval = 1.0 / g_hz;
 		const double due = g_lastMotion + interval;
-		if (g_clock >= due - 1e-6)
+		if (g_clock >= due - interval * MOTION_EARLY_SHARE)
 		{
 			SendMotion();
 			g_lastMotion = (g_lastMotion < -1e17 || g_clock - due > interval) ? g_clock : due;
