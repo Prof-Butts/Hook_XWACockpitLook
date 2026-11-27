@@ -26,6 +26,7 @@
 #include "UDP.h"
 #include "YawVR.h"
 #include "Telemetry.h"
+#include "OgsXWA.h"
 #include "SharedMem.h"
 
 // Unfortunately, applying roll inertia modifies the worldview transform in such a way
@@ -363,7 +364,7 @@ void Matrix4toHmdMatrix34(const Matrix4& m4, vr::HmdMatrix34_t& mat) {
  * Fs: The "Forward" vector in global coordinates
  * A viewMatrix that maps [Rs, Us, Fs] to the major [X, Y, Z] axes
  */
-Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool invert = false)
+Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vector4 &Fs, bool invert = false, bool bStoreState = true)
 {
 	const float DEG2RAD = 3.141593f / 180;
 	float yaw, pitch, roll;
@@ -446,13 +447,32 @@ Matrix4 GetCurrentHeadingMatrix(int playerIndex, Vector4 &Rs, Vector4 &Us, Vecto
 	}
 
 	// Store data for the next frame if we're not in hyperspace
-	if (!g_bInHyperspace || g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST) {
+	if (bStoreState && (!g_bInHyperspace || g_HyperspacePhaseFSM == HS_HYPER_EXIT_ST)) {
 		g_LastRsBeforeHyperspace = Rs;
 		g_LastFsBeforeHyperspace = Fs;
 		g_prevHeadingMatrix = viewMatrix;
 		g_fLastSpeedBeforeHyperspace = (float)PlayerDataTable[playerIndex].currentSpeed;
 	}
 	return viewMatrix;
+}
+
+/*
+ * The craft's right, up and forward axes in world space, expressed in the OGS-TS
+ * standard frame (left-handed, +X right, +Y up, +Z forward), for the OGS publisher.
+ * GetCurrentHeadingMatrix() returns them in XWA's world frame (+X right, +Y forward,
+ * +Z up, right-handed), so swapping Y and Z both converts the axes and the handedness.
+ * Uses the no-side-effect form so the inertia code's per-frame state is untouched.
+ */
+bool GetCraftBasisStd(int playerIndex, float R[3], float U[3], float F[3])
+{
+	Vector4 Rs, Us, Fs;
+	GetCurrentHeadingMatrix(playerIndex, Rs, Us, Fs, false, false);
+	R[0] = Rs.x; R[1] = Rs.z; R[2] = Rs.y;
+	U[0] = Us.x; U[1] = Us.z; U[2] = Us.y;
+	F[0] = Fs.x; F[1] = Fs.z; F[2] = Fs.y;
+	for (int i = 0; i < 3; i++)
+		if (!_finite(R[i]) || !_finite(U[i]) || !_finite(F[i])) return false;
+	return true;
 }
 
 /*
@@ -1125,7 +1145,12 @@ int UpdateTrackingData()
 		}
 	}
 
-	if (g_bUDPEnabled) SendXWADataOverUDP();
+	if (g_bUDPEnabled) {
+		if (g_UDPFormat == TELEMETRY_FORMAT_OGS)
+			UpdateOGSTelemetry();
+		else
+			SendXWADataOverUDP();
+	}
 	// TODO: fix shared memory telemetry. Currently it won't work unless UDP is also enabled
 
 	// Restore the position of the external camera if external inertia is enabled.
@@ -2136,10 +2161,22 @@ void LoadParams() {
 					g_UDPFormat = TELEMETRY_FORMAT_JSON;
 					log_debug("[UDP] Telemetry Format: JSON");
 				}
+				else if (_stricmp(svalue, "OGS") == 0 || _stricmp(svalue, "OGS-TS") == 0) {
+					g_UDPFormat = TELEMETRY_FORMAT_OGS;
+					log_debug("[UDP] Telemetry Format: OGS-TS");
+				}
 				else {
 					g_UDPFormat = TELEMETRY_FORMAT_SIMPLIFIED;
 					log_debug("[UDP] Telemetry Format: Simplified");
 				}
+			}
+			else if (_stricmp(param, "OGS_motion_hz") == 0) {
+				g_fOGSMotionHz = fValue;
+				log_debug("[OGS] Motion rate: %0.1f Hz", g_fOGSMotionHz);
+			}
+			else if (_stricmp(param, "OGS_speed_scale") == 0) {
+				g_fOGSSpeedScale = fValue;
+				log_debug("[OGS] Speed scale: %0.4f m/s per speed unit", g_fOGSSpeedScale);
 			}
 			else if (_stricmp(param, "UDP_sparse_telemetry") == 0 ||
 				     _stricmp(param, "UDP_telemetry_sparse") == 0) {
@@ -2487,8 +2524,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		InitHeadingMatrix();
 		// UDP Telemetry Initialization
 		if (g_bUDPEnabled) {
-			InitializeUDP();
-			InitializeUDPSocket();
+			if (g_UDPFormat == TELEMETRY_FORMAT_OGS) {
+				OgsXWAStart();
+			}
+			else {
+				InitializeUDP();
+				InitializeUDPSocket();
+			}
 		}
 
 		if (YawVR::bEnabled) YawVR::Initialize();
@@ -2515,7 +2557,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD uReason, LPVOID lpReserved)
 		break;
 	case DLL_PROCESS_DETACH:
 		log_debug("Unloading Cockpitlook hook");
-		if (g_bUDPEnabled) CloseUDP();
+		if (g_bUDPEnabled) {
+			if (g_UDPFormat == TELEMETRY_FORMAT_OGS)
+				OgsXWAStop();
+			else
+				CloseUDP();
+		}
 		if (YawVR::bEnabled) YawVR::Shutdown();
 #if DEBUG_INERTIA == 1
 		WriteInertiaData();
